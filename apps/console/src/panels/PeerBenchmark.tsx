@@ -84,7 +84,10 @@ export function PeerBenchmark(props: PeerBenchmarkPanelProps): ReactElement {
                 <td>{formatScore(p.distance, { decimals: 3 })}</td>
                 <td>{formatMoney(p.ratePer100Tiv, { decimals: 2 })}</td>
                 <td>{formatMoney(p.annualLoss)}</td>
-                <td>{p.verdict !== null ? <VerdictPill verdict={p.verdict} /> : '—'}</td>
+                {/* The peer's own stored verdict (FILL-backend D8); absent is said in words, never a dash. */}
+                <td data-testid="peer-verdict">
+                  {p.verdict !== null ? <VerdictPill verdict={p.verdict} /> : 'No stored result'}
+                </td>
               </tr>
             ))}
           </tbody>

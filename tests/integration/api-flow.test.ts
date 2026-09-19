@@ -283,6 +283,55 @@ describe('I3 API flow: ingest -> queue -> detail (mock adapter, real snapshot)',
     expect(d.contradictions.filter((c) => c.canonicalPath === 'receivedDate' && c.severity === 'HIGH')).toEqual([]);
   });
 
+  it('FILL: every one of the 158 pages says who and what the account is, from Federato', () => {
+    expect(details.size).toBe(TOTAL_SUBMISSIONS);
+    const kinds: Record<string, number> = {};
+    for (const d of details.values()) {
+      expect(d.facts.source, d.externalId).toBe('federato_triage');
+      expect(d.facts.submissionNumber).toBe(d.externalId);
+      expect(d.facts.insuredName, d.externalId).not.toBeNull();
+      expect(d.facts.receivedDate, d.externalId).not.toBeNull();
+      expect(d.insuredName, d.externalId).not.toBeNull();
+      kinds[d.accountKind] = (kinds[d.accountKind] ?? 0) + 1;
+      if (d.accountKind === 'triage_knockout') {
+        // Its own line (cyber, health, ...), never commercial_property.
+        expect(d.displayLineOfBusiness).toBe(d.facts.lineOfBusiness);
+        expect(d.displayLineOfBusiness).not.toBe('commercial_property');
+        expect(d.displayLineOfBusiness).not.toBe('property');
+      } else {
+        expect(d.displayLineOfBusiness).toBe('commercial_property');
+        expect(d.facts.lineOfBusiness).toBe('property');
+      }
+    }
+    expect(kinds).toEqual({
+      triage_knockout: TRIAGE_KNOCKOUTS,
+      no_policy: PROPERTY_NO_POLICY,
+      scored: TOTAL_SUBMISSIONS - TRIAGE_KNOCKOUTS - PROPERTY_NO_POLICY,
+    });
+  });
+
+  it('FILL: the 38 real property accounts carry their verification record; knockouts carry none', () => {
+    const verified = [...details.values()].filter((d) => d.verification !== null);
+    expect(verified).toHaveLength(TOTAL_SUBMISSIONS - TRIAGE_KNOCKOUTS);
+    for (const d of verified) {
+      expect(d.accountKind).not.toBe('triage_knockout');
+      expect(d.verification!.caseId).toBe(d.externalId);
+      expect(d.verification!.secondOpinion).not.toBeNull();
+    }
+  });
+
+  it('FILL: every peer in every benchmark carries the verdict its own page shows', () => {
+    const byId = new Map([...details.values()].map((d) => [d.id, d]));
+    let peersSeen = 0;
+    for (const d of details.values()) {
+      for (const p of d.peers?.peers ?? []) {
+        peersSeen += 1;
+        expect(p.verdict, `${d.id} -> ${p.id}`).toBe(byId.get(p.id)?.result.verdict.verdict);
+      }
+    }
+    expect(peersSeen).toBeGreaterThan(0);
+  });
+
   it('FIXED I3-4 (PRD §6.4 coarse match): a no-policy account gets coarse peers', () => {
     const row = q.rows.find((r) => r.externalId === 'SUB-2025-00115')!;
     const d = details.get(row.id)!;

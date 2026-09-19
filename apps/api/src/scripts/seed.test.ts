@@ -16,7 +16,7 @@ import type { FakeLlmOptions } from '../llm/fake-provider';
 import { fixedClock } from '../services/types';
 import type { Deps } from '../services/types';
 import { seededObservations } from './seed-data';
-import { SEEDED_SWEEP_ID, runSeed } from './seed';
+import { SEEDED_SWEEP_ID, needsSeed, runSeed } from './seed';
 
 /** Same loader shim as services/ingest.test.ts: read the committed engine data files. */
 vi.mock('@retrofit/engine', async (importOriginal) => {
@@ -218,6 +218,22 @@ describe('runSeed', () => {
     expect(forced.ingest.updated).toBe(first.ingest.ingested);
     expect(forced.enrichment.attempted).toBe(first.enrichment.attempted);
     expect(calls).toHaveLength(first.enrichment.attempted);
+  });
+
+  it('needsSeed: an empty database, or a Federato row without its facts, is seeded; a complete one is not', async () => {
+    const deps = depsWith();
+    const repos = createRepos(deps.db);
+    expect(needsSeed(repos)).toBe(true);
+    await runSeed(deps, { skipEnrichment: true, skipSweep: true, skipActions: true, log: quiet });
+    expect(needsSeed(repos)).toBe(false);
+    const one = repos.submissions.byExternalId('SUB-1003')!;
+    repos.submissions.update(one.id, { facts: null });
+    expect(needsSeed(repos)).toBe(true);
+    // The idempotent re-seed restores it without re-ingesting anything.
+    const again = await runSeed(deps, { skipEnrichment: true, skipSweep: true, skipActions: true, log: quiet });
+    expect(again.ingest.ingested).toBe(0);
+    expect(repos.submissions.byExternalId('SUB-1003')!.facts?.lineOfBusiness).toBe('cyber');
+    expect(needsSeed(repos)).toBe(false);
   });
 
   it('scores the seeded sweep on engine pair rules when relate is unavailable', async () => {

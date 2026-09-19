@@ -23,7 +23,8 @@ const STATEMENTS: readonly string[] = [
   share_slug text,
   rank integer,
   created_at text NOT NULL,
-  updated_at text NOT NULL
+  updated_at text NOT NULL,
+  facts text
 )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS submissions_external_id_idx ON submissions (external_id)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS submissions_share_slug_idx ON submissions (share_slug)`,
@@ -76,10 +77,26 @@ const STATEMENTS: readonly string[] = [
   `CREATE INDEX IF NOT EXISTS actions_type_idx ON actions (type)`,
 ];
 
+/**
+ * Columns added after a database may already exist (a deployed volume keeps
+ * its file across releases). `CREATE TABLE IF NOT EXISTS` never alters an
+ * existing table, so each is added with `ALTER TABLE ... ADD COLUMN` when
+ * `PRAGMA table_info` says it is missing. Always nullable, always appended
+ * last, so a fresh and an upgraded database end with the same column order.
+ */
+const ADDED_COLUMNS: readonly { readonly table: string; readonly column: string; readonly ddl: string }[] = [
+  { table: 'submissions', column: 'facts', ddl: 'facts text' },
+];
+
 /** Idempotent: every statement is `IF NOT EXISTS`, all run in one transaction. */
 export function migrate(handle: DbHandle): void {
   handle.db.transaction((tx) => {
     for (const statement of STATEMENTS) tx.run(sql.raw(statement));
+    for (const added of ADDED_COLUMNS) {
+      const columns = tx.all<{ name: string }>(sql.raw(`PRAGMA table_info(${added.table})`));
+      if (columns.some((c) => c.name === added.column)) continue;
+      tx.run(sql.raw(`ALTER TABLE ${added.table} ADD COLUMN ${added.ddl}`));
+    }
   });
 }
 

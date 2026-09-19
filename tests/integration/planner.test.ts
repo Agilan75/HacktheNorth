@@ -147,7 +147,7 @@ describe('I2 planner over the MockFederatoAdapter and the real snapshot', async 
     expect(result.warnings.some((w) => /Triage saw|Deep pass hydrated|failed/.test(w))).toBe(false);
   });
 
-  it('triage is one cheap Submission query: id, status and line of business, no expand', () => {
+  it('triage is one Submission query, no expand stage: the knockout fields plus the display facts as $expand leaves', () => {
     const [triage] = byPass('triage');
     expect(byPass('triage')).toHaveLength(1);
     const p = triage!.payload;
@@ -155,10 +155,55 @@ describe('I2 planner over the MockFederatoAdapter and the real snapshot', async 
     expect(p.expand).toBeUndefined();
     expect(p.where).toBeUndefined();
     expect(p.filter).toBeUndefined();
-    expect(p.select).toEqual(expect.arrayContaining(['id', 'status', 'line_of_business']));
+    expect(p.select).toEqual({
+      id: true,
+      submission_number: true,
+      status: true,
+      line_of_business: true,
+      requested_limit: true,
+      received_date: true,
+      target_effective_date: true,
+      decline_reason: true,
+      competitor: true,
+      insured: { $expand: { select: ['name'] } },
+      broker: { $expand: { select: ['name'] } },
+      underwriter: { $expand: { select: ['name'] } },
+    });
+    // The trace step records why the facts are fetched.
+    expect(triage!.requiredBy.map((r) => r.ruleId)).toEqual(['AG-LOB-NA', 'PRD-10-ACCOUNT-FACTS']);
     expect(triage!.rowCount).toBe(158);
     expect(triage!.totalAvailable).toBe(158);
     expect(triage!.outcome).toBe('ok');
+  });
+
+  it('carries the real Federato facts for all 158 submissions, names resolved, nothing invented', () => {
+    const records = rawSnapshot.records;
+    const nameOf = (resource: string, id: unknown): string | null =>
+      (records[resource]!.find((r) => r['id'] === id)?.['name'] as string | undefined) ?? null;
+    const all = [...result.plan.knockedOut, ...result.plan.survivors];
+    expect(all).toHaveLength(158);
+    for (const t of all) {
+      const src = SUBMISSIONS.find((s) => s['id'] === t.submissionId)!;
+      expect(t.facts).toEqual({
+        submissionId: src['id'],
+        submissionNumber: src['submission_number'],
+        insuredName: nameOf('Insured', src['insured']),
+        brokerName: nameOf('Broker', src['broker']),
+        underwriterName: src['underwriter'] === null ? null : nameOf('Underwriter', src['underwriter']),
+        lineOfBusiness: src['line_of_business'],
+        status: src['status'],
+        requestedLimit: src['requested_limit'],
+        receivedDate: src['received_date'],
+        targetEffectiveDate: src['target_effective_date'],
+        declineReason: src['decline_reason'],
+        competitor: src['competitor'],
+      });
+    }
+    // Every submission has an insured name; the 27 with no underwriter stay absent.
+    expect(all.every((t) => t.facts.insuredName !== null)).toBe(true);
+    expect(all.filter((t) => t.facts.underwriterName === null)).toHaveLength(
+      SUBMISSIONS.filter((s) => s['underwriter'] === null).length,
+    );
   });
 
   it('120 of 158 are knocked out on line of business, each with its reason recorded', () => {

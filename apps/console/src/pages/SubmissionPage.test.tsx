@@ -1,3 +1,4 @@
+import '@testing-library/jest-dom/vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -21,7 +22,7 @@ vi.mock('../panels/Flip.js', () => ({ Flip: () => { throw new Error('NOT_IMPLEME
 vi.mock('../panels/Vector.js', () => ({ Vector: panel('h') }));
 vi.mock('../panels/Schema.js', () => ({ Schema: panel('i') }));
 vi.mock('../panels/Enrichment.js', () => ({ Enrichment: panel('j') }));
-vi.mock('../panels/Actions.js', () => ({ Actions: (p: { onApprove: (id: string) => Promise<void> }) => <button onClick={() => void p.onApprove('act-1')}>approve</button> }));
+vi.mock('../panels/Actions.js', () => ({ Actions: (p: { onApprove: (id: string) => Promise<void>; routing: { rationale: string } }) => <button data-rationale={p.routing.rationale} onClick={() => void p.onApprove('act-1')}>approve</button> }));
 vi.mock('../panels/ReplyBox.js', () => ({ ReplyBox: (p: { pending: boolean; result: unknown; onSubmitText: (t: string) => Promise<void> }) => <div data-testid="k-reply" data-pending={String(p.pending)}>{JSON.stringify(p.result)}<button onClick={() => void p.onSubmitText('sprinklered: yes')}>send</button></div> }));
 vi.mock('../panels/AttachedSweep.js', () => ({ AttachedSweep: panel('l') }));
 
@@ -30,7 +31,8 @@ import { SubmissionPage } from './SubmissionPage.js';
 function detail(over: Partial<SubmissionDetailView> = {}): SubmissionDetailView {
   const pricing = { quotedPremium: 41250, predictedPremium: 50000, adequacy: 0.825, expectedLoss: 12000, ratePer100Tiv: 0.31, currency: 'USD' as const, factors: [], notes: [] };
   return {
-    submissionId: 'SUB-7', insuredName: 'Harbor Freight Storage', lineOfBusiness: 'commercial_property', verdict: 'REFER',
+    submissionId: 'SUB-7', insuredName: 'Harbor Freight Storage', lineOfBusiness: 'commercial_property',
+    displayLineOfBusiness: 'commercial_property', accountKind: 'scored', facts: null, verification: null, verdict: 'REFER',
     appetiteScore: 81, completeness: 88.88888888888889, confidence: 0.7,
     explanation: { verdict: 'REFER', headline: 'h', paragraphs: [], recommendation: 'r', decidingFactorId: null, decidingRuleId: null, confidence: 0.7 },
     factors: [{ factorId: 'tiv', label: 'TIV', tier: 'target', tierValue: 1, weight: 0.2, points: 20, known: true, knockout: false, ruleId: 'R1', citation: null }],
@@ -129,5 +131,131 @@ describe('SubmissionPage', () => {
     expect(document.querySelector('[data-field=completeness]')!.textContent).toBe('100.0%');
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Run enrichment' })); });
     expect(screen.getAllByRole('alert').map((e) => e.textContent)).toContain('Running enrichment failed: boom');
+  });
+});
+
+/* ---------------------------------------------------------------------------
+ * FILL-console: sparse accounts, the Line of business label, independent checks.
+ * The facts below are SUB-2024-00008 and SUB-2025-00115 as the API serves them
+ * from the committed snapshot.
+ * ------------------------------------------------------------------------- */
+
+const LOB_CITATION = { document: 'APPETITE_GUIDELINES.pdf', page: 2, row: 'p2 "Line of business"', quote: 'All other lines' };
+
+function knockout(over: Partial<SubmissionDetailView> = {}): SubmissionDetailView {
+  const base = detail();
+  return detail({
+    submissionId: 'SUB-2024-00008', insuredName: 'Redline Logistics Inc', lineOfBusiness: 'commercial_property',
+    displayLineOfBusiness: 'health', accountKind: 'triage_knockout', verdict: 'DOES_NOT_FIT', appetiteScore: 0,
+    completeness: 11.11111111111111,
+    facts: {
+      source: 'federato_triage', traceId: 'q-000', federatoId: 8, submissionNumber: 'SUB-2024-00008',
+      insuredName: 'Redline Logistics Inc', brokerName: 'Ashford Specialty Group', underwriterName: 'A. Delgado',
+      lineOfBusiness: 'health', status: 'bound', requestedLimit: 1000000, receivedDate: '2024-07-10',
+      targetEffectiveDate: '2024-10-01', declineReason: null, competitor: null,
+    },
+    factors: [
+      { factorId: 'line_of_business', label: 'Line Of Business', tier: 'not_acceptable', tierValue: 0, weight: 0.15, points: 0, known: true, knockout: true, ruleId: 'AG-LOB-NA', citation: LOB_CITATION },
+      { factorId: 'tiv', label: 'Tiv', tier: null, tierValue: null, weight: 0.15, points: 0, known: false, knockout: false, ruleId: null, citation: null },
+    ],
+    flip: { ...base.flip, reason: 'No move over at most two movable components reaches FIT; isNewBusiness, isPropertyLine cannot be changed.' },
+    routing: { region: null, underwriter: null, authorityLimit: null, withinAuthority: null, rationale: 'Not routed yet. Run the action plan to assign an underwriter.' },
+    ...over,
+  });
+}
+
+function noPolicyDetail(over: Partial<SubmissionDetailView> = {}): SubmissionDetailView {
+  return detail({
+    submissionId: 'SUB-2025-00115', insuredName: 'Halcyon Metalworks Corp', accountKind: 'no_policy',
+    displayLineOfBusiness: 'commercial_property', appetiteScore: 15,
+    facts: {
+      source: 'federato_triage', traceId: 'q-000', federatoId: 115, submissionNumber: 'SUB-2025-00115',
+      insuredName: 'Halcyon Metalworks Corp', brokerName: 'Highland Risk Partners', underwriterName: 'O. Tanaka',
+      lineOfBusiness: 'property', status: 'declined', requestedLimit: 10000000, receivedDate: '2025-08-15',
+      targetEffectiveDate: '2025-10-01', declineReason: 'loss_history', competitor: null,
+    },
+    factors: [
+      { factorId: 'line_of_business', label: 'Line Of Business', tier: 'acceptable', tierValue: 0.6, weight: 0.15, points: 9, known: true, knockout: false, ruleId: 'AG-LOB-A', citation: null },
+      { factorId: 'tiv', label: 'TIV', tier: null, tierValue: null, weight: 0.15, points: 0, known: false, knockout: false, ruleId: null, citation: null },
+    ],
+    ...over,
+  });
+}
+
+const VERIFICATION = {
+  caseId: 'SUB-7', generatedAt: '2026-09-19T19:30:25.951Z',
+  engine: { verdict: 'REFER' as const, appetiteScore: 81, knockoutFactorIds: [], decidingFactorId: 'building_age' },
+  matchesCurrentResult: true,
+  naive: { verdict: 'REFER' as const, appetiteScore: 81, knockoutFactorIds: [], decidingFactorId: 'building_age', agrees: { verdict: true, appetiteScore: true, knockouts: true, decidingFactor: true, all: true } },
+  secondOpinion: null,
+};
+
+function h2s(): (string | null)[] {
+  return screen.getAllByRole('heading', { level: 2 }).map((e) => e.textContent);
+}
+
+describe('SubmissionPage for sparse accounts (FILL-console)', () => {
+  it('a scored account keeps its twelve panels and shows no facts card or not-applicable list', () => {
+    mount();
+    expect(h2s()).toHaveLength(12);
+    expect(screen.queryByTestId('account-facts')).toBeNull();
+    expect(screen.queryByTestId('not-applicable')).toBeNull();
+    expect(document.querySelector('[data-field=lineOfBusiness]')!.textContent).toBe('Commercial property');
+  });
+
+  it('a triage knockout leads with its facts and shows only the explanation, trace and actions', () => {
+    h.state = { ...h.state, data: knockout() };
+    mount('/submissions/SUB-2024-00008');
+    expect(h2s()).toEqual(['Submission facts', '(a) Explanation and recommendation', '(c) How the agent got here', '(k) Actions', 'Not applicable to this account']);
+    expect(document.querySelector('[data-field=lineOfBusiness]')!.textContent).toBe('Health');
+    expect(document.body.textContent).not.toMatch(/commercial[ _]property/i);
+    expect(screen.getByTestId('why-not-scored').textContent).toContain('Knocked out at triage: line of business is Health.');
+    expect(screen.getByTestId('why-not-scored').textContent).toContain('appetite covers property only');
+    expect(screen.getByText('Knocked out at triage')).toBeTruthy();
+    const na = screen.getByTestId('not-applicable');
+    expect([...na.querySelectorAll('li')].map((l) => l.getAttribute('data-letter'))).toEqual(['b', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'l']);
+    // The flip reason is the engine's own sentence.
+    expect(na.querySelector('[data-letter=g]')!.textContent).toContain('isNewBusiness, isPropertyLine cannot be changed');
+    expect(screen.getByRole('navigation', { name: 'Panels on this page' }).querySelectorAll('a')).toHaveLength(4);
+  });
+
+  it('a knockout is never told to "run the action plan"', () => {
+    h.state = { ...h.state, data: knockout() };
+    mount('/submissions/SUB-2024-00008');
+    const rationale = screen.getByRole('button', { name: 'approve' }).getAttribute('data-rationale');
+    expect(rationale).toBe('Not routed: a submission knocked out at triage is never routed to an underwriter.');
+  });
+
+  it('a knockout panel whose data IS present (a sweep) still shows', () => {
+    h.state = { ...h.state, data: knockout({ sweep: { sweepId: 's1', roomLabel: 'Lobby', stage: 'done', coverage: 80, frameCount: 12, observations: [] } }) };
+    mount('/submissions/SUB-2024-00008');
+    expect(h2s()).toContain('(l) Attached photo or sweep');
+    expect(screen.getByTestId('not-applicable').querySelector('[data-letter=l]')).toBeNull();
+  });
+
+  it('a no-policy account shows the score breakdown and the peer benchmark without pricing', () => {
+    h.state = { ...h.state, data: noPolicyDetail() };
+    mount('/submissions/SUB-2025-00115');
+    expect(h2s()).toEqual(['Submission facts', '(a) Explanation and recommendation', '(b) Score breakdown', '(c) How the agent got here', '(d) Peer benchmark', '(k) Actions', 'Not applicable to this account']);
+    expect(screen.getByTestId('why-not-scored').textContent).toContain('Federato holds no policy for this submission');
+    expect(screen.getByTestId('no-pricing')).toBeTruthy();
+    expect(screen.queryByTestId('d-pricing')).toBeNull();
+    expect(screen.getByTestId('d-peers')).toBeTruthy();
+    expect(document.querySelector('[data-fact=declineReason]')!.textContent).toContain('Loss history');
+  });
+
+  it('a scored account keeps the routing rationale the API gave', () => {
+    mount();
+    expect(screen.getByRole('button', { name: 'approve' }).getAttribute('data-rationale')).toBe('');
+  });
+
+  it('renders Independent checks after the panels, indexed and linked to /verification', () => {
+    h.state = { ...h.state, data: detail({ verification: VERIFICATION }) };
+    mount();
+    const heads = h2s();
+    expect(heads).toHaveLength(13);
+    expect(heads[12]).toBe('Independent checks');
+    expect(screen.getByRole('navigation', { name: 'Panels on this page' }).querySelectorAll('a')).toHaveLength(13);
+    expect(screen.getByRole('link', { name: /How the testing works/ })).toHaveAttribute('href', '/verification');
   });
 });

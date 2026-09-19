@@ -391,6 +391,64 @@ describe('createApiClient', () => {
     expect(view.sweep).toBeNull();
   });
 
+  it('carries the account kind, display line, facts, verification and peer verdicts (FILL-console)', async () => {
+    const base = detailDto();
+    const facts = {
+      source: 'federato_triage', traceId: 'q-000', federatoId: 8, submissionNumber: 'SUB-2024-00008',
+      insuredName: 'Redline Logistics Inc', brokerName: 'Ashford Specialty Group', underwriterName: 'A. Delgado',
+      lineOfBusiness: 'health', status: 'bound', requestedLimit: 1000000, receivedDate: '2024-07-10',
+      targetEffectiveDate: '2024-10-01', declineReason: null, competitor: null,
+    };
+    const outcome = { verdict: 'FIT', appetiteScore: 84, knockoutFactorIds: [], decidingFactorId: 'tiv' };
+    const verification = {
+      caseId: 'POL-1', generatedAt: '2026-09-19T19:30:25.951Z', engine: outcome, matchesCurrentResult: true,
+      naive: { ...outcome, agrees: { verdict: true, appetiteScore: true, knockouts: true, decidingFactor: true, all: true } },
+      secondOpinion: null,
+    };
+    const dto = {
+      ...base,
+      insuredName: null,
+      displayLineOfBusiness: 'health',
+      accountKind: 'triage_knockout',
+      facts,
+      verification,
+      peers: { ...base.peers, peers: [{ ...base.peers.peers[0], verdict: 'REFER' }, { ...base.peers.peers[0], id: 'sub-3', verdict: null }] },
+    };
+    const { impl } = fakeFetch({ 'GET /submissions/sub-1': dto });
+    const view = await createApiClient({ baseUrl: BASE, fetchImpl: impl }).getSubmission('sub-1');
+    expect(view.accountKind).toBe('triage_knockout');
+    expect(view.displayLineOfBusiness).toBe('health');
+    expect(view.lineOfBusiness).toBe('commercial_property');
+    expect(view.facts).toEqual(facts);
+    expect(view.verification).toEqual(verification);
+    // The 120 knockouts have no broker insured record; the facts name them.
+    expect(view.insuredName).toBe('Redline Logistics Inc');
+    expect(view.peers.peers.map((p) => p.verdict)).toEqual(['REFER', null]);
+  });
+
+  it('an API deployed before the facts existed maps to the full scored view, with nothing guessed', async () => {
+    const { impl } = fakeFetch({ 'GET /submissions/sub-1': detailDto() });
+    const view = await createApiClient({ baseUrl: BASE, fetchImpl: impl }).getSubmission('sub-1');
+    expect(view.accountKind).toBe('scored');
+    expect(view.displayLineOfBusiness).toBe('commercial_property');
+    expect(view.facts).toBeNull();
+    expect(view.verification).toBeNull();
+    expect(view.peers.peers[0]!.verdict).toBeNull();
+  });
+
+  it('getVerification returns GET /verification unchanged', async () => {
+    const body = {
+      layersAB: null, layerC: null, realAccounts: null,
+      extraction: { status: 'not_measured', fieldAccuracy: null, reason: 'HTTP 402.' },
+      defectsFound: { cp1InvariantViolations: 20662, cp1Disagreements: 1369, run2Confirmed: 39, run2Refuted: 11, defects: [] },
+      sources: ['VERIFICATION.md'],
+    };
+    const { impl, calls } = fakeFetch({ 'GET /verification': body });
+    const dto = await createApiClient({ baseUrl: BASE, fetchImpl: impl }).getVerification();
+    expect(calls[0]!.url).toBe('http://localhost:3000/verification');
+    expect(dto).toEqual(body);
+  });
+
   it('reads vector labels only from the DTO: without vectorSpec it falls back to generic labels (C01)', async () => {
     const { vectorSpec: _spec, ...dto } = detailDto();
     const { impl } = fakeFetch({ 'GET /submissions/sub-1': dto });

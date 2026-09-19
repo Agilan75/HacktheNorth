@@ -127,7 +127,7 @@ const NOTES: readonly QueryLanguageNote[] = Object.freeze(
         quote: '// A SELECT LEAF. Resolves in the output only.',
         page: 3,
         implementation:
-          'Implemented in the mock `applySelect`; the planner does not emit it, since every reference it follows is needed downstream.',
+          'Implemented in the mock `applySelect`. The triage query emits it for `insured`, `broker` and `underwriter` (`{ $expand: { select: ["name"] } }`): their names are display facts wanted in the reply only, so no expand stage runs. Every reference the deep pass follows is needed downstream and uses the expand stage.',
       },
       {
         id: 'projection',

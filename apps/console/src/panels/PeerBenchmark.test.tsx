@@ -51,6 +51,20 @@ describe('PeerBenchmark', () => {
     expect(screen.getByTestId('peer-count')).toHaveTextContent('5 nearest accounts');
   });
 
+  it('fills the Verdict column from each peer\'s stored verdict, and says so in words when there is none', () => {
+    renderPanel(full);
+    const cells = screen.getAllByTestId('peer-verdict');
+    expect(cells.map((c) => c.querySelector('[data-verdict]')?.getAttribute('data-verdict') ?? null)).toEqual([
+      'FIT',
+      'REFER',
+      'DOES_NOT_FIT',
+      null,
+      'FIT',
+    ]);
+    expect(cells[3]).toHaveTextContent('No stored result');
+    expect(cells.some((c) => c.textContent === '—')).toBe(false);
+  });
+
   it('shows the engine median rate and mean loss (P-3) without recomputing them', () => {
     renderPanel(full);
     expect(screen.getByTestId('peer-median-rate')).toHaveTextContent('$0.40');

@@ -28,6 +28,7 @@ export const ROUTE_IDS = [
   'rules',
   'glossary',
   'share',
+  'verification',
 ] as const;
 
 export type RouteId = (typeof ROUTE_IDS)[number];
@@ -217,6 +218,15 @@ export const ROUTES: Readonly<Record<RouteId, RouteDef>> = {
     summary: 'Public result JSON. No contact details, no secrets.',
     public: true,
     unit: 'A11',
+  },
+  verification: {
+    id: 'verification',
+    method: 'GET',
+    path: '/verification',
+    params: [],
+    summary: 'The testing in full: layers A+B, layer C with every disagreement, the extraction check, and the defects the testing found.',
+    public: false,
+    unit: 'FILL-backend',
   },
 };
 

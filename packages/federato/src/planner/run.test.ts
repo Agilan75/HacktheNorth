@@ -67,6 +67,21 @@ describe('runPlanner — mini snapshot end to end', async () => {
     ]);
   });
 
+  it('carries the Federato facts for every triaged submission, knocked out or not', () => {
+    const all = [...result.plan.knockedOut, ...result.plan.survivors];
+    expect(all).toHaveLength(5);
+    for (const t of all) {
+      expect(t.facts.submissionNumber).toBe(t.externalId);
+      expect(t.facts.insuredName).not.toBeNull();
+      expect(t.facts.brokerName).not.toBeNull();
+      expect(t.facts.requestedLimit).not.toBeNull();
+      expect(t.facts.receivedDate).not.toBeNull();
+    }
+    expect(result.plan.knockedOut[0]!.facts.lineOfBusiness).toBe('cyber');
+    const triage = result.trace[0]!;
+    expect(triage.requiredBy.some((r) => r.ruleId === 'PRD-10-ACCOUNT-FACTS')).toBe(true);
+  });
+
   it('runs exactly three queries in order: triage, deep Policy, no-policy Submission', () => {
     expect(result.trace.map((e) => e.pass)).toEqual(['triage', 'deep', 'no_policy_followup']);
     expect(sent.map((p) => p.resource)).toEqual(['Submission', 'Policy', 'Submission']);
@@ -186,6 +201,26 @@ describe('runPlanner — adaptation and errors', () => {
     // Every property survivor falls through to the no-policy pass instead of vanishing.
     expect(result.counts.noPolicy).toBe(4);
     expect(result.bundles).toHaveLength(4);
+  });
+
+  it('falls back to the minimal triage projection when the full one is rejected, and says so', async () => {
+    const mock = createMockAdapter({ snapshot: MINI_SNAPSHOT });
+    const { adapter, sent } = spy(mock, (p, n) =>
+      n === 0 && p.resource === 'Submission' ? new Error('[INVALID_SELECT] $expand not allowed here') : null,
+    );
+    const result = await runPlanner(inputWith(adapter));
+    expect(result.trace.map((e) => e.pass).slice(0, 2)).toEqual(['triage', 'adapt_retry']);
+    const retry = result.trace[1]!;
+    expect(retry.adaptation).toBe('minimal_select');
+    expect(retry.adaptedFrom).toBe(result.trace[0]!.id);
+    expect(retry.notes.some((n) => n.includes('display facts'))).toBe(true);
+    expect(sent[1]!.select).toEqual(['id', 'submission_number', 'status', 'line_of_business']);
+    // Knockouts still work; the facts are absent, not guessed.
+    expect(result.plan.knockedOut.map((k) => k.externalId)).toEqual(['SUB-1003']);
+    expect(result.plan.knockedOut[0]!.facts.insuredName).toBeNull();
+    expect(result.plan.knockedOut[0]!.facts.lineOfBusiness).toBe('cyber');
+    expect(result.warnings.some((w) => w.includes('minimal projection'))).toBe(true);
+    expect(result.plan.triage.requiredBy.map((r) => r.ruleId)).toEqual(['AG-LOB-NA']);
   });
 
   it('warns when the page limit truncates the triage', async () => {

@@ -679,3 +679,142 @@ describe('GET /submissions/:id', () => {
     expect(attachedSweep?.needsConfirmation.map((o) => o.id)).toEqual(['o2']);
   });
 });
+
+/* -------------------------------------------------------------------------- */
+/* FILL-backend: facts, account kind, display line, peer verdicts, verification */
+/* -------------------------------------------------------------------------- */
+
+const FACTS = {
+  source: 'federato_triage' as const,
+  traceId: 'q-000',
+  federatoId: 42,
+  submissionNumber: 'SUB-K',
+  insuredName: 'Northwind Cyber Ltd',
+  brokerName: 'Highland Risk Partners',
+  underwriterName: 'F. Adeyemi',
+  lineOfBusiness: 'cyber',
+  status: 'declined',
+  requestedLimit: 5_000_000,
+  receivedDate: '2025-03-01',
+  targetEffectiveDate: '2025-04-01',
+  declineReason: 'Outside appetite',
+  competitor: null,
+};
+
+const policyRaw = (externalId: string): RawBundle => ({
+  externalId,
+  records: { Policy: [{ resource: 'Policy', id: 9, data: { line_of_business: 'property' } }] },
+});
+const noPolicyRaw = (externalId: string): RawBundle => ({
+  externalId,
+  records: { Submission: [{ resource: 'Submission', id: 9, data: { submission_number: externalId, line_of_business: 'property' } }] },
+});
+
+describe('GET /submissions/:id — who and what the account is (FILL-backend)', () => {
+  it('shows a triage knockout under its Federato line, never commercial_property, with its facts', async () => {
+    setup();
+    const ko = insert(
+      'SUB-K',
+      makeResult({ id: 'SUB-K', verdict: 'DOES_NOT_FIT', tiers: { line_of_business: 'not_acceptable' } }),
+      9,
+      rawWithLine('SUB-K', 'cyber'),
+    );
+    repos.submissions.update(ko.id, { facts: FACTS });
+    const d = await detail('SUB-K');
+    expect(d.accountKind).toBe('triage_knockout');
+    expect(d.displayLineOfBusiness).toBe('cyber');
+    // `lineOfBusiness` stays the spec it was scored on.
+    expect(d.lineOfBusiness).toBe('commercial_property');
+    expect(d.facts).toEqual(FACTS);
+    expect(d.verification).toBeNull();
+    const row = (await queue()).rows.find((r) => r.externalId === 'SUB-K')!;
+    expect(row).toMatchObject({ accountKind: 'triage_knockout', lineOfBusiness: 'cyber' });
+  });
+
+  it('tells a scored account from a no-policy account', async () => {
+    setup();
+    insert('SUB-P', makeResult({ id: 'SUB-P', verdict: 'FIT' }), 1, policyRaw('SUB-P'));
+    insert('SUB-N', makeResult({ id: 'SUB-N', verdict: 'REFER' }), 2, noPolicyRaw('SUB-N'));
+    const p = await detail('SUB-P');
+    const n = await detail('SUB-N');
+    expect(p.accountKind).toBe('scored');
+    expect(p.displayLineOfBusiness).toBe('commercial_property');
+    expect(n.accountKind).toBe('no_policy');
+    const kinds = new Map((await queue()).rows.map((r) => [r.externalId, r.accountKind]));
+    expect(kinds.get('SUB-P')).toBe('scored');
+    expect(kinds.get('SUB-N')).toBe('no_policy');
+  });
+
+  it('says so when a row was stored before facts were read: every fact absent, none guessed', async () => {
+    setup();
+    insert('SUB-P', makeResult({ id: 'SUB-P', verdict: 'FIT' }), 1, policyRaw('SUB-P'));
+    const { facts } = await detail('SUB-P');
+    expect(facts.source).toBe('not_fetched');
+    expect(facts.submissionNumber).toBe('SUB-P');
+    const { source: _s, submissionNumber: _n, ...rest } = facts;
+    expect(Object.values(rest).every((v) => v === null)).toBe(true);
+  });
+
+  it('gives every peer its verdict from its own stored result, and null for a peer with none', async () => {
+    setup();
+    insert('SUB-B', makeResult({ id: 'SUB-B', verdict: 'DOES_NOT_FIT', tiers: { tiv: 'not_acceptable' } }), 2, policyRaw('SUB-B'));
+    insert('SUB-C', makeResult({ id: 'SUB-C', verdict: 'REFER', tiers: { building_age: 'refer' } }), 3, policyRaw('SUB-C'));
+    const peer = (id: string, distance: number) => ({
+      id,
+      label: id,
+      distance,
+      comparedComponents: 6,
+      ratePer100: 0.12,
+      annualLoss: 1000,
+      totalTiv: 1,
+      quotedPremium: 1,
+      coarse: false,
+    });
+    const result = {
+      ...makeResult({ id: 'SUB-A', verdict: 'FIT' }),
+      peers: {
+        k: 5,
+        peers: [peer('id-SUB-B', 0.1), peer('id-SUB-C', 0.2), peer('id-SUB-GONE', 0.3)],
+        medianRatePer100: 0.12,
+        meanAnnualLoss: 1000,
+        coarse: false,
+        componentsUsed: [2, 3],
+      },
+    } as EngineResult;
+    insert('SUB-A', result, 1, policyRaw('SUB-A'));
+    const d = await detail('SUB-A');
+    expect(d.peers!.peers.map((p) => [p.id, p.verdict])).toEqual([
+      ['id-SUB-B', 'DOES_NOT_FIT'],
+      ['id-SUB-C', 'REFER'],
+      ['id-SUB-GONE', null],
+    ]);
+    // The rest of the benchmark is served unchanged.
+    expect(d.peers!.medianRatePer100).toBe(0.12);
+    expect(d.result.peers!.peers[0]).not.toHaveProperty('verdict');
+  });
+
+  it('attaches the committed verification record to a real property account, and says whether it still matches', async () => {
+    setup();
+    // SUB-2026-00081 is FIT at 88.0 in packages/verify/out/per-account.json.
+    const same = makeResult({
+      id: 'SUB-2026-00081',
+      verdict: 'FIT',
+      tiers: { tiv: 'acceptable', total_premium: 'acceptable' },
+    });
+    insert('SUB-2026-00081', same, 1, policyRaw('SUB-2026-00081'));
+    const d = await detail('SUB-2026-00081');
+    expect(d.verification).not.toBeNull();
+    const v = d.verification!;
+    expect(v.caseId).toBe('SUB-2026-00081');
+    expect(v.engine.verdict).toBe('FIT');
+    expect(v.matchesCurrentResult).toBe(true);
+    expect(v.naive.agrees.all).toBe(true);
+    expect(v.secondOpinion?.agreed).toBe(true);
+    expect(v.secondOpinion?.reasoning.length).toBeGreaterThan(20);
+
+    // Re-scored to something else since: the record says it no longer matches.
+    insert('SUB-2025-00001', makeResult({ id: 'SUB-2025-00001', verdict: 'FIT' }), 2, policyRaw('SUB-2025-00001'));
+    const moved = await detail('SUB-2025-00001');
+    expect(moved.verification?.matchesCurrentResult).toBe(false);
+  });
+});

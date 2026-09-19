@@ -1,6 +1,7 @@
 /** GET /submissions and GET /submissions/:id. Body owned by Run 1 unit A12. */
 import type { Hono } from 'hono';
 import type {
+  AccountKindDto,
   ActionDto,
   ActionStatusDto,
   BuildingRowDto,
@@ -10,8 +11,10 @@ import type {
   QueueQueryDto,
   QueueResponseDto,
   QueueRowDto,
+  PeerResultDto,
   RoutingDecisionDto,
   SubmissionDetailDto,
+  SubmissionFactsDto,
   SweepDto,
   UnderwriterDto,
 } from '@retrofit/contracts';
@@ -23,6 +26,7 @@ import type {
   LineOfBusiness,
   LocationFacts,
   VectorSpec,
+  Verdict,
 } from '@retrofit/engine';
 import { bestValue, readVectorSpec, rollup } from '@retrofit/engine';
 import { explain, narrateGuard } from '@retrofit/federato';
@@ -32,6 +36,8 @@ import { createRepos } from '../db/repos';
 import type { ActionRow, EnrichmentRow, SubmissionRow, SweepRow } from '../db/schema';
 import { narrateCall } from '../llm/index';
 import { getSweep } from '../services/sweep';
+import { accountVerification, currentPerAccount } from '../services/verification';
+import type { PerAccountFile } from '../services/verification';
 import type { Deps } from '../services/types';
 
 /* -------------------------------------------------------------------------- */
@@ -83,10 +89,46 @@ function isOutOfAppetiteLine(result: EngineResult): boolean {
   return result.evaluate.knockoutFactors.includes('line_of_business');
 }
 
-/** What the queue shows: Retrofit's line, or Federato's own line for a triage knockout. */
+/**
+ * What to show as the line: Retrofit's line, or Federato's own line for a
+ * triage knockout (`cyber`, `health`, ...) -- never `commercial_property` for
+ * an account that is not property. The triage facts win, then the raw record.
+ */
 function displayLine(row: SubmissionRow, result: EngineResult): string {
-  if (isOutOfAppetiteLine(result)) return federatoLine(row) ?? row.lineOfBusiness;
+  if (isOutOfAppetiteLine(result)) return row.facts?.lineOfBusiness ?? federatoLine(row) ?? row.lineOfBusiness;
   return row.lineOfBusiness;
+}
+
+/**
+ * Which view the account needs (FILL-backend D4). A Federato property account
+ * whose stored bundle has no Policy record is a no-policy account: no premium,
+ * business type or buildings were ever returned for it.
+ */
+function accountKindOf(row: SubmissionRow, result: EngineResult): AccountKindDto {
+  if (isOutOfAppetiteLine(result)) return 'triage_knockout';
+  if (row.source === 'federato' && (row.raw?.records['Policy']?.length ?? 0) === 0) return 'no_policy';
+  return 'scored';
+}
+
+/** The stored triage facts, or an explicit "never read" record: every value absent, none guessed. */
+function factsOf(row: SubmissionRow): SubmissionFactsDto {
+  if (row.facts != null) return row.facts;
+  return {
+    source: 'not_fetched',
+    traceId: null,
+    federatoId: null,
+    submissionNumber: row.externalId,
+    insuredName: null,
+    brokerName: null,
+    underwriterName: null,
+    lineOfBusiness: null,
+    status: null,
+    requestedLimit: null,
+    receivedDate: null,
+    targetEffectiveDate: null,
+    declineReason: null,
+    competitor: null,
+  };
 }
 
 function lineMatches(filter: string, row: SubmissionRow, result: EngineResult): boolean {
@@ -172,6 +214,7 @@ function toQueueRow(
     insuredName: row.insuredName,
     lineOfBusiness: displayLine(row, result),
     outOfAppetiteLine: isOutOfAppetiteLine(result),
+    accountKind: accountKindOf(row, result),
     appetiteScore: result.evaluate.appetiteScore,
     primaryState: result.rollup.primaryState,
     totalTiv: result.rollup.totalTiv,
@@ -368,6 +411,30 @@ async function explanationFor(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Detail: peers and verification                                             */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `result.peers` with each peer's verdict, read from that peer's stored result
+ * -- the result the same book re-score wrote. A peer with no stored result
+ * (deleted, unscored) gets null, shown as absent.
+ */
+function peersWithVerdicts(result: EngineResult, verdictOf: (id: string) => Verdict | null): PeerResultDto | null {
+  const peers = result.peers;
+  if (peers === null) return null;
+  return { ...peers, peers: peers.peers.map((p) => ({ ...p, verdict: verdictOf(p.id) })) };
+}
+
+/** The per-account verification file; a file that cannot be read leaves the block absent rather than failing the page. */
+function perAccountOrNull(): PerAccountFile | null {
+  try {
+    return currentPerAccount();
+  } catch {
+    return null;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /* Registrar                                                                  */
 /* -------------------------------------------------------------------------- */
 
@@ -488,11 +555,17 @@ export function registerSubmissionRoutes(app: Hono<ApiEnv>, deps: Deps): void {
     const canonical = result.canonical ?? row.canonical;
     const actions = repos.actions.list({ submissionId: row.id }).rows;
     const vectorSpec = await activeSpec(result.vector.lineOfBusiness);
+    const verdictOf = (peerId: string): Verdict | null =>
+      (repos.submissions.byId(peerId) ?? repos.submissions.byExternalId(peerId))?.result?.verdict.verdict ?? null;
     const body: SubmissionDetailDto = {
       id: row.id,
       externalId: row.externalId,
       source: row.source,
       lineOfBusiness: row.lineOfBusiness,
+      displayLineOfBusiness: displayLine(row, result),
+      accountKind: accountKindOf(row, result),
+      facts: factsOf(row),
+      verification: accountVerification(perAccountOrNull(), row.externalId, result),
       insuredName: row.insuredName,
       rank: row.rank,
       result,
@@ -501,7 +574,7 @@ export function registerSubmissionRoutes(app: Hono<ApiEnv>, deps: Deps): void {
       price: result.price,
       flip: result.flip,
       voi: result.voi,
-      peers: result.peers,
+      peers: peersWithVerdicts(result, verdictOf),
       contradictions: result.contradictions,
       interpretations: result.interpretations,
       buildings: canonical == null ? [] : buildingRows(canonical, result),

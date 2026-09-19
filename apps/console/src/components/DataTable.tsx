@@ -11,6 +11,12 @@ export interface DataTableColumn<Row> {
   /** Optional sort key; when absent the column is not sortable. */
   readonly sortValue?: (row: Row) => string | number | null;
   readonly headerTitle?: string;
+  /** Minimum width in px, so a text-heavy column is never crushed to one word per line. */
+  readonly minWidth?: number;
+  /** Clamp the cell to this many lines; the full text stays available on hover. */
+  readonly clampLines?: number;
+  /** Full text for the hover title when the cell is clamped. */
+  readonly title?: (row: Row) => string;
 }
 
 export interface DataTableProps<Row> {
@@ -200,8 +206,33 @@ export function DataTable<Row>(props: DataTableProps<Row>): ReactElement {
           data-clickable={clickable ? 'true' : undefined}
         >
           {columns.map((column) => (
-            <td key={column.key} style={{ ...cellBase, textAlign: column.align ?? 'left' }}>
-              {column.render(row)}
+            <td
+            key={column.key}
+            style={{
+              ...cellBase,
+              textAlign: column.align ?? 'left',
+              ...(column.minWidth !== undefined ? { minWidth: column.minWidth } : {}),
+            }}
+            title={column.title ? column.title(row) : undefined}
+          >
+              {column.clampLines !== undefined ? (
+                <div
+                  style={{
+                    display: '-webkit-box',
+                    WebkitBoxOrient: 'vertical',
+                    WebkitLineClamp: column.clampLines,
+                    overflow: 'hidden',
+                    // The cell itself defaults to nowrap so short columns
+                    // never wrap; a clamped cell needs normal wrapping or
+                    // -webkit-line-clamp has nothing to clamp across lines.
+                    whiteSpace: 'normal',
+                  }}
+                >
+                  {column.render(row)}
+                </div>
+              ) : (
+                column.render(row)
+              )}
             </td>
           ))}
         </tr>

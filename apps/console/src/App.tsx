@@ -9,6 +9,7 @@ import { GlossaryPage } from './pages/GlossaryPage.js';
 import { QueuePage } from './pages/QueuePage.js';
 import { RulesPage } from './pages/RulesPage.js';
 import { SubmissionPage } from './pages/SubmissionPage.js';
+import { VerificationPage } from './pages/VerificationPage.js';
 
 /**
  * FROZEN (W0-4) — the console route table (PRD §10).
@@ -23,6 +24,8 @@ export const ROUTES = {
   rules: '/rules',
   glossary: '/glossary',
   aggregate: '/aggregate',
+  /** The testing in full, from GET /verification (FILL-console). */
+  verification: '/verification',
 } as const;
 
 export type RouteKey = keyof typeof ROUTES;
@@ -39,6 +42,7 @@ export const NAV_ITEMS: readonly { readonly to: string; readonly label: string }
   { to: ROUTES.rules, label: 'Rules' },
   { to: ROUTES.glossary, label: 'Glossary' },
   { to: ROUTES.aggregate, label: 'Aggregate' },
+  { to: ROUTES.verification, label: 'Verification' },
 ];
 
 export function App(): ReactElement {
@@ -55,6 +59,7 @@ export function App(): ReactElement {
         <Route path={ROUTES.rules} element={<RulesPage />} />
         <Route path={ROUTES.glossary} element={<GlossaryPage />} />
         <Route path={ROUTES.aggregate} element={<AggregatePage />} />
+        <Route path={ROUTES.verification} element={<VerificationPage />} />
         <Route path="*" element={<Navigate to={ROUTES.queue} replace />} />
       </Routes>
     </Layout>

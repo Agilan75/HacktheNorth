@@ -2,13 +2,15 @@ import { Component, useCallback, useEffect, useId, useRef, useState } from 'reac
 import type { ErrorInfo, ReactElement, ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 
-import { formatPercent, formatScore, titleCase } from '@retrofit/contracts';
+import { formatPercent, formatScore } from '@retrofit/contracts';
 
 import { ROUTES } from '../App.js';
 import { useApi, useApiClient } from '../api/useApi.js';
 import { Card } from '../components/atoms/Card.js';
 import { Skeleton } from '../components/atoms/Skeleton.js';
 import { VerdictPill } from '../components/atoms/VerdictPill.js';
+import { Badge } from '../components/atoms/Badge.js';
+import { AccountFacts, lineOfBusinessLabel } from '../panels/AccountFacts.js';
 import { Actions } from '../panels/Actions.js';
 import { AttachedSweep } from '../panels/AttachedSweep.js';
 import { Buildings } from '../panels/Buildings.js';
@@ -16,6 +18,7 @@ import { Contradictions } from '../panels/Contradictions.js';
 import { Enrichment } from '../panels/Enrichment.js';
 import { Explanation } from '../panels/Explanation.js';
 import { Flip } from '../panels/Flip.js';
+import { IndependentChecks } from '../panels/IndependentChecks.js';
 import { PeerBenchmark } from '../panels/PeerBenchmark.js';
 import { Pricing } from '../panels/Pricing.js';
 import { QueryTrace } from '../panels/QueryTrace.js';
@@ -23,7 +26,7 @@ import { ReplyBox } from '../panels/ReplyBox.js';
 import { Schema } from '../panels/Schema.js';
 import { ScoreBreakdown } from '../panels/ScoreBreakdown.js';
 import { Vector } from '../panels/Vector.js';
-import type { ReplyResultView, SubmissionDetailView } from '../panels/types.js';
+import type { ReplyResultView, RoutingView, SubmissionDetailView } from '../panels/types.js';
 
 /* ---------------------------------------------------------------------------
  * PRD 10 panel table. The letters and titles are the PRD's; the order is the
@@ -137,11 +140,18 @@ function SubmissionHeader(props: HeaderProps): ReactElement {
       <h1 id={headingId}>{detail.insuredName}</h1>
       <div className="submission-verdict">
         <VerdictPill verdict={detail.verdict} />
+        {detail.accountKind !== 'scored' ? (
+          <>
+            {' '}
+            <Badge label={KIND_BADGE[detail.accountKind]} tone="attention" />
+          </>
+        ) : null}
       </div>
       <dl className="submission-headline">
         <div>
           <dt>Line of business</dt>
-          <dd data-field="lineOfBusiness">{titleCase(detail.lineOfBusiness)}</dd>
+          {/* Never `lineOfBusiness`: that is the scoring spec (commercial_property), not the submission's line. */}
+          <dd data-field="lineOfBusiness">{lineOfBusinessLabel(detail.displayLineOfBusiness)}</dd>
         </div>
         <div>
           <dt>Appetite score</dt>
@@ -170,19 +180,139 @@ function SubmissionHeader(props: HeaderProps): ReactElement {
   );
 }
 
-function PanelIndex(): ReactElement {
+/* ---------------------------------------------------------------------------
+ * Which panels apply (FILL-console D1). A fully scored account shows all
+ * twelve, exactly as before. A triage knockout or a no-policy submission has
+ * no policy, buildings, premium or losses behind it, so a panel built on those
+ * would be a card of dashes: it is left out and listed, with the reason in
+ * words, under "Not applicable to this account". A panel whose data IS present
+ * (a sweep, an enrichment card, a contradiction, an available flip) always
+ * shows, whatever the kind.
+ * ------------------------------------------------------------------------- */
+
+const ALWAYS_SHOWN: Readonly<Record<'triage_knockout' | 'no_policy', ReadonlySet<PanelLetter>>> = {
+  triage_knockout: new Set<PanelLetter>(['a', 'c', 'k']),
+  no_policy: new Set<PanelLetter>(['a', 'b', 'c', 'd', 'k']),
+};
+
+function hasData(letter: PanelLetter, detail: SubmissionDetailView): boolean {
+  switch (letter) {
+    case 'e':
+      return detail.buildings.length > 0;
+    case 'f':
+      return detail.contradictions.length > 0 || detail.interpretations.length > 0;
+    case 'g':
+      return detail.flip.available;
+    case 'j':
+      return detail.enrichment.length > 0;
+    case 'l':
+      return detail.sweep !== null;
+    default:
+      return false;
+  }
+}
+
+function notApplicableReason(letter: PanelLetter, detail: SubmissionDetailView): string {
+  const knockout = detail.accountKind === 'triage_knockout';
+  switch (letter) {
+    case 'b':
+      return 'Line of business alone decides a triage knockout. The other seven factors need policy and building data, which is never read for a line outside appetite.';
+    case 'd':
+      return 'No premium, buildings or losses were read, so there is nothing to price and no peers to compare against.';
+    case 'e':
+      return knockout
+        ? 'No buildings were read: the deep query covers property policies only.'
+        : 'Federato holds no policy for this submission, so there are no buildings.';
+    case 'f':
+      return 'No field on this account has two conflicting sources, and no interpretation was applied.';
+    case 'g': {
+      const reason = detail.flip.reason?.trim() ?? '';
+      return reason.length > 0 ? `No minimal flip. ${reason}` : 'No minimal flip: no move reaches FIT.';
+    }
+    case 'h':
+      return 'The building, premium and loss components of the feature vector are all missing, so it adds nothing to the facts above.';
+    case 'i':
+      return 'The discovered schema maps Federato’s policy and building fields; this submission has none.';
+    case 'j':
+      return 'Enrichment looks up flood zone and fire-station distance for building locations; this submission has no buildings.';
+    case 'l':
+      return 'No photo or sweep is attached.';
+    default:
+      return 'Not applicable to this account.';
+  }
+}
+
+interface PanelPlan {
+  readonly shown: readonly PanelSpec[];
+  readonly hidden: readonly { readonly spec: PanelSpec; readonly reason: string }[];
+}
+
+function planPanels(detail: SubmissionDetailView): PanelPlan {
+  if (detail.accountKind === 'scored') return { shown: PANELS, hidden: [] };
+  const always = ALWAYS_SHOWN[detail.accountKind];
+  const shown: PanelSpec[] = [];
+  const hidden: { spec: PanelSpec; reason: string }[] = [];
+  for (const spec of PANELS) {
+    if (always.has(spec.letter) || hasData(spec.letter, detail)) {
+      // A no-policy account has peers but nothing to price: its (d) is the benchmark alone.
+      shown.push(
+        spec.letter === 'd' && detail.accountKind === 'no_policy' ? { letter: 'd', title: 'Peer benchmark' } : spec,
+      );
+    } else {
+      hidden.push({ spec, reason: notApplicableReason(spec.letter, detail) });
+    }
+  }
+  return { shown, hidden };
+}
+
+const FACTS_ANCHOR = 'panel-facts';
+const CHECKS_ANCHOR = 'panel-checks';
+const CHECKS_TITLE = 'Independent checks';
+const FACTS_TITLE = 'Submission facts';
+
+function PanelIndex(props: {
+  readonly shown: readonly PanelSpec[];
+  readonly facts: boolean;
+  readonly checks: boolean;
+}): ReactElement {
   return (
     <nav aria-label="Panels on this page" className="submission-index">
       <ol>
-        {PANELS.map((p) => (
+        {props.facts ? (
+          <li>
+            <a href={`#${FACTS_ANCHOR}`}>{FACTS_TITLE}</a>
+          </li>
+        ) : null}
+        {props.shown.map((p) => (
           <li key={p.letter}>
             <a href={`#${panelAnchor(p.letter)}`}>{panelTitle(p)}</a>
           </li>
         ))}
+        {props.checks ? (
+          <li>
+            <a href={`#${CHECKS_ANCHOR}`}>{CHECKS_TITLE}</a>
+          </li>
+        ) : null}
       </ol>
     </nav>
   );
 }
+
+/** A knockout is never routed (PRD 7.6: "any account that is not knocked out"); say that, not "run the plan". */
+function routingFor(detail: SubmissionDetailView): RoutingView {
+  if (detail.accountKind === 'triage_knockout' && detail.routing.underwriter === null) {
+    return {
+      ...detail.routing,
+      rationale: 'Not routed: a submission knocked out at triage is never routed to an underwriter.',
+    };
+  }
+  return detail.routing;
+}
+
+const KIND_BADGE: Readonly<Record<'triage_knockout' | 'no_policy', string>> = {
+  triage_knockout: 'Knocked out at triage',
+  no_policy: 'No policy in Federato',
+};
 
 /* ---------------------------------------------------------------------------
  * The page.
@@ -362,12 +492,21 @@ export function SubmissionPage(): ReactElement {
       />
     ),
     c: <QueryTrace entries={detail.queryTrace} />,
-    d: (
-      <>
-        <Pricing pricing={detail.pricing} />
-        <PeerBenchmark benchmark={detail.peers} />
-      </>
-    ),
+    d:
+      detail.accountKind === 'no_policy' ? (
+        <>
+          <p data-testid="no-pricing">
+            No premium to price: Federato holds no policy for this submission. The peers below are
+            matched on what is known.
+          </p>
+          <PeerBenchmark benchmark={detail.peers} />
+        </>
+      ) : (
+        <>
+          <Pricing pricing={detail.pricing} />
+          <PeerBenchmark benchmark={detail.peers} />
+        </>
+      ),
     e: <Buildings buildings={detail.buildings} rollup={detail.rollup} />,
     f: (
       <Contradictions
@@ -383,7 +522,7 @@ export function SubmissionPage(): ReactElement {
       <>
         <Actions
           submissionId={detail.submissionId}
-          routing={detail.routing}
+          routing={routingFor(detail)}
           drafts={detail.drafts}
           log={detail.actionLog}
           onApprove={onApprove}
@@ -401,6 +540,8 @@ export function SubmissionPage(): ReactElement {
   };
 
   const busy = pending !== null;
+  const plan = planPanels(detail);
+  const sparse = detail.accountKind !== 'scored';
 
   return (
     <article className="submission-page" aria-labelledby={headingId} aria-busy={busy}>
@@ -429,15 +570,52 @@ export function SubmissionPage(): ReactElement {
         </div>
       ) : null}
 
-      <PanelIndex />
+      {sparse ? (
+        <Card title={FACTS_TITLE} anchorId={FACTS_ANCHOR}>
+          <AccountFacts
+            accountKind={detail.accountKind === 'triage_knockout' ? 'triage_knockout' : 'no_policy'}
+            displayLineOfBusiness={detail.displayLineOfBusiness}
+            facts={detail.facts}
+            factors={detail.factors}
+            traceAnchor={panelAnchor('c')}
+          />
+        </Card>
+      ) : null}
 
-      {PANELS.map((spec) => (
+      <PanelIndex shown={plan.shown} facts={sparse} checks={detail.verification !== null} />
+
+      {plan.shown.map((spec) => (
         <Card key={spec.letter} title={panelTitle(spec)} anchorId={panelAnchor(spec.letter)}>
           <PanelBoundary title={panelTitle(spec)} resetKey={detail}>
             {bodies[spec.letter]}
           </PanelBoundary>
         </Card>
       ))}
+
+      {detail.verification !== null ? (
+        <Card title={CHECKS_TITLE} anchorId={CHECKS_ANCHOR}>
+          <PanelBoundary title={CHECKS_TITLE} resetKey={detail}>
+            <IndependentChecks verification={detail.verification} verificationPath={ROUTES.verification} />
+          </PanelBoundary>
+        </Card>
+      ) : null}
+
+      {plan.hidden.length > 0 ? (
+        <Card title="Not applicable to this account" anchorId="panel-not-applicable">
+          <p>
+            These panels need a policy, buildings, premium or losses, which this submission does not
+            have, so they are left out rather than shown empty.
+          </p>
+          <ul data-testid="not-applicable">
+            {plan.hidden.map(({ spec, reason }) => (
+              <li key={spec.letter} data-letter={spec.letter}>
+                <strong>{panelTitle(spec)}</strong>
+                {` — ${reason}`}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
     </article>
   );
 }

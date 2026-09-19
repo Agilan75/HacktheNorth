@@ -72,10 +72,12 @@ export { locateFields } from './planner/locate';
 export type { LocateInput } from './planner/locate';
 export {
   buildPlan,
+  factsOf,
   planDeep,
   planFollowUps,
   planNoPolicy,
   planTriage,
+  planTriageMinimal,
   triageRows,
 } from './planner/plan';
 export type { PlanInput } from './planner/plan';

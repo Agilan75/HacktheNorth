@@ -1,3 +1,4 @@
+import type { VerificationDto } from '@retrofit/contracts';
 import type { ActionLogEntryView, QueueRowView, ReplyResultView, SubmissionDetailView } from '../panels/types.js';
 /** Base URL for the API. Vite env, never a secret (PRD §5 constraints). */
 export interface ApiClientOptions {
@@ -70,6 +71,8 @@ export interface ApiClient {
     getAggregate(): Promise<AggregateResponse>;
     getRules(): Promise<RulesResponse>;
     getGlossary(): Promise<GlossaryResponse>;
+    /** GET /verification, returned as the API sent it: the page formats, never recomputes. */
+    getVerification(): Promise<VerificationDto>;
 }
 export declare function createApiClient(options: ApiClientOptions): ApiClient;
 //# sourceMappingURL=client.d.ts.map

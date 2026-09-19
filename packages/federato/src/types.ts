@@ -340,8 +340,12 @@ export type QueryPass =
   | 'high_scorer_followup'
   | 'adapt_retry';
 
-/** What F10 changed when a query came back empty. */
-export type AdaptationKind = 'elem_match_swap' | 'drop_narrowest_filter' | 'none';
+/**
+ * What F10 changed when a query came back empty, or -- `minimal_select` -- what
+ * the planner did when the triage query itself was rejected: it retried with
+ * only the four fields the line-of-business knockout needs (FILL-backend D3).
+ */
+export type AdaptationKind = 'elem_match_swap' | 'drop_narrowest_filter' | 'minimal_select' | 'none';
 
 export type QueryOutcome = 'ok' | 'empty' | 'error' | 'declined';
 
@@ -460,6 +464,29 @@ export type SchemaAssistFn = (
   request: SchemaAssistRequest,
 ) => Promise<readonly SchemaAssistMapping[]>;
 
+/**
+ * What Federato's own `Submission` record says about one submission, read by
+ * the triage query for all 158 (FILL-backend D1). Display facts only: nothing
+ * here is scored, so an absent value is `null` and stays visibly absent.
+ * References (insured, broker, underwriter) are resolved to their names by a
+ * `$expand` select leaf; a reference the handler did not resolve is `null`.
+ */
+export interface SubmissionFacts {
+  readonly submissionId: number;
+  readonly submissionNumber: string;
+  readonly insuredName: string | null;
+  readonly brokerName: string | null;
+  readonly underwriterName: string | null;
+  /** Federato's own line (`property`, `cyber`, `health`, ...), never Retrofit's. */
+  readonly lineOfBusiness: string | null;
+  readonly status: string | null;
+  readonly requestedLimit: number | null;
+  readonly receivedDate: string | null;
+  readonly targetEffectiveDate: string | null;
+  readonly declineReason: string | null;
+  readonly competitor: string | null;
+}
+
 /** Step 4, triage pass: one submission ruled out before any deep query. */
 export interface TriageKnockout {
   readonly externalId: string;
@@ -469,6 +496,7 @@ export interface TriageKnockout {
   readonly reason: string;
   readonly ruleId: string;
   readonly factor: AppetiteFactorId;
+  readonly facts: SubmissionFacts;
 }
 
 /** Step 4, triage pass: one submission that survives to the deep pass. */
@@ -477,6 +505,7 @@ export interface TriageSurvivor {
   readonly submissionId: number;
   readonly lineOfBusiness: string;
   readonly status: string;
+  readonly facts: SubmissionFacts;
 }
 
 export interface TriagePlan {

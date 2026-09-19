@@ -13,6 +13,7 @@
  * from one of these props. No panel recomputes a score, a premium or a tier, and
  * colour never carries meaning alone — a pill always carries its label text.
  */
+import type { AccountVerificationDto, SubmissionFactsDto } from '@retrofit/contracts';
 export type Verdict = 'FIT' | 'REFER' | 'DOES_NOT_FIT';
 export type TierLabel = 'target' | 'acceptable' | 'not_acceptable' | 'refer';
 export type Severity = 'HIGH' | 'MEDIUM' | 'LOW';
@@ -328,11 +329,29 @@ export interface QueueRowView {
     readonly explanationLine: string;
     readonly outOfAppetiteLine: boolean;
 }
+/**
+ * Which view an account page needs (FILL-backend D4, FILL-console): a fully
+ * scored property account, a non-property line knocked out at triage, or a
+ * property submission Federato holds no policy for.
+ */
+export type AccountKind = 'scored' | 'triage_knockout' | 'no_policy';
+/** What Federato's own Submission record says (the DTO's `facts`, unchanged). */
+export type SubmissionFactsView = SubmissionFactsDto;
+/** The independent checks on one real property account (the DTO's `verification`, unchanged). */
+export type AccountVerificationView = AccountVerificationDto;
 /** The whole `/submissions/:id` payload, as the panels consume it. */
 export interface SubmissionDetailView {
     readonly submissionId: string;
     readonly insuredName: string;
+    /** The line the account is SCORED on (the vector spec key). Never displayed: see `displayLineOfBusiness`. */
     readonly lineOfBusiness: string;
+    /** The line to show: Federato's own (`cyber`, ...) on a triage knockout, otherwise `lineOfBusiness`. */
+    readonly displayLineOfBusiness: string;
+    readonly accountKind: AccountKind;
+    /** Null only when the API predates the facts (an older deploy); `facts.source` says whether they were read. */
+    readonly facts: SubmissionFactsView | null;
+    /** Non-null on the 38 real property accounts the verification covered. */
+    readonly verification: AccountVerificationView | null;
     readonly verdict: Verdict;
     readonly appetiteScore: number;
     readonly completeness: number;

@@ -85,6 +85,8 @@ function byRank(a: QueueRowView, b: QueueRowView): number {
 }
 
 function premiumCell(row: QueueRowView): string {
+  // No policy means no quoted or predicted premium; say so in words, not "— vs —".
+  if (row.quotedPremium === null && row.predictedPremium === null) return 'No premium yet';
   return `${formatMoney(row.quotedPremium)} vs ${formatMoney(row.predictedPremium)}`;
 }
 
@@ -114,6 +116,7 @@ function buildColumns(): readonly DataTableColumn<QueueRowView>[] {
     {
       key: 'insured',
       header: 'Insured',
+      minWidth: 170,
       render: (r) => (
         <Link to={submissionPath(r.submissionId)} aria-label={`Open ${r.insuredName}`}>
           {r.insuredName}
@@ -142,7 +145,7 @@ function buildColumns(): readonly DataTableColumn<QueueRowView>[] {
       header: 'Adequacy',
       headerTitle: 'Quoted premium ÷ predicted premium',
       align: 'right',
-      render: (r) => formatPercent(r.adequacy),
+      render: (r) => (r.adequacy === null ? 'n/a' : formatPercent(r.adequacy)),
       sortValue: (r) => r.adequacy,
     },
     {
@@ -163,7 +166,14 @@ function buildColumns(): readonly DataTableColumn<QueueRowView>[] {
       key: 'flip',
       header: 'Flip',
       headerTitle: 'One movable change away from FIT',
-      render: (r) => (r.oneFlipFromFit ? <Badge label="1 flip from FIT" tone="attention" /> : null),
+      render: (r) =>
+        r.oneFlipFromFit ? (
+          <Badge label="1 flip from FIT" tone="attention" />
+        ) : r.verdict === 'FIT' ? (
+          'Not needed'
+        ) : (
+          'None'
+        ),
       sortValue: (r) => (r.oneFlipFromFit ? 1 : 0),
     },
     {
@@ -186,25 +196,11 @@ function buildColumns(): readonly DataTableColumn<QueueRowView>[] {
     {
       key: 'explanation',
       header: 'Why',
-      // PRD §10 /queue calls this a "one-line explanation"; the full sentence
-      // is always on the row's own submission page. Without a cap, a real
-      // explanation wraps one word per line in an auto-layout table and
-      // blows every row up to hundreds of pixels tall — title carries the
-      // full text for anyone who wants it without a click.
-      render: (r) => (
-        <span
-          title={r.explanationLine}
-          style={{
-            display: 'block',
-            maxWidth: 320,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {r.explanationLine}
-        </span>
-      ),
+      // Was crushed to one word per line: every row grew hundreds of px tall.
+      minWidth: 340,
+      clampLines: 3,
+      title: (r) => r.explanationLine,
+      render: (r) => r.explanationLine,
     },
   ];
 }

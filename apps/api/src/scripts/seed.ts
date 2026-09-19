@@ -378,6 +378,18 @@ export async function runSeed(deps: Deps, options: SeedOptions = {}): Promise<Se
   return summary;
 }
 
+/**
+ * `--if-empty`'s test. True when the database holds no submission, or when a
+ * Federato row was stored before the triage facts existed (`facts` null): the
+ * next boot then runs the idempotent ingest once, which only backfills those
+ * facts -- it re-scores nothing (FILL-backend D2). Sweep rows never carry facts.
+ */
+export function needsSeed(repos: Repos): boolean {
+  const rows = repos.submissions.all();
+  if (rows.length === 0) return true;
+  return rows.some((r) => r.source === 'federato' && (r.facts === null || r.facts === undefined));
+}
+
 /** `npm run seed [--force] [--no-enrich] [--no-sweep] [--no-actions] [--if-empty]`. */
 export async function main(): Promise<void> {
   const args = new Set(process.argv.slice(2));
@@ -387,9 +399,11 @@ export async function main(): Promise<void> {
     migrate(handle);
     // --if-empty: seed only a fresh database. A hosted container runs this on
     // every boot (DEPLOY.md), so the first boot loads the book and every
-    // restart after that goes straight to serving. DECISIONS D-2.
-    if (args.has('--if-empty') && createRepos(handle.db).submissions.all().length > 0) {
-      console.log('Seed skipped: the database already holds submissions (--if-empty).');
+    // restart after that goes straight to serving. DECISIONS D-2. A database
+    // stored before the triage facts existed is seeded once more to backfill
+    // them (idempotent: nothing is re-scored).
+    if (args.has('--if-empty') && !needsSeed(createRepos(handle.db))) {
+      console.log('Seed skipped: the database already holds submissions with their facts (--if-empty).');
       return;
     }
     const deps: Deps = {

@@ -108,7 +108,26 @@ describe('toBundles', () => {
   });
 
   it('keeps a survivor that no pass returned, carrying its triage row', () => {
-    const orphan: TriageSurvivor = { externalId: 'SUB-9999', submissionId: 9999, lineOfBusiness: 'property', status: 'received' };
+    const orphan: TriageSurvivor = {
+      externalId: 'SUB-9999',
+      submissionId: 9999,
+      lineOfBusiness: 'property',
+      status: 'received',
+      facts: {
+        submissionId: 9999,
+        submissionNumber: 'SUB-9999',
+        insuredName: null,
+        brokerName: null,
+        underwriterName: null,
+        lineOfBusiness: 'property',
+        status: 'received',
+        requestedLimit: null,
+        receivedDate: null,
+        targetEffectiveDate: null,
+        declineReason: null,
+        competitor: null,
+      },
+    };
     const [b] = toBundles({
       policies: [],
       noPolicySubmissions: [],
