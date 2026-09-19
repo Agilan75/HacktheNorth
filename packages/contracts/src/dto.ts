@@ -22,6 +22,7 @@ import type {
   FlipResult,
   LineOfBusiness,
   Observation,
+  PeerMatch,
   PeerResult,
   PriceBreakdown,
   Question,
@@ -242,6 +243,7 @@ export interface QueueRowDto {
   readonly lineOfBusiness: string;
   /** True for the 120 rows collapsed under "Out of appetite: line of business". */
   readonly outOfAppetiteLine: boolean;
+  readonly accountKind: AccountKindDto;
   readonly appetiteScore: number;
   readonly primaryState: string | null;
   readonly totalTiv: number | null;
@@ -302,11 +304,108 @@ export interface BuildingRowDto {
   readonly assumedAcceptableConstruction: boolean;
 }
 
+/**
+ * Which view an account page needs (FILL-backend D4):
+ * - `scored`: a property account with a policy, scored on every factor;
+ * - `triage_knockout`: a non-property line (cyber, health, cgl, auto, excess,
+ *   lpl), knocked out on line of business at triage and never queried in depth;
+ * - `no_policy`: a property submission with no policy, so no premium, business
+ *   type or buildings -- scored REFER on what is missing.
+ * A tenant sweep account is `scored`.
+ */
+export type AccountKindDto = 'scored' | 'triage_knockout' | 'no_policy';
+
+/**
+ * What Federato's own `Submission` record says about the account, read by the
+ * planner's triage query for every submission (all 158). Display facts only:
+ * none of these is scored. A null is a fact Federato does not hold (or, with
+ * `source: 'not_fetched'`, one never read) -- never a guessed value.
+ */
+export interface SubmissionFactsDto {
+  /** `federato_triage`: read by the triage query `traceId`. `not_fetched`: this row was stored before facts were read; every value is null. */
+  readonly source: 'federato_triage' | 'not_fetched';
+  /** The trace entry of the query that read them, when there is one. */
+  readonly traceId: string | null;
+  readonly federatoId: number | null;
+  readonly submissionNumber: string;
+  readonly insuredName: string | null;
+  readonly brokerName: string | null;
+  readonly underwriterName: string | null;
+  /** Federato's own line (`property`, `cyber`, `health`, ...). */
+  readonly lineOfBusiness: string | null;
+  readonly status: string | null;
+  readonly requestedLimit: number | null;
+  /** `YYYY-MM-DD`. */
+  readonly receivedDate: string | null;
+  readonly targetEffectiveDate: string | null;
+  readonly declineReason: string | null;
+  readonly competitor: string | null;
+}
+
+/** One peer, with its verdict from the book's stored results (null when that account has none). */
+export type PeerMatchDto = PeerMatch & { readonly verdict: Verdict | null };
+
+export type PeerResultDto = Omit<PeerResult, 'peers'> & { readonly peers: readonly PeerMatchDto[] };
+
+/** The appetite outcome one implementation reached, as compared by verification. */
+export interface VerifiedOutcomeDto {
+  readonly verdict: Verdict;
+  readonly appetiteScore: number;
+  readonly knockoutFactorIds: readonly string[];
+  readonly decidingFactorId: string | null;
+}
+
+/**
+ * The verification record of one of the 38 real property accounts, from
+ * `packages/verify/out/per-account.json` (written by
+ * `packages/verify/src/scripts/per-account.ts`).
+ */
+export interface AccountVerificationDto {
+  readonly caseId: string;
+  readonly generatedAt: string;
+  /** The engine's outcome on this account when the verification ran. */
+  readonly engine: VerifiedOutcomeDto;
+  /**
+   * True when the stored result the page shows has the same verdict and score
+   * as `engine`; false after anything re-scored the account differently (a
+   * broker reply, a different as-of date).
+   */
+  readonly matchesCurrentResult: boolean;
+  /** Layer B on the real account: the naive second implementation, given the same rolled-up facts. */
+  readonly naive: VerifiedOutcomeDto & {
+    readonly agrees: {
+      readonly verdict: boolean;
+      readonly appetiteScore: boolean;
+      readonly knockouts: boolean;
+      readonly decidingFactor: boolean;
+      readonly all: boolean;
+    };
+  };
+  /** Layer C: the second-opinion model, given only the guideline text and the facts. Null when it never answered. */
+  readonly secondOpinion: {
+    readonly verdict: Verdict;
+    readonly decidingFactor: string;
+    readonly reasoning: string;
+    readonly agreed: boolean;
+    readonly decidingFactorAgreed: boolean;
+    /** The engine view layer C compared against. */
+    readonly engine: VerifiedOutcomeDto;
+  } | null;
+}
+
 export interface SubmissionDetailDto {
   readonly id: string;
   readonly externalId: string;
   readonly source: string;
+  /** The line the account is SCORED on (the vector spec). See `displayLineOfBusiness` for what to show. */
   readonly lineOfBusiness: LineOfBusiness;
+  /** The line to show: Federato's own line (`cyber`, ...) for a triage knockout, otherwise `lineOfBusiness`. */
+  readonly displayLineOfBusiness: string;
+  readonly accountKind: AccountKindDto;
+  /** Present for every submission. */
+  readonly facts: SubmissionFactsDto;
+  /** Present for the 38 real property accounts the verification covered; null otherwise or when no verification file exists. */
+  readonly verification: AccountVerificationDto | null;
   readonly insuredName: string | null;
   readonly rank: number | null;
   readonly result: EngineResult;
@@ -315,7 +414,8 @@ export interface SubmissionDetailDto {
   readonly price: PriceBreakdown;
   readonly flip: FlipResult;
   readonly voi: VoiResult;
-  readonly peers: PeerResult | null;
+  /** `result.peers`, each peer carrying its verdict. */
+  readonly peers: PeerResultDto | null;
   readonly contradictions: readonly Contradiction[];
   readonly interpretations: readonly AppliedInterpretation[];
   readonly buildings: readonly BuildingRowDto[];
@@ -604,6 +704,108 @@ export interface AggregateDto {
     readonly extractionFieldAccuracy: number | null;
     readonly generatedAt: string;
   } | null;
+}
+
+/* -------------------------------------------------------------------------- */
+/* GET /verification                                                          */
+/* -------------------------------------------------------------------------- */
+
+export interface WilsonIntervalDto {
+  readonly point: number;
+  readonly low: number;
+  readonly high: number;
+  readonly n: number;
+  readonly confidence: number;
+}
+
+/** The engine's side of a layer-C case. */
+export interface LayerCEngineViewDto extends VerifiedOutcomeDto {
+  readonly completeness: number;
+  readonly tierValuesByFactor: Readonly<Record<string, number | null>>;
+}
+
+export interface LayerCDisagreementDto {
+  readonly caseId: string;
+  readonly stratum: string;
+  readonly engine: LayerCEngineViewDto;
+  readonly model: {
+    readonly verdict: Verdict;
+    readonly decidingFactor: string;
+    readonly reasoning: string;
+  };
+}
+
+/** A real defect the testing found, parsed from its row in DECISIONS.md. */
+export interface VerificationDefectDto {
+  /** The DECISIONS.md row id, e.g. `CP1-4`, `R2-3`. */
+  readonly id: string;
+  /** `CP1` (the 100K differential) or `Run 2` (the review over real data). */
+  readonly phase: string;
+  readonly title: string;
+  readonly detail: string;
+}
+
+/**
+ * Everything the console needs to show the testing (FILL-backend D7). Each
+ * block is parsed from a committed file named in `sources`; a block whose
+ * file is absent is null, never filled in.
+ */
+export interface VerificationDto {
+  /** Layers A + B: `packages/verify/out/run.json`. */
+  readonly layersAB: {
+    readonly requested: number;
+    readonly completed: number;
+    readonly seed: number;
+    readonly workers: number;
+    readonly invariantViolations: number;
+    readonly disagreements: number;
+    readonly errors: number;
+    readonly casesPerSecond: number;
+    readonly startedAt: string;
+    readonly finishedAt: string;
+  } | null;
+  /** Layer C: `packages/verify/out/layer-c.json`. */
+  readonly layerC: {
+    readonly judged: number;
+    readonly agreed: number;
+    /** Cases the model never answered; excluded from every count. */
+    readonly unanswered: number;
+    readonly agreement: WilsonIntervalDto;
+    /** Of the agreeing cases, how many also named the same deciding factor. */
+    readonly decidingFactorAgreed: number;
+    readonly byStratum: readonly {
+      readonly stratum: string;
+      readonly total: number;
+      readonly agreed: number;
+      readonly rate: number | null;
+    }[];
+    readonly disagreements: readonly LayerCDisagreementDto[];
+  } | null;
+  /** The 38 real property accounts: `packages/verify/out/per-account.json`. */
+  readonly realAccounts: {
+    readonly total: number;
+    readonly naiveAgreedAll: number;
+    readonly secondOpinionAnswered: number;
+    readonly secondOpinionAgreed: number;
+    readonly generatedAt: string;
+  } | null;
+  /** The reply-extraction check. Never carries a number known to be invalid. */
+  readonly extraction: {
+    readonly status: 'measured' | 'not_measured';
+    readonly fieldAccuracy: number | null;
+    /** Why it is not measured, from VERIFICATION.md. */
+    readonly reason: string | null;
+  };
+  /** What the testing found before these zeros, from VERIFICATION.md and DECISIONS.md. */
+  readonly defectsFound: {
+    readonly cp1InvariantViolations: number | null;
+    readonly cp1Disagreements: number | null;
+    readonly run2Confirmed: number | null;
+    readonly run2Refuted: number | null;
+    readonly defects: readonly VerificationDefectDto[];
+  };
+  /** Repo-relative paths of every file this was read from. */
+  readonly sources: readonly string[];
 }
 
 export interface RulesResponseDto {

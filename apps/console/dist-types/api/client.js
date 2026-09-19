@@ -279,7 +279,9 @@ function peerView(peers) {
             distance: p.distance,
             ratePer100Tiv: p.ratePer100,
             annualLoss: p.annualLoss,
-            verdict: null,
+            // FILL-backend D8: the peer's own stored verdict; null = that peer has no stored result.
+            // `?? null` also covers an older API that sent no verdict at all.
+            verdict: p.verdict ?? null,
         })),
         medianRatePer100Tiv: peers.medianRatePer100,
         meanAnnualLoss: peers.meanAnnualLoss,
@@ -483,12 +485,27 @@ function sweepView(sweep) {
         })),
     };
 }
+const ACCOUNT_KINDS = new Set(['scored', 'triage_knockout', 'no_policy']);
+/**
+ * The API's own classification. An API deployed before FILL-backend sends no
+ * `accountKind`; the page then keeps the full twelve-panel view rather than
+ * guessing a kind the API never stated (FILL-console D2).
+ */
+function accountKindOf(dto) {
+    const kind = dto.accountKind;
+    return typeof kind === 'string' && ACCOUNT_KINDS.has(kind) ? kind : 'scored';
+}
 function submissionView(dto) {
     const result = dto.result;
+    const partial = dto;
     return {
         submissionId: dto.id,
-        insuredName: dto.insuredName ?? dto.externalId,
+        insuredName: dto.insuredName ?? partial.facts?.insuredName ?? dto.externalId,
         lineOfBusiness: dto.lineOfBusiness,
+        displayLineOfBusiness: partial.displayLineOfBusiness ?? dto.lineOfBusiness,
+        accountKind: accountKindOf(dto),
+        facts: partial.facts ?? null,
+        verification: partial.verification ?? null,
         verdict: result.verdict.verdict,
         appetiteScore: result.evaluate.appetiteScore,
         completeness: result.evaluate.completeness,
@@ -707,6 +724,9 @@ export function createApiClient(options) {
         async getRules() {
             const dto = await call('rules');
             return { rulebooks: dto.rulebooks };
+        },
+        async getVerification() {
+            return call('verification');
         },
         async getGlossary() {
             const dto = await call('glossary');

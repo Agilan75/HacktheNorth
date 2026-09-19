@@ -78,6 +78,40 @@ describe('migrate', () => {
     handle.close();
   });
 
+  it('adds the facts column to a submissions table created before it existed, keeping its rows', () => {
+    const handle = createDb({ url: ':memory:' });
+    // The submissions table exactly as the first release created it.
+    handle.db.run(
+      sql.raw(`CREATE TABLE submissions (
+  id text PRIMARY KEY NOT NULL,
+  source text NOT NULL,
+  line_of_business text NOT NULL,
+  external_id text NOT NULL,
+  insured_name text,
+  raw text,
+  canonical text,
+  result text,
+  query_trace text DEFAULT '[]' NOT NULL,
+  share_slug text,
+  rank integer,
+  created_at text NOT NULL,
+  updated_at text NOT NULL
+)`),
+    );
+    handle.db.run(
+      sql.raw(
+        `INSERT INTO submissions (id, source, line_of_business, external_id, created_at, updated_at) VALUES ('S-1', 'federato', 'commercial_property', 'S-1', 'x', 'x')`,
+      ),
+    );
+    migrate(handle);
+    migrate(handle);
+    const cols = handle.db.all<{ name: string }>(sql.raw('PRAGMA table_info(submissions)'));
+    expect(cols.map((c) => c.name)).toEqual(getTableConfig(schema.submissions).columns.map((c) => c.name));
+    const rows = handle.db.all<{ id: string; facts: string | null }>(sql.raw('SELECT id, facts FROM submissions'));
+    expect(rows).toEqual([{ id: 'S-1', facts: null }]);
+    handle.close();
+  });
+
   it('is idempotent', () => {
     const handle = createDb({ url: ':memory:' });
     migrate(handle);

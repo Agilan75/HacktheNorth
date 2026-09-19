@@ -12,6 +12,8 @@ export declare const ROUTES: {
     readonly rules: "/rules";
     readonly glossary: "/glossary";
     readonly aggregate: "/aggregate";
+    /** The testing in full, from GET /verification (FILL-console). */
+    readonly verification: "/verification";
 };
 export type RouteKey = keyof typeof ROUTES;
 /** Build the concrete path for one submission. */

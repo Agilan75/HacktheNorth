@@ -71,6 +71,9 @@ function byRank(a, b) {
     return a.submissionId < b.submissionId ? -1 : a.submissionId > b.submissionId ? 1 : 0;
 }
 function premiumCell(row) {
+    // No policy means no quoted or predicted premium; say so in words, not "— vs —".
+    if (row.quotedPremium === null && row.predictedPremium === null)
+        return 'No premium yet';
     return `${formatMoney(row.quotedPremium)} vs ${formatMoney(row.predictedPremium)}`;
 }
 function buildColumns() {
@@ -99,6 +102,7 @@ function buildColumns() {
         {
             key: 'insured',
             header: 'Insured',
+            minWidth: 170,
             render: (r) => (_jsx(Link, { to: submissionPath(r.submissionId), "aria-label": `Open ${r.insuredName}`, children: r.insuredName })),
             sortValue: (r) => r.insuredName,
         },
@@ -123,7 +127,7 @@ function buildColumns() {
             header: 'Adequacy',
             headerTitle: 'Quoted premium ÷ predicted premium',
             align: 'right',
-            render: (r) => formatPercent(r.adequacy),
+            render: (r) => (r.adequacy === null ? 'n/a' : formatPercent(r.adequacy)),
             sortValue: (r) => r.adequacy,
         },
         {
@@ -144,7 +148,7 @@ function buildColumns() {
             key: 'flip',
             header: 'Flip',
             headerTitle: 'One movable change away from FIT',
-            render: (r) => (r.oneFlipFromFit ? _jsx(Badge, { label: "1 flip from FIT", tone: "attention" }) : null),
+            render: (r) => r.oneFlipFromFit ? (_jsx(Badge, { label: "1 flip from FIT", tone: "attention" })) : r.verdict === 'FIT' ? ('Not needed') : ('None'),
             sortValue: (r) => (r.oneFlipFromFit ? 1 : 0),
         },
         {
@@ -162,6 +166,10 @@ function buildColumns() {
         {
             key: 'explanation',
             header: 'Why',
+            // Was crushed to one word per line: every row grew hundreds of px tall.
+            minWidth: 340,
+            clampLines: 3,
+            title: (r) => r.explanationLine,
             render: (r) => r.explanationLine,
         },
     ];

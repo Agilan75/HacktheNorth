@@ -87,6 +87,20 @@ describe('AggregatePage with the C14 fields', () => {
   });
 });
 
+describe('AggregatePage verification link (FILL-console)', () => {
+  it('links the verification tiles to the full Verification page', () => {
+    mount({ ...RICH, verification: { propertyCasesRun: 10000000, differentialCasesRun: 10000000, disagreements: 0, llmCasesRun: 1332, llmAgreementRate: 0.9992492492492493, llmAgreementCi95: null, extractionFieldAccuracy: null, generatedAt: '2026-09-19T16:38:04.459Z' } });
+    expect(screen.getByTestId('verify-propertyCasesRun')).toBeInTheDocument();
+    expect(screen.getByTestId('verification-link')).toHaveAttribute('href', '/verification');
+  });
+
+  it('keeps the link when no run exists yet', () => {
+    mount(BASE);
+    expect(screen.getByTestId('verification-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('verification-link')).toHaveAttribute('href', '/verification');
+  });
+});
+
 describe('AggregatePage without the C14 fields (fallback)', () => {
   it('falls back to the verdict sum, titleCase labels, median only and the queue explanation', () => {
     mount(BASE);

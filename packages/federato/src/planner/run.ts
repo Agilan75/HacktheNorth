@@ -35,7 +35,7 @@ import { collectNeededFields } from './collect';
 import { buildResourceGraph, pathsFrom } from './graph';
 import { locateFields } from './locate';
 import type { PlanInput } from './plan';
-import { planDeep, planFollowUps, planNoPolicy, planTriage, triageRows } from './plan';
+import { planDeep, planFollowUps, planNoPolicy, planTriage, planTriageMinimal, triageRows } from './plan';
 import { externalIdOf, toBundles } from './to-bundle';
 import type { TraceRecorder } from './trace';
 import { createTraceRecorder } from './trace';
@@ -65,6 +65,8 @@ interface QueryStep {
   readonly requiredBy: readonly TraceRuleNeed[];
   readonly pathChosen: TracePathChoice;
   readonly payload: QueryPayload;
+  /** Set when this step replaces a query that failed: the trace links the two. */
+  readonly replaces?: { readonly id: string; readonly kind: AdaptationKind; readonly why: string };
 }
 
 interface StepOutcome {
@@ -170,9 +172,9 @@ async function execute(
   const attempted: AdaptationKind[] = [];
   let payload = step.payload;
   let pass = step.pass;
-  let adaptedFrom: string | null = null;
-  let adaptation: AdaptationKind = 'none';
-  let why: string | null = null;
+  let adaptedFrom: string | null = step.replaces?.id ?? null;
+  let adaptation: AdaptationKind = step.replaces?.kind ?? 'none';
+  let why: string | null = step.replaces?.why ?? null;
 
   for (;;) {
     const id = recorder.begin({
@@ -287,10 +289,36 @@ export async function runPlanner(input: RunPlannerInput): Promise<PlannerResult>
   });
   const arrays = (r: FederatoResource): readonly string[] => arrayPathsFor(schema, graph, r);
 
-  // Step 4a: triage.
-  const triagePlan = planTriage(planInput);
-  const triage = await execute(adapter, recorder, { pass: 'triage', ...triagePlan }, arrays(triagePlan.payload.resource));
-  if (triage.error !== null) warnings.push(describeError('Triage query', triage.error));
+  // Step 4a: triage. If the handler rejects the full projection (the `$expand`
+  // leaves that read the display facts), retry once with the four fields the
+  // knockout needs: the book is still triaged, and the facts stay absent.
+  let triagePlan = planTriage(planInput);
+  let triage = await execute(adapter, recorder, { pass: 'triage', ...triagePlan }, arrays(triagePlan.payload.resource));
+  if (triage.error !== null) {
+    warnings.push(describeError('Triage query', triage.error));
+    const minimal = planTriageMinimal(planInput);
+    const retry = await execute(
+      adapter,
+      recorder,
+      {
+        pass: 'adapt_retry',
+        ...minimal,
+        replaces: {
+          id: triage.finalId,
+          kind: 'minimal_select',
+          why: 'The triage query with the display facts was rejected, so it was retried with only id, number, status and line of business. Knockouts are unaffected; the display facts for every submission are absent.',
+        },
+      },
+      arrays(minimal.payload.resource),
+    );
+    if (retry.error === null) {
+      warnings.push('Triage fell back to the minimal projection: the display facts (insured, broker, dates, ...) are absent for every submission.');
+      triagePlan = minimal;
+      triage = retry;
+    } else {
+      warnings.push(describeError('Minimal triage retry', retry.error));
+    }
+  }
   if (triage.total !== null && triage.total > triage.rows.length) {
     warnings.push(
       `Triage saw ${triage.rows.length} of ${triage.total} submissions; raise pageLimit to see the rest.`,

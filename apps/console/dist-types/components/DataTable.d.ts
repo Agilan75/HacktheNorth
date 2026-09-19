@@ -7,6 +7,12 @@ export interface DataTableColumn<Row> {
     /** Optional sort key; when absent the column is not sortable. */
     readonly sortValue?: (row: Row) => string | number | null;
     readonly headerTitle?: string;
+    /** Minimum width in px, so a text-heavy column is never crushed to one word per line. */
+    readonly minWidth?: number;
+    /** Clamp the cell to this many lines; the full text stays available on hover. */
+    readonly clampLines?: number;
+    /** Full text for the hover title when the cell is clamped. */
+    readonly title?: (row: Row) => string;
 }
 export interface DataTableProps<Row> {
     /** Required: read by screen readers as the table's <caption>. */

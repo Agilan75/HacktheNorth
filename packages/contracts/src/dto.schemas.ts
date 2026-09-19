@@ -26,6 +26,7 @@ import type {
   ShareDto,
   SubmissionDetailDto,
   SweepDto,
+  VerificationDto,
   VerifyFixResponseDto,
 } from './dto';
 
@@ -262,6 +263,74 @@ export const priceBreakdownSchema = opaque<SubmissionDetailDto['price']>(
 export const flipResultSchema = opaque<SubmissionDetailDto['flip']>('flip', 'reason');
 export const voiResultSchema = opaque<SubmissionDetailDto['voi']>('nextQuestion', 'ranked');
 export const peerResultSchema = opaque<NonNullable<SubmissionDetailDto['peers']>>('k', 'peers');
+
+/* -------------------------------------------------------------------------- */
+/* Account facts, kind and verification (FILL-backend)                        */
+/* -------------------------------------------------------------------------- */
+
+export const accountKindSchema = z.enum(['scored', 'triage_knockout', 'no_policy']);
+
+export const submissionFactsSchema = z.object({
+  source: z.enum(['federato_triage', 'not_fetched']),
+  traceId: z.string().nullable(),
+  federatoId: z.number().nullable(),
+  submissionNumber: z.string(),
+  insuredName: z.string().nullable(),
+  brokerName: z.string().nullable(),
+  underwriterName: z.string().nullable(),
+  lineOfBusiness: z.string().nullable(),
+  status: z.string().nullable(),
+  requestedLimit: z.number().nullable(),
+  receivedDate: z.string().nullable(),
+  targetEffectiveDate: z.string().nullable(),
+  declineReason: z.string().nullable(),
+  competitor: z.string().nullable(),
+});
+
+/** `result.peers` with a verdict on every peer; the rest of each match stays opaque. */
+export const peerResultDtoSchema = z.looseObject({
+  k: z.number(),
+  peers: z.array(
+    z.looseObject({
+      id: z.string(),
+      distance: z.number(),
+      verdict: verdictSchema.nullable(),
+    }),
+  ),
+}) as unknown as z.ZodType<NonNullable<SubmissionDetailDto['peers']>>;
+
+export const verifiedOutcomeSchema = z.object({
+  verdict: verdictSchema,
+  appetiteScore: z.number(),
+  knockoutFactorIds: z.array(z.string()),
+  decidingFactorId: z.string().nullable(),
+});
+
+export const accountVerificationSchema = z.object({
+  caseId: z.string(),
+  generatedAt: z.string(),
+  engine: verifiedOutcomeSchema,
+  matchesCurrentResult: z.boolean(),
+  naive: verifiedOutcomeSchema.extend({
+    agrees: z.object({
+      verdict: z.boolean(),
+      appetiteScore: z.boolean(),
+      knockouts: z.boolean(),
+      decidingFactor: z.boolean(),
+      all: z.boolean(),
+    }),
+  }),
+  secondOpinion: z
+    .object({
+      verdict: verdictSchema,
+      decidingFactor: z.string(),
+      reasoning: z.string(),
+      agreed: z.boolean(),
+      decidingFactorAgreed: z.boolean(),
+      engine: verifiedOutcomeSchema,
+    })
+    .nullable(),
+});
 export const contradictionSchema = opaque<SubmissionDetailDto['contradictions'][number]>(
   'canonicalPath',
   'severity',
@@ -397,6 +466,7 @@ export const queueRowSchema = z.object({
   insuredName: z.string().nullable(),
   lineOfBusiness: z.string(),
   outOfAppetiteLine: z.boolean(),
+  accountKind: accountKindSchema,
   appetiteScore: z.number(),
   primaryState: z.string().nullable(),
   totalTiv: z.number().nullable(),
@@ -513,6 +583,10 @@ export const submissionDetailSchema: z.ZodType<SubmissionDetailDto> = z.object({
   externalId: z.string(),
   source: z.string(),
   lineOfBusiness: lineOfBusinessSchema,
+  displayLineOfBusiness: z.string(),
+  accountKind: accountKindSchema,
+  facts: submissionFactsSchema,
+  verification: accountVerificationSchema.nullable(),
   insuredName: z.string().nullable(),
   rank: z.number().int().nullable(),
   result: engineResultSchema,
@@ -521,7 +595,7 @@ export const submissionDetailSchema: z.ZodType<SubmissionDetailDto> = z.object({
   price: priceBreakdownSchema,
   flip: flipResultSchema,
   voi: voiResultSchema,
-  peers: peerResultSchema.nullable(),
+  peers: peerResultDtoSchema.nullable(),
   contradictions: z.array(contradictionSchema),
   interpretations: z.array(interpretationSchema),
   buildings: z.array(buildingRowSchema),
@@ -660,6 +734,83 @@ export const aggregateResponseSchema: z.ZodType<AggregateDto> = z.object({
       generatedAt: isoDateSchema,
     })
     .nullable(),
+});
+
+const wilsonSchema = z.object({
+  point: z.number(),
+  low: z.number(),
+  high: z.number(),
+  n: z.number().int().nonnegative(),
+  confidence: z.number(),
+});
+
+export const verificationResponseSchema: z.ZodType<VerificationDto> = z.object({
+  layersAB: z
+    .object({
+      requested: z.number().int().nonnegative(),
+      completed: z.number().int().nonnegative(),
+      seed: z.number().int(),
+      workers: z.number().int().nonnegative(),
+      invariantViolations: z.number().int().nonnegative(),
+      disagreements: z.number().int().nonnegative(),
+      errors: z.number().int().nonnegative(),
+      casesPerSecond: z.number(),
+      startedAt: z.string(),
+      finishedAt: z.string(),
+    })
+    .nullable(),
+  layerC: z
+    .object({
+      judged: z.number().int().nonnegative(),
+      agreed: z.number().int().nonnegative(),
+      unanswered: z.number().int().nonnegative(),
+      agreement: wilsonSchema,
+      decidingFactorAgreed: z.number().int().nonnegative(),
+      byStratum: z.array(
+        z.object({
+          stratum: z.string(),
+          total: z.number().int().nonnegative(),
+          agreed: z.number().int().nonnegative(),
+          rate: z.number().nullable(),
+        }),
+      ),
+      disagreements: z.array(
+        z.object({
+          caseId: z.string(),
+          stratum: z.string(),
+          engine: verifiedOutcomeSchema.extend({
+            completeness: z.number(),
+            tierValuesByFactor: z.record(z.string(), z.number().nullable()),
+          }),
+          model: z.object({ verdict: verdictSchema, decidingFactor: z.string(), reasoning: z.string() }),
+        }),
+      ),
+    })
+    .nullable(),
+  realAccounts: z
+    .object({
+      total: z.number().int().nonnegative(),
+      naiveAgreedAll: z.number().int().nonnegative(),
+      secondOpinionAnswered: z.number().int().nonnegative(),
+      secondOpinionAgreed: z.number().int().nonnegative(),
+      generatedAt: z.string(),
+    })
+    .nullable(),
+  extraction: z.object({
+    status: z.enum(['measured', 'not_measured']),
+    fieldAccuracy: z.number().nullable(),
+    reason: z.string().nullable(),
+  }),
+  defectsFound: z.object({
+    cp1InvariantViolations: z.number().int().nonnegative().nullable(),
+    cp1Disagreements: z.number().int().nonnegative().nullable(),
+    run2Confirmed: z.number().int().nonnegative().nullable(),
+    run2Refuted: z.number().int().nonnegative().nullable(),
+    defects: z.array(
+      z.object({ id: z.string(), phase: z.string(), title: z.string(), detail: z.string() }),
+    ),
+  }),
+  sources: z.array(z.string()),
 });
 
 export const rulesResponseSchema: z.ZodType<RulesResponseDto> = z.object({

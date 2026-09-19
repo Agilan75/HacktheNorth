@@ -19,7 +19,7 @@ import {
   readVectorSpec,
   runEngine,
 } from '@retrofit/engine';
-import type { EngineConfig } from '@retrofit/engine';
+import type { EngineConfig, EngineResult } from '@retrofit/engine';
 import { realCases } from '../../../engine/src/fixtures/real.js';
 import { bestValue } from '../../../engine/src/util/fields.js';
 import type { NaiveInput } from '../types.js';
@@ -31,7 +31,20 @@ function value<T>(field: Parameters<typeof bestValue<T>>[0]): T | null {
   return best === null ? null : best.value;
 }
 
-export async function main(): Promise<number> {
+/** One real property account: the facts layer C and the naive oracle read, and the engine run they came from. */
+export interface RealInput {
+  readonly caseId: string;
+  readonly input: NaiveInput;
+  readonly asOf: string;
+  readonly result: EngineResult;
+}
+
+/**
+ * The 38 real property accounts, each run through the engine once and rolled
+ * up into the naive input. Shared by this script (layer C's facts) and
+ * `per-account.ts` (layer B on the real accounts), so both read the same facts.
+ */
+export async function realInputs(): Promise<readonly RealInput[]> {
   const config: EngineConfig = {
     spec: await readVectorSpec('commercial_property'),
     rulebook: await readRulebook('commercial'),
@@ -39,7 +52,7 @@ export async function main(): Promise<number> {
     ratingTable: await readRatingTable('commercial_property'),
     bookStats: null,
   };
-  const out: { caseId: string; input: NaiveInput }[] = [];
+  const out: RealInput[] = [];
   for (const c of realCases()) {
     const asOf = value<string>(c.submission.receivedDate) ?? value<string>(c.submission.effectiveDate);
     if (asOf === null) throw new Error(`${c.externalId}: no date`);
@@ -48,6 +61,8 @@ export async function main(): Promise<number> {
     const hasBuildings = roll.buildingCount > 0;
     out.push({
       caseId: c.externalId,
+      asOf,
+      result: r,
       input: {
         submissionType: value<string>(c.submission.submissionType ?? []),
         lineOfBusiness: c.submission.lineOfBusiness,
@@ -63,6 +78,11 @@ export async function main(): Promise<number> {
       },
     });
   }
+  return out;
+}
+
+export async function main(): Promise<number> {
+  const out = (await realInputs()).map(({ caseId, input }) => ({ caseId, input }));
   mkdirSync(OUT, { recursive: true });
   const file = join(OUT, 'real-inputs.json');
   writeFileSync(file, `${JSON.stringify(out, null, 2)}\n`);

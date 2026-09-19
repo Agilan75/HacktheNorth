@@ -146,6 +146,57 @@ describe('ingestFederato', () => {
     expect(ko.rank).toBe(5);
   });
 
+  it('stores the Federato facts for every submission, knockouts included (FILL-backend D1)', async () => {
+    await ingestFederato(deps, {});
+    const subs = MINI_SNAPSHOT.records['Submission'];
+    const name = (resource: 'Insured' | 'Broker' | 'Underwriter', id: unknown): unknown =>
+      MINI_SNAPSHOT.records[resource].find((r) => r['id'] === id)?.['name'] ?? null;
+    for (const externalId of ALL_IDS) {
+      const facts = row(externalId).facts;
+      expect(facts, externalId).not.toBeNull();
+      const src = subs.find((s) => s['submission_number'] === externalId)!;
+      expect(facts).toMatchObject({
+        source: 'federato_triage',
+        federatoId: src['id'],
+        submissionNumber: externalId,
+        insuredName: name('Insured', src['insured']),
+        brokerName: name('Broker', src['broker']),
+        underwriterName: name('Underwriter', src['underwriter']),
+        lineOfBusiness: src['line_of_business'],
+        status: src['status'],
+        requestedLimit: src['requested_limit'],
+        receivedDate: src['received_date'],
+        targetEffectiveDate: src['target_effective_date'],
+        declineReason: src['decline_reason'],
+        competitor: src['competitor'],
+      });
+      // The facts point at the triage query that read them.
+      expect(row(externalId).queryTrace.map((e) => e.id)).toContain(facts!.traceId);
+    }
+    // The cyber knockout is named by Federato's insured record...
+    const ko = row('SUB-1003');
+    expect(ko.facts!.lineOfBusiness).toBe('cyber');
+    expect(ko.insuredName).toBe(ko.facts!.insuredName);
+    expect(ko.insuredName).not.toBeNull();
+    // ...but the engine still sees only the four knockout fields: nothing display-only is scored.
+    expect(Object.keys(ko.raw!.records['Submission']![0]!.data).sort()).toEqual(
+      ['id', 'line_of_business', 'status', 'submission_number'],
+    );
+  });
+
+  it('backfills facts onto rows an idempotent re-ingest leaves alone, without re-scoring them', async () => {
+    await ingestFederato(deps, {});
+    const repos = createRepos(deps.db);
+    for (const id of ALL_IDS) repos.submissions.update(row(id).id, { facts: null });
+    const before = new Map(ALL_IDS.map((id) => [id, row(id).updatedAt]));
+    const again = await ingestFederato(depsAt('2026-09-20T12:00:00.000Z'), {});
+    expect(again.skipped).toBe(5);
+    for (const id of ALL_IDS) {
+      expect(row(id).facts?.submissionNumber).toBe(id);
+      expect(row(id).updatedAt).toBe(before.get(id));
+    }
+  });
+
   it('computes peers against book-wide statistics over every account but itself', async () => {
     await ingestFederato(deps, {});
     const results = PROPERTY_IDS.map(resultOf);

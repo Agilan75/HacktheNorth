@@ -136,7 +136,16 @@ export function DataTable(props) {
     else {
         body = sortedRows.map((row) => {
             const clickable = onRowClick !== undefined;
-            return (_jsx("tr", { tabIndex: clickable ? 0 : undefined, onClick: clickable ? () => onRowClick(row) : undefined, onKeyDown: clickable ? (event) => handleRowKeyDown(event, row) : undefined, style: clickable ? { cursor: 'pointer' } : undefined, "data-clickable": clickable ? 'true' : undefined, children: columns.map((column) => (_jsx("td", { style: { ...cellBase, textAlign: column.align ?? 'left' }, children: column.render(row) }, column.key))) }, rowKey(row)));
+            return (_jsx("tr", { tabIndex: clickable ? 0 : undefined, onClick: clickable ? () => onRowClick(row) : undefined, onKeyDown: clickable ? (event) => handleRowKeyDown(event, row) : undefined, style: clickable ? { cursor: 'pointer' } : undefined, "data-clickable": clickable ? 'true' : undefined, children: columns.map((column) => (_jsx("td", { style: {
+                        ...cellBase,
+                        textAlign: column.align ?? 'left',
+                        ...(column.minWidth !== undefined ? { minWidth: column.minWidth } : {}),
+                    }, title: column.title ? column.title(row) : undefined, children: column.clampLines !== undefined ? (_jsx("div", { style: {
+                            display: '-webkit-box',
+                            WebkitBoxOrient: 'vertical',
+                            WebkitLineClamp: column.clampLines,
+                            overflow: 'hidden',
+                        }, children: column.render(row) })) : (column.render(row)) }, column.key))) }, rowKey(row)));
         });
     }
     return (_jsx("div", { style: { width: '100%', overflowX: 'auto' }, children: _jsxs("table", { style: tableStyle, "aria-busy": loading ? 'true' : undefined, children: [_jsxs("caption", { style: captionStyle, children: [caption, loading ? _jsx("span", { style: srOnly, children: " (loading)" }) : null] }), _jsx("thead", { children: _jsx("tr", { children: columns.map((column) => {

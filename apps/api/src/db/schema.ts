@@ -23,6 +23,7 @@ import type {
   ActionStatusDto,
   ActionTypeDto,
   ExtractedValueDto,
+  SubmissionFactsDto,
   QueryTraceEntryDto,
   RequestedFieldDto,
   RequestTriggerDto,
@@ -77,6 +78,13 @@ export const submissions = sqliteTable(
     rank: integer('rank'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
+    /**
+     * What Federato's own Submission record says (insured, broker, dates, ...),
+     * read by the planner's triage query. Display only, never scored. Null on a
+     * sweep row, or on a row stored before this column existed (FILL-backend D2).
+     * Added last so an existing database gains it with one ALTER TABLE.
+     */
+    facts: text('facts', { mode: 'json' }).$type<SubmissionFactsDto | null>(),
   },
   (table) => [
     uniqueIndex('submissions_external_id_idx').on(table.externalId),

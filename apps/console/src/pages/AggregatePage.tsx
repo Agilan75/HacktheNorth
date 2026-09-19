@@ -4,7 +4,7 @@ import { Link } from 'react-router';
 import { formatDate, formatMoney, formatPercent, formatScore, pluralize, titleCase } from '@retrofit/contracts';
 import { VERDICT_MARKS, VERDICT_STYLES } from '@retrofit/design';
 
-import { submissionPath } from '../App.js';
+import { ROUTES, submissionPath } from '../App.js';
 import type { AggregateResponse } from '../api/client.js';
 import { useApi } from '../api/useApi.js';
 import { Card } from '../components/atoms/Card.js';
@@ -296,6 +296,12 @@ function AggregateBody(props: { readonly data: AggregateResponse }): ReactElemen
             ))}
           </dl>
         )}
+        <p style={{ margin: 'var(--rf-space-lg) 0 0' }}>
+          <Link to={ROUTES.verification} data-testid="verification-link">
+            See the full verification: every check, results by kind of case, each disagreement with both
+            sides’ reasoning, and what the testing found
+          </Link>
+        </p>
       </Card>
     </>
   );

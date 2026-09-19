@@ -2,7 +2,11 @@
  * Step 4 of PRD §7.5: the two-pass plan.
  *
  * TRIAGE  — one cheap `Submission` query selecting id, status and line of
- *           business. 120 of 158 are knocked out on line of business.
+ *           business, plus the display facts Federato already holds on every
+ *           submission (insured, broker and underwriter names through `$expand`
+ *           leaves, requested limit, dates, decline reason, competitor), so
+ *           every account can say who and what it is -- including the 120
+ *           knocked out here that no deep query ever reaches.
  * DEEP    — one `Policy` query (NOT a `Submission` query) that expands
  *           `submission`, `insured`, `claims` and
  *           `exposure_units.location.buildings`. `Submission` carries no
@@ -25,6 +29,8 @@ import type {
   LocateResult,
   NoPolicyPlan,
   QueryPlan,
+  SelectObject,
+  SubmissionFacts,
   TraceRuleNeed,
   TriageKnockout,
   TriagePlan,
@@ -65,14 +71,46 @@ const need = (
   why: string,
 ): TraceRuleNeed => ({ ruleId, factor, canonicalPath, why });
 
-const TRIAGE_NEEDS: readonly TraceRuleNeed[] = [
-  need(
-    LOB_KNOCKOUT_RULE,
-    'line_of_business',
-    'lineOfBusiness',
-    'Every non-property line is Not Acceptable, so it is decided from line of business alone.',
-  ),
-];
+const LOB_NEED = need(
+  LOB_KNOCKOUT_RULE,
+  'line_of_business',
+  'lineOfBusiness',
+  'Every non-property line is Not Acceptable, so it is decided from line of business alone.',
+);
+
+/** Why the triage query also reads the display facts (FILL-backend D1). */
+const FACTS_NEED = need(
+  'PRD-10-ACCOUNT-FACTS',
+  null,
+  'submission.facts',
+  'Who and what each submission is -- insured, broker and underwriter names, requested limit, received and target effective dates, status, decline reason, competitor -- so every account page can say so, including the submissions knocked out here that no deep query ever reaches. Routing (PRD 7.6) also reads the requested limit. Fetched in this same query: they sit on the Submission record already, so a second query would cost a round trip and learn nothing new.',
+);
+
+const TRIAGE_NEEDS: readonly TraceRuleNeed[] = [LOB_NEED, FACTS_NEED];
+
+/** The four fields the line-of-business knockout needs, and nothing else. */
+const TRIAGE_MINIMAL_SELECT: readonly string[] = ['id', 'submission_number', 'status', 'line_of_business'];
+
+/**
+ * The triage projection. Object form with `$expand` leaves, exactly as
+ * QUERY_REQUEST_BODY.pdf documents it (`"broker": { "$expand": { "select":
+ * ["name"] } }`): a reference wanted only in the reply is resolved in `select`,
+ * not hydrated by an `expand` stage (PRD 7.3).
+ */
+const TRIAGE_SELECT: SelectObject = {
+  id: true,
+  submission_number: true,
+  status: true,
+  line_of_business: true,
+  requested_limit: true,
+  received_date: true,
+  target_effective_date: true,
+  decline_reason: true,
+  competitor: true,
+  insured: { $expand: { select: ['name'] } },
+  broker: { $expand: { select: ['name'] } },
+  underwriter: { $expand: { select: ['name'] } },
+};
 
 /** The appetite factors the deep pass hydrates, each tied to the rule that reads it. */
 const DEEP_NEEDS: readonly TraceRuleNeed[] = [
@@ -120,6 +158,17 @@ function text(value: unknown): string | null {
   return null;
 }
 
+function finiteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/** An expanded reference's `name`; a bare id or null (not resolved) is no name. */
+function referenceName(value: unknown): string | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return null;
+  const name = (value as Readonly<Record<string, unknown>>)['name'];
+  return typeof name === 'string' && name.trim() !== '' ? name.trim() : null;
+}
+
 function numericId(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   if (typeof value === 'string' && value.trim() !== '') {
@@ -159,14 +208,15 @@ export function planTriage(input: PlanInput): TriagePlan {
   return {
     payload: {
       resource: 'Submission',
-      select: ['id', 'submission_number', 'status', 'line_of_business'],
+      select: TRIAGE_SELECT,
       sort: [{ field: 'id', direction: 'asc' }],
       pagination: { limit: Math.max(pageLimitOf(input), DEFAULT_PAGE_LIMIT) },
     },
     goal:
-      line === null
+      (line === null
         ? `List every submission cheaply. ${input.lineOfBusiness} has no Federato line of business, so every row is knocked out on line of business.`
-        : `List every submission cheaply (id, number, status, line of business) and knock out every line other than "${line}" before any deep query runs.`,
+        : `List every submission cheaply (id, number, status, line of business) and knock out every line other than "${line}" before any deep query runs.`) +
+      ' The same query reads the facts Federato already holds on each submission (insured, broker and underwriter names, requested limit, received and target effective dates, decline reason, competitor), so every account -- knocked out or not -- can say who and what it is.',
     requiredBy: TRIAGE_NEEDS,
     pathChosen: {
       rootResource: 'Submission',
@@ -180,6 +230,43 @@ export function planTriage(input: PlanInput): TriagePlan {
         },
       ],
     },
+  };
+}
+
+/**
+ * The fallback triage query, used only when the handler rejects `planTriage`:
+ * the four fields the line-of-business knockout needs. Knockouts still work;
+ * the display facts come back as absent (FILL-backend D3).
+ */
+export function planTriageMinimal(input: PlanInput): TriagePlan {
+  const plan = planTriage(input);
+  return {
+    ...plan,
+    payload: { ...plan.payload, select: TRIAGE_MINIMAL_SELECT },
+    goal: 'The full triage projection was rejected, so list every submission with only id, number, status and line of business: enough to decide the line-of-business knockout. The display facts stay absent.',
+    requiredBy: [LOB_NEED],
+  };
+}
+
+/**
+ * The display facts one triage row carries. Every field is read as-is; a
+ * reference that came back as a bare id (not expanded) yields no name, never
+ * a guessed one.
+ */
+export function factsOf(row: Readonly<Record<string, unknown>>, externalId: string, submissionId: number): SubmissionFacts {
+  return {
+    submissionId,
+    submissionNumber: text(row['submission_number']) ?? externalId,
+    insuredName: referenceName(row['insured']),
+    brokerName: referenceName(row['broker']),
+    underwriterName: referenceName(row['underwriter']),
+    lineOfBusiness: text(row['line_of_business']),
+    status: text(row['status']),
+    requestedLimit: finiteNumber(row['requested_limit']),
+    receivedDate: text(row['received_date']),
+    targetEffectiveDate: text(row['target_effective_date']),
+    declineReason: text(row['decline_reason']),
+    competitor: text(row['competitor']),
   };
 }
 
@@ -211,6 +298,7 @@ export function triageRows(
     const rawLine = text(row['line_of_business']);
     const lineOfBusiness = rawLine ?? '';
     const status = text(row['status']) ?? '';
+    const facts = factsOf(row, externalId, submissionId);
 
     // A missing line of business is missing data (G-2), never a knockout (G-3):
     // it survives and resolves through the deep or no-policy pass.
@@ -229,9 +317,10 @@ export function triageRows(
             : `Line of business "${rawLine}" is not "${wanted}"; knocked out at triage (${LOB_CITATION}).`,
         ruleId: LOB_KNOCKOUT_RULE,
         factor: 'line_of_business',
+        facts,
       });
     } else {
-      survivors.push({ externalId, submissionId, lineOfBusiness, status });
+      survivors.push({ externalId, submissionId, lineOfBusiness, status, facts });
     }
   }
 

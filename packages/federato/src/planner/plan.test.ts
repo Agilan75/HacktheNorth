@@ -1,15 +1,22 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MINI_BROKERS,
   MINI_HYDRATED_POLICIES,
+  MINI_INSUREDS,
+  MINI_SNAPSHOT,
   MINI_SUBMISSIONS,
+  MINI_UNDERWRITERS,
 } from '../../fixtures/mini-snapshot';
+import { createMockAdapter } from '../mock/adapter';
 import type { LocateResult, QueryPayload } from '../types';
 import {
   buildPlan,
+  factsOf,
   planDeep,
   planFollowUps,
   planNoPolicy,
   planTriage,
+  planTriageMinimal,
   triageRows,
   type PlanInput,
 } from './plan';
@@ -60,15 +67,106 @@ const TRIAGE_ROWS = MINI_SUBMISSIONS.map((s) => ({
 }));
 
 describe('planTriage', () => {
-  it('is one cheap, un-expanded Submission query selecting id, number, status and line', () => {
+  it('is one un-expanded Submission query: the knockout fields plus the display facts, references as $expand leaves', () => {
     const plan = planTriage(INPUT);
     expect(plan.payload.resource).toBe('Submission');
+    // No expand STAGE: the names are wanted in the reply only (PRD 7.3).
     expect(plan.payload.expand).toBeUndefined();
-    expect(plan.payload.select).toEqual(['id', 'submission_number', 'status', 'line_of_business']);
+    expect(plan.payload.select).toEqual({
+      id: true,
+      submission_number: true,
+      status: true,
+      line_of_business: true,
+      requested_limit: true,
+      received_date: true,
+      target_effective_date: true,
+      decline_reason: true,
+      competitor: true,
+      insured: { $expand: { select: ['name'] } },
+      broker: { $expand: { select: ['name'] } },
+      underwriter: { $expand: { select: ['name'] } },
+    });
     // 158 submissions must fit in one page.
     expect(plan.payload.pagination?.limit).toBeGreaterThanOrEqual(158);
-    expect(plan.requiredBy.map((r) => r.ruleId)).toEqual(['AG-LOB-NA']);
+    expect(plan.requiredBy.map((r) => r.ruleId)).toEqual(['AG-LOB-NA', 'PRD-10-ACCOUNT-FACTS']);
     expect(plan.pathChosen.rootResource).toBe('Submission');
+  });
+
+  it('records in the trace step why the display facts are fetched', () => {
+    const plan = planTriage(INPUT);
+    const facts = plan.requiredBy.find((r) => r.ruleId === 'PRD-10-ACCOUNT-FACTS')!;
+    expect(facts.factor).toBeNull();
+    expect(facts.why).toMatch(/knocked out/);
+    expect(facts.why).toMatch(/insured, broker and underwriter names/);
+    expect(plan.goal).toMatch(/knocked out or not/);
+  });
+
+  it('has a minimal fallback that selects only the four knockout fields', () => {
+    const plan = planTriageMinimal(INPUT);
+    expect(plan.payload.select).toEqual(['id', 'submission_number', 'status', 'line_of_business']);
+    expect(plan.requiredBy.map((r) => r.ruleId)).toEqual(['AG-LOB-NA']);
+  });
+
+  it('returns every fact through the mock adapter, with references resolved to names', async () => {
+    const adapter = createMockAdapter({ snapshot: MINI_SNAPSHOT });
+    const result = await adapter.query(planTriage(INPUT).payload);
+    expect(result.results).toHaveLength(MINI_SUBMISSIONS.length);
+    const row = result.results.find((r) => r['id'] === 1002)!;
+    const source = MINI_SUBMISSIONS.find((s) => s['id'] === 1002)!;
+    const name = (rows: readonly Record<string, unknown>[], id: unknown): unknown =>
+      rows.find((r) => r['id'] === id)?.['name'];
+    expect(row['insured']).toEqual({ name: name(MINI_INSUREDS, source['insured']) });
+    expect(row['broker']).toEqual({ name: name(MINI_BROKERS, source['broker']) });
+    expect(row['underwriter']).toEqual({ name: name(MINI_UNDERWRITERS, source['underwriter']) });
+    expect(row['requested_limit']).toBe(source['requested_limit']);
+    expect(row['competitor']).toBe('Meridian Mutual');
+  });
+});
+
+describe('factsOf', () => {
+  it('reads every display fact from one triage row', () => {
+    const facts = factsOf(
+      {
+        id: 7,
+        submission_number: 'SUB-7',
+        status: 'declined',
+        line_of_business: 'cyber',
+        requested_limit: 5000000,
+        received_date: '2025-01-02',
+        target_effective_date: '2025-02-01',
+        decline_reason: 'Outside appetite',
+        competitor: 'Meridian Mutual',
+        insured: { name: 'Acme LLC' },
+        broker: { name: 'Highland Risk Partners' },
+        underwriter: { name: 'F. Adeyemi' },
+      },
+      'SUB-7',
+      7,
+    );
+    expect(facts).toEqual({
+      submissionId: 7,
+      submissionNumber: 'SUB-7',
+      insuredName: 'Acme LLC',
+      brokerName: 'Highland Risk Partners',
+      underwriterName: 'F. Adeyemi',
+      lineOfBusiness: 'cyber',
+      status: 'declined',
+      requestedLimit: 5000000,
+      receivedDate: '2025-01-02',
+      targetEffectiveDate: '2025-02-01',
+      declineReason: 'Outside appetite',
+      competitor: 'Meridian Mutual',
+    });
+  });
+
+  it('never invents a value: an unexpanded reference id, a null and a missing key are all absent', () => {
+    const facts = factsOf({ id: 8, insured: 301, broker: null, requested_limit: 'lots' }, 'SUB-8', 8);
+    expect(facts.insuredName).toBeNull();
+    expect(facts.brokerName).toBeNull();
+    expect(facts.underwriterName).toBeNull();
+    expect(facts.requestedLimit).toBeNull();
+    expect(facts.receivedDate).toBeNull();
+    expect(facts.submissionNumber).toBe('SUB-8');
   });
 });
 
@@ -86,6 +184,8 @@ describe('triageRows', () => {
     expect(k.factor).toBe('line_of_business');
     expect(k.reason).toContain('cyber');
     expect(k.reason).toContain('All other lines');
+    // The knockout carries its own facts, Federato's line included.
+    expect(k.facts).toMatchObject({ submissionNumber: 'SUB-1003', lineOfBusiness: 'cyber', status: 'bound' });
   });
 
   it('keeps the four property submissions in input order', () => {
@@ -95,7 +195,7 @@ describe('triageRows', () => {
       'SUB-1004',
       'SUB-1005',
     ]);
-    expect(survivors.find((s) => s.externalId === 'SUB-1004')).toEqual({
+    expect(survivors.find((s) => s.externalId === 'SUB-1004')).toMatchObject({
       externalId: 'SUB-1004',
       submissionId: 1004,
       lineOfBusiness: 'property',
@@ -125,7 +225,13 @@ describe('triageRows', () => {
     const r = triageRows([{ id: 77, submission_number: 'SUB-77', status: 'received', line_of_business: null }], INPUT);
     expect(r.knockedOut).toHaveLength(0);
     expect(r.survivors).toEqual([
-      { externalId: 'SUB-77', submissionId: 77, lineOfBusiness: '', status: 'received' },
+      {
+        externalId: 'SUB-77',
+        submissionId: 77,
+        lineOfBusiness: '',
+        status: 'received',
+        facts: expect.objectContaining({ submissionNumber: 'SUB-77', lineOfBusiness: null, status: 'received' }),
+      },
     ]);
   });
 
