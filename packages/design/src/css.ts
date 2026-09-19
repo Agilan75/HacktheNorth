@@ -103,6 +103,11 @@ function check(foreground: string, background: string): ContrastCheck {
  * outlined (transparent) pill sits on Paper. `muted` on Paper is listed
  * because it is used, and it is AA-large only: it is for 22px+ or decorative
  * text, and small secondary text must use `mutedDeep`.
+ *
+ * Blue and Green are the accent family (never a verdict): Blue Deep and
+ * Green Deep are the text pairings (on Paper and on their own Tint, for
+ * badges and chips); Blue is also used as a filled surface (primary button,
+ * chart marks) with Paper text on top, mirroring how Red is used for FIT.
  */
 export function contrastMatrix(): readonly ContrastCheck[] {
   const pairs: Array<readonly [string, string]> = [
@@ -115,6 +120,11 @@ export function contrastMatrix(): readonly ContrastCheck[] {
     [COLORS.mutedDeep, COLORS.mutedTint],
     [COLORS.ink, COLORS.redTint],
     [COLORS.redDeep, COLORS.redTint],
+    [COLORS.blueDeep, COLORS.paper],
+    [COLORS.paper, COLORS.blue],
+    [COLORS.blueDeep, COLORS.blueTint],
+    [COLORS.greenDeep, COLORS.paper],
+    [COLORS.greenDeep, COLORS.greenTint],
   ];
   for (const style of Object.values(VERDICT_STYLES)) {
     const background = style.fill === 'transparent' ? COLORS.paper : style.fill;

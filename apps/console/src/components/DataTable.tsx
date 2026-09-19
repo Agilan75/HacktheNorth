@@ -68,6 +68,12 @@ const cellBase: CSSProperties = {
   padding: `${SPACE.sm}px ${SPACE.md}px`,
   borderBottom: `1px solid ${cssVar('muted-tint')}`,
   verticalAlign: 'top',
+  // A dense multi-column table left to auto-layout squeezes every column to
+  // fit the viewport, so free text (an explanation sentence, a long insured
+  // name) wraps one word per line and each row balloons to hundreds of
+  // pixels tall. Cells stay on one line instead; the wrapper's own
+  // `overflow-x: auto` (below) scrolls the rare wide table sideways.
+  whiteSpace: 'nowrap',
 };
 
 const headerCellBase: CSSProperties = {
@@ -186,6 +192,7 @@ export function DataTable<Row>(props: DataTableProps<Row>): ReactElement {
       return (
         <tr
           key={rowKey(row)}
+          role={clickable ? 'button' : undefined}
           tabIndex={clickable ? 0 : undefined}
           onClick={clickable ? () => onRowClick(row) : undefined}
           onKeyDown={clickable ? (event) => handleRowKeyDown(event, row) : undefined}

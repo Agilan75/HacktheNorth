@@ -19,7 +19,7 @@ function EnrichmentCard(props: { readonly card: EnrichmentCardView }): ReactElem
         <h3 id={titleId}>{card.title}</h3>{' '}
         <Badge
           label={card.available ? 'Available' : 'Unavailable'}
-          tone={card.available ? 'quiet' : 'attention'}
+          tone={card.available ? 'positive' : 'attention'}
         />
       </header>
 

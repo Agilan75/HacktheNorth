@@ -169,7 +169,12 @@ function buildColumns(): readonly DataTableColumn<QueueRowView>[] {
     {
       key: 'underwriter',
       header: 'Underwriter',
-      render: (r) => r.assignedUnderwriter ?? 'Unassigned',
+      render: (r) =>
+        r.assignedUnderwriter !== null ? (
+          <Badge label={r.assignedUnderwriter} tone="info" />
+        ) : (
+          <Badge label="Unassigned" tone="quiet" />
+        ),
       sortValue: (r) => r.assignedUnderwriter,
     },
     {
@@ -181,7 +186,25 @@ function buildColumns(): readonly DataTableColumn<QueueRowView>[] {
     {
       key: 'explanation',
       header: 'Why',
-      render: (r) => r.explanationLine,
+      // PRD §10 /queue calls this a "one-line explanation"; the full sentence
+      // is always on the row's own submission page. Without a cap, a real
+      // explanation wraps one word per line in an auto-layout table and
+      // blows every row up to hundreds of pixels tall — title carries the
+      // full text for anyone who wants it without a click.
+      render: (r) => (
+        <span
+          title={r.explanationLine}
+          style={{
+            display: 'block',
+            maxWidth: 320,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {r.explanationLine}
+        </span>
+      ),
     },
   ];
 }

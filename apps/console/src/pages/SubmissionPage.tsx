@@ -238,6 +238,14 @@ export function SubmissionPage(): ReactElement {
 
   const { reload } = loaded;
 
+  /**
+   * Records the failure as `mutationError` (the page-level alert) and then
+   * rethrows, so a caller that awaits `run` — DraftCard's approve button,
+   * ReplyBox's paste-or-upload form — learns the mutation actually failed and
+   * does not treat a caught, logged error as a success (R5-11: `run` used to
+   * swallow every failure, so `onSubmitText` always resolved and ReplyBox
+   * cleared the pasted text even when nothing was extracted).
+   */
   const run = useCallback(
     async (kind: Mutation, work: () => Promise<void>): Promise<void> => {
       setPending(kind);
@@ -246,6 +254,7 @@ export function SubmissionPage(): ReactElement {
         await work();
       } catch (err) {
         if (alive.current) setMutationError(`${MUTATION_LABEL[kind]} failed: ${messageOf(err)}`);
+        throw err;
       } finally {
         if (alive.current) setPending(null);
       }
@@ -253,18 +262,21 @@ export function SubmissionPage(): ReactElement {
     [],
   );
 
+  // Neither button's caller awaits the result — the failure already lands in
+  // `mutationError` above — so the rethrow from `run` is caught here and
+  // dropped rather than becoming an unhandled rejection.
   const onRerun = useCallback((): void => {
     void run('rerun', async () => {
       const next = await client.runSubmission(id);
       if (alive.current) setFresh(next);
-    });
+    }).catch(() => {});
   }, [client, id, run]);
 
   const onEnrich = useCallback((): void => {
     void run('enrich', async () => {
       const next = await client.enrich(id);
       if (alive.current) setFresh(next);
-    });
+    }).catch(() => {});
   }, [client, id, run]);
 
   const onApprove = useCallback(

@@ -12,6 +12,12 @@
   --rf-muted: #7C8073;
   --rf-muted-deep: #5E6357;
   --rf-muted-tint: #EDEFE8;
+  --rf-blue: #2C6E9E;
+  --rf-blue-deep: #1D3557;
+  --rf-blue-tint: #E4EAF1;
+  --rf-green: #2E7050;
+  --rf-green-deep: #265C42;
+  --rf-green-tint: #E3EFE7;
   --rf-font-display: 'Fraunces Variable', Fraunces, Georgia, 'Times New Roman', serif;
   --rf-font-body: 'Inter Variable', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --rf-size-display: 34px;

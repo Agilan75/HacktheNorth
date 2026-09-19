@@ -728,6 +728,12 @@ function aggregateView(dto: AggregateDto, queue: readonly QueueRowView[]): Aggre
   const oneFlipAway = dto.oneFlipAway.map((o): QueueRowView => {
     const row = byId.get(o.id);
     if (row) return row;
+    // R5-12: the queue has no row for this id (e.g. its own fetch failed or
+    // raced this one). `rank`, `qualityIndex` and `verdict` are unknown, not
+    // zero or REFER — those three are unread placeholders the type requires;
+    // `incomplete: true` tells the view not to render them as real values.
+    // `premiumAfter` is the *post-flip* premium and must never stand in for
+    // `predictedPremium` (the current one), which is genuinely unknown here.
     return {
       submissionId: o.id,
       rank: 0,
@@ -738,7 +744,7 @@ function aggregateView(dto: AggregateDto, queue: readonly QueueRowView[]): Aggre
       primaryState: null,
       appetiteScore: o.appetiteScore,
       quotedPremium: null,
-      predictedPremium: o.premiumAfter,
+      predictedPremium: null,
       adequacy: null,
       completeness: 0,
       contradictionCount: 0,
@@ -747,6 +753,7 @@ function aggregateView(dto: AggregateDto, queue: readonly QueueRowView[]): Aggre
       pendingAction: null,
       explanationLine: o.moveLabel,
       outOfAppetiteLine: false,
+      incomplete: true,
     };
   });
   return {

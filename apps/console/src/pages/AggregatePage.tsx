@@ -86,7 +86,7 @@ function knockoutBars(factors: AggregateResponse['topKnockoutFactors']): readonl
     key: f.factorId,
     label: f.label ?? titleCase(f.factorId),
     count: f.count,
-    fill: 'var(--rf-ink)',
+    fill: 'var(--rf-blue)',
   }));
 }
 
@@ -194,7 +194,11 @@ function OneFlipTable(props: { readonly rows: readonly QueueRowView[]; readonly 
                   </Link>
                 </th>
                 <td>
-                  <VerdictPill verdict={r.verdict} />
+                  {r.incomplete ? (
+                    <span style={{ color: 'var(--rf-muted-deep)' }}>Not in current queue</span>
+                  ) : (
+                    <VerdictPill verdict={r.verdict} />
+                  )}
                 </td>
                 <td style={{ textAlign: 'right' }}>{formatScore(r.appetiteScore)}</td>
                 <td style={{ textAlign: 'right' }}>{formatMoney(r.predictedPremium)}</td>

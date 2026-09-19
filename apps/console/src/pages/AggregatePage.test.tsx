@@ -100,3 +100,15 @@ describe('AggregatePage without the C14 fields (fallback)', () => {
     expect(cells).toContain('—');
   });
 });
+
+describe('AggregatePage one-flip row not present in the queue (R5-12)', () => {
+  it('never invents a verdict or a predicted premium for a row the queue never returned', () => {
+    const row = flipRow('z', { predictedPremium: null, incomplete: true });
+    mount({ ...BASE, oneFlipAway: [row] });
+    const table = screen.getByTestId('flip-z');
+    expect(within(table).queryByText('DOES NOT FIT')).toBeNull();
+    expect(within(table).getByText('Not in current queue')).toBeInTheDocument();
+    const cells = within(table).getAllByRole('cell').map((c) => c.textContent);
+    expect(cells).toContain('—'); // Predicted premium: unknown, not the post-flip figure.
+  });
+});

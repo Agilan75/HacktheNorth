@@ -117,7 +117,7 @@ export function Layout(props: LayoutProps): ReactElement {
           <ul style={navListStyle}>
             {nav.map((item) => (
               <li key={item.to}>
-                <NavLink to={item.to} style={navLinkStyle}>
+                <NavLink to={item.to} className="rf-nav-link" style={navLinkStyle}>
                   {item.label}
                 </NavLink>
               </li>

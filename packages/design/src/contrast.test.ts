@@ -42,6 +42,13 @@ describe('relativeLuminance / contrastRatio (WCAG 2.x)', () => {
     expect(contrastRatio(COLORS.mutedDeep, COLORS.paper)).toBeCloseTo(5.819, 2);
     expect(contrastRatio(COLORS.muted, COLORS.paper)).toBeCloseTo(3.808, 2);
     expect(contrastRatio(COLORS.redDeep, COLORS.redTint)).toBeCloseTo(5.629, 2);
+    // Accent family (blue, green): Deep pairs with Paper and its own Tint;
+    // Blue's mid tone is also a filled surface, so Paper-on-Blue is checked.
+    expect(contrastRatio(COLORS.blueDeep, COLORS.paper)).toBeCloseTo(11.638, 2);
+    expect(contrastRatio(COLORS.paper, COLORS.blue)).toBeCloseTo(5.161, 2);
+    expect(contrastRatio(COLORS.blueDeep, COLORS.blueTint)).toBeCloseTo(10.204, 2);
+    expect(contrastRatio(COLORS.greenDeep, COLORS.paper)).toBeCloseTo(7.346, 2);
+    expect(contrastRatio(COLORS.greenDeep, COLORS.greenTint)).toBeCloseTo(6.6, 2);
   });
 });
 

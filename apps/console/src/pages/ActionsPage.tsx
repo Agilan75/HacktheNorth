@@ -233,6 +233,7 @@ export function ActionsPage(): ReactElement {
       render: (e) => (
         <button
           type="button"
+          className="rf-button--primary"
           onClick={(event) => {
             event.stopPropagation();
             void approve(e);
