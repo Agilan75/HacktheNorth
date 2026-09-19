@@ -197,6 +197,44 @@ export interface ApiClient {
   submitAnswers(id: string, body: SweepAnswersRequestDto, opts?: CallOptions): Promise<SweepDto>;
   verifyFix(id: string, body: VerifyFixRequestDto, opts?: CallOptions): Promise<VerifyFixResponseDto>;
   getShare(slug: string, opts?: CallOptions): Promise<ShareDto>;
+  /** Live sweep pricing: the items in one frame, each with its ballpark price. */
+  identifyItems(imageBase64: string, opts?: CallOptions): Promise<{ readonly items: readonly LiveItem[] }>;
+  /** Live sweep pricing: a sourced price for one branded item. */
+  lookupPrice(item: LiveLookupRequest, opts?: CallOptions): Promise<LiveLookupResult>;
+}
+
+/* Live sweep pricing (POST /price/identify, /price/lookup). Mirrors apps/api/src/pricing/live.ts. */
+
+export interface LiveItem {
+  readonly label: string;
+  readonly name: string;
+  readonly brand: string | null;
+  readonly model: string | null;
+  readonly confidence: number;
+  readonly tablePrice: number;
+  readonly key: string;
+}
+
+export interface LiveLookupRequest {
+  readonly label: string;
+  readonly name: string;
+  readonly brand: string | null;
+  readonly model: string | null;
+}
+
+export interface LivePriceSource {
+  readonly url: string;
+  readonly title: string | null;
+  readonly quote: string;
+  readonly price: number;
+}
+
+export interface LiveLookupResult {
+  readonly key: string;
+  readonly price: number | null;
+  readonly tablePrice: number;
+  readonly sources: readonly LivePriceSource[];
+  readonly cached: boolean;
 }
 
 /** Route paths, mirrored from `ROUTES` in @retrofit/contracts (pinned by api.test.ts). */
@@ -207,6 +245,8 @@ export const API_PATHS = {
   nextQuestion: (id: string) => `/sweeps/${encodeURIComponent(id)}/next-question`,
   verifyFix: (id: string) => `/sweeps/${encodeURIComponent(id)}/verify-fix`,
   share: (slug: string) => `/s/${encodeURIComponent(slug)}`,
+  identifyItems: () => '/price/identify',
+  lookupPrice: () => '/price/lookup',
 } as const;
 
 export function normalizeBaseUrl(raw: string | null | undefined): string | null {
@@ -363,6 +403,13 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     verifyFix: (id, body, opts) =>
       request<VerifyFixResponseDto>('POST', API_PATHS.verifyFix(id), body, uploadTimeoutMs, opts),
     getShare: (slug, opts) => request<ShareDto>('GET', API_PATHS.share(slug), undefined, timeoutMs, opts),
+    identifyItems: (imageBase64, opts) =>
+      request<{ readonly items: readonly LiveItem[] }>('POST', API_PATHS.identifyItems(), { imageBase64 }, timeoutMs, {
+        retry: { maxAttempts: 1 },
+        ...opts,
+      }),
+    lookupPrice: (item, opts) =>
+      request<LiveLookupResult>('POST', API_PATHS.lookupPrice(), item, timeoutMs, { retry: { maxAttempts: 1 }, ...opts }),
   };
 }
 

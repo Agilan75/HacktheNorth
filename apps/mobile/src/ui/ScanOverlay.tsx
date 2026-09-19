@@ -31,6 +31,7 @@
  */
 import { useEffect, useMemo, useRef } from 'react';
 import { AccessibilityInfo, Pressable, View, useWindowDimensions } from 'react-native';
+import type { ReactNode } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { COLORS, MIN_TOUCH_TARGET, RADIUS, SPACE } from '@retrofit/design';
@@ -50,6 +51,8 @@ export interface ScanOverlayProps {
   readonly onFinish: () => void;
   /** When given, shows "Use photos instead" (the upload path) as an equal choice. */
   readonly onUsePhotos?: () => void;
+  /** Shown between the ring and the controls (the live price chips). */
+  readonly middle?: ReactNode;
   /** Shows a spinner on Finish while the screen submits the sweep. */
   readonly finishing?: boolean;
   /** Speak milestone updates through VoiceOver/TalkBack. Default true. */
@@ -63,6 +66,7 @@ export function ScanOverlay({
   state,
   onFinish,
   onUsePhotos,
+  middle,
   finishing = false,
   announce = true,
   ringSize,
@@ -152,6 +156,8 @@ export function ScanOverlay({
           </Text>
         </View>
       </View>
+
+      {middle}
 
       {/* Bottom: the turn hint, then Finish and the photo alternative. */}
       <View pointerEvents="box-none" style={{ gap: SPACE.md }}>
