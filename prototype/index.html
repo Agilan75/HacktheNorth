@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Room Sweep</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="topbar">
+    <span class="brand">Room Sweep</span>
+    <span class="topbar-actions">
+      <button id="save-frames" class="ghost" hidden>Download frames</button>
+      <button id="rescan" class="ghost" hidden>New scan</button>
+    </span>
+  </header>
+
+  <main>
+    <section id="view-setup" class="view" hidden>
+      <h1>One step before scanning</h1>
+      <p>No API key found. Copy <code>config.example.js</code> to <code>config.js</code>, paste your Gemini key into it, and reload.</p>
+    </section>
+
+    <section id="view-capture" class="view" hidden>
+      <h1>Scan your room, get your price</h1>
+      <p class="lede">Stand in the middle of the room and turn slowly through a full circle. We take 20 photos over 15 seconds.</p>
+
+      <div class="stage">
+        <video id="video" playsinline muted></video>
+        <div id="stage-idle" class="stage-idle">Camera is off</div>
+        <div id="sweep-overlay" class="sweep-overlay" hidden>
+          <span id="sweep-count">Turn slowly · 0 / 20</span>
+          <div class="bar"><div id="sweep-bar"></div></div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="primary" class="primary">Open camera</button>
+        <label class="ghost upload">
+          Upload photos instead
+          <input id="upload" type="file" accept="image/*" multiple hidden>
+        </label>
+      </div>
+      <p id="capture-error" class="inline-error" hidden></p>
+      <div id="capture-thumbs" class="thumbs"></div>
+    </section>
+
+    <section id="view-analyzing" class="view" hidden>
+      <div class="spinner" aria-hidden="true"></div>
+      <h1>Reading the room</h1>
+      <p class="lede"><span id="analyzing-count">20</span> frames sent as one request, so hazards that span frames can be found. <span id="elapsed">0s</span></p>
+      <p id="analyzing-status" class="meta"></p>
+      <div id="analyzing-thumbs" class="thumbs"></div>
+    </section>
+
+    <section id="view-results" class="view" hidden>
+      <div class="quote">
+        <div class="quote-label">Your monthly premium</div>
+        <div id="quote-total" class="quote-total"></div>
+        <div id="quote-lines" class="quote-lines"></div>
+      </div>
+
+      <h2>Hazards <span id="hazard-count" class="count"></span></h2>
+      <div id="hazards"></div>
+
+      <h2>Contents <span id="contents-count" class="count"></span></h2>
+      <div id="contents"></div>
+
+      <div id="unanswerable-block">
+        <h2>Couldn't determine</h2>
+        <ul id="unanswerable"></ul>
+      </div>
+    </section>
+
+    <section id="view-error" class="view" hidden>
+      <h1>The analysis failed</h1>
+      <p id="error-message" class="inline-error"></p>
+      <div id="error-raw-block" hidden>
+        <h2>Raw model output</h2>
+        <pre id="error-raw"></pre>
+      </div>
+      <div class="actions">
+        <button id="retry" class="primary">Retry with same frames</button>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="lightbox">
+    <img id="lightbox-img" alt="">
+    <div id="lightbox-caption"></div>
+  </dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

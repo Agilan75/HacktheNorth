@@ -1,0 +1,154 @@
+:root {
+  --bg: #f6f5f1;
+  --surface: #ffffff;
+  --text: #1b1d1f;
+  --muted: #6b7075;
+  --border: #e2e0d9;
+  --accent: #1f5f4a;
+  --accent-text: #ffffff;
+  --high: #b3261e;
+  --high-bg: #fbe9e7;
+  --medium: #9a5b00;
+  --medium-bg: #fdf0d9;
+  --low: #3d5a80;
+  --low-bg: #e6edf5;
+  --save: #1f7a4d;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131516;
+    --surface: #1d2022;
+    --text: #ecebe7;
+    --muted: #9aa0a6;
+    --border: #2e3235;
+    --accent: #5fc79f;
+    --accent-text: #0c1f18;
+    --high: #ff8a80;
+    --high-bg: #3a1a18;
+    --medium: #ffc266;
+    --medium-bg: #36280f;
+    --low: #9dbde6;
+    --low-bg: #1a2735;
+    --save: #6fd6a0;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-text-size-adjust: 100%;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  padding-top: max(12px, env(safe-area-inset-top));
+  border-bottom: 1px solid var(--border);
+}
+
+.brand { font-weight: 700; letter-spacing: -0.01em; }
+
+main { max-width: 640px; margin: 0 auto; padding: 24px 16px 64px; }
+
+h1 { font-size: 1.6rem; line-height: 1.2; letter-spacing: -0.02em; margin: 0 0 8px; }
+h2 { font-size: 1.05rem; margin: 32px 0 12px; }
+h3 { font-size: 1rem; margin: 0; flex: 1; min-width: 0; }
+p { margin: 0 0 12px; }
+.lede { color: var(--muted); margin-bottom: 20px; }
+.count { color: var(--muted); font-weight: 400; }
+.empty, .meta { color: var(--muted); }
+.meta { font-size: 0.85rem; }
+code { background: var(--border); padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+
+button, .upload { font: inherit; cursor: pointer; border-radius: 10px; padding: 12px 18px; border: 1px solid transparent; }
+.primary { background: var(--accent); color: var(--accent-text); font-weight: 600; flex: 1; }
+.ghost { background: transparent; color: var(--text); border-color: var(--border); text-align: center; }
+.topbar-actions { display: flex; gap: 8px; }
+.topbar .ghost { padding: 6px 12px; font-size: 0.9rem; }
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; }
+
+.stage {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: 14px;
+  overflow: hidden;
+}
+.stage video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.stage-idle { position: absolute; inset: 0; display: grid; place-items: center; color: #8a8f94; }
+.stage-idle[hidden], .sweep-overlay[hidden] { display: none; }
+.sweep-overlay {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 28px 16px 14px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  color: #fff;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.bar { height: 6px; margin-top: 8px; background: rgba(255, 255, 255, 0.25); border-radius: 3px; overflow: hidden; }
+#sweep-bar { height: 100%; width: 0; background: #fff; transition: width 0.2s linear; }
+
+.thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.thumb { position: relative; padding: 0; border: 0; border-radius: 6px; overflow: hidden; width: 56px; height: 42px; background: var(--border); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb span {
+  position: absolute; left: 2px; bottom: 2px;
+  background: rgba(0, 0, 0, 0.65); color: #fff;
+  font-size: 0.65rem; line-height: 1; padding: 2px 4px; border-radius: 3px;
+}
+
+.inline-error { color: var(--high); background: var(--high-bg); padding: 10px 12px; border-radius: 8px; overflow-wrap: anywhere; }
+
+.spinner {
+  width: 36px; height: 36px; margin-bottom: 20px;
+  border: 3px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.quote { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+.quote-label { color: var(--muted); font-size: 0.9rem; }
+.quote-total { font-size: 3rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.quote-total span { font-size: 1.1rem; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.quote-lines { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; font-size: 0.92rem; }
+.line { display: flex; justify-content: space-between; gap: 16px; padding: 3px 0; font-variant-numeric: tabular-nums; }
+.line span:first-child { min-width: 0; overflow-wrap: anywhere; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+.card p { margin: 10px 0 0; }
+.card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.badge { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 8px; border-radius: 999px; }
+.badge.high { color: var(--high); background: var(--high-bg); }
+.badge.medium { color: var(--medium); background: var(--medium-bg); }
+.badge.low { color: var(--low); background: var(--low-bg); }
+.delta { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.unpriced { opacity: 0.65; }
+.unpriced .delta { font-weight: 400; color: var(--muted); }
+.saving { color: var(--save); font-weight: 600; white-space: nowrap; }
+.hazard .meta { margin-top: 10px; }
+
+table.card { width: 100%; border-collapse: separate; border-spacing: 0; padding: 4px 16px; }
+td { padding: 10px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-left: 16px; }
+tfoot td { border-bottom: 0; font-weight: 600; }
+
+#unanswerable { margin: 0; padding-left: 20px; color: var(--muted); }
+#unanswerable li { margin-bottom: 6px; }
+
+pre {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px; max-height: 320px; overflow: auto; font-size: 0.8rem; white-space: pre-wrap; overflow-wrap: anywhere;
+}
+
+dialog { border: 0; padding: 0; background: transparent; max-width: min(92vw, 900px); color: #fff; text-align: center; }
+dialog::backdrop { background: rgba(0, 0, 0, 0.85); }
+dialog img { max-width: 100%; max-height: 80vh; border-radius: 8px; display: block; }
+#lightbox-caption { margin-top: 8px; font-size: 0.9rem; }
