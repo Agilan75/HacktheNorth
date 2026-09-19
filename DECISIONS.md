@@ -214,3 +214,13 @@ CRIT1 checked PRD 15, 8, 10 and 12 against the repo and read README and DEMO lin
 | CP3-8 | **Push `build/retrofit`; do not merge to `main`.** Scanned before pushing: no live secret in any tracked file, and none in any commit in the history. | The remote is shared with a teammate; merging is Caleb's call (pre-flight P2). | Merging to `main` unattended. |
 
 **Final state:** `tsc -b` 0 errors · `tsc -p apps/mobile` 0 errors · **1,805 / 1,805 tests** (143 files) · 10M layers A+B 0 / 0 · layer C 1,331 / 1,332 · `expo-doctor` 21 / 21 · naive isolation clean.
+
+## Deploy — Railway + Vercel (2026-09-19)
+
+| # | Decision | Why | Rejected alternative |
+| --- | --- | --- | --- |
+| D-1 | **API on Railway with a volume; console on Vercel.** Caleb's choice. | The API writes to SQLite, which needs a persistent disk; Vercel functions cannot keep a file between requests. Moving to Postgres would have changed 62 synchronous database calls across verified code, hours before a demo. | Porting the database to run everything on Vercel. |
+| D-2 | **`seed --if-empty` on every boot, joined to the server with `;`.** | The first boot loads the live book into the volume; restarts go straight to serving in about 3 s; and if Federato is down at boot, the server still starts rather than crash-looping. | A manual seed step on the host. |
+| D-3 | **`tsx` declared as a runtime dependency of `@retrofit/api`.** | The server runs TypeScript through `tsx` in production, but `tsx` was only a root dev dependency, and hosts often prune dev dependencies — a container that cannot start. It was a mis-declaration, not a hosting quirk. | Relying on the host to keep dev dependencies. |
+| D-4 | **`react-native-screens` pinned to the installed 4.26.2.** | When pinning the Expo modules exact (R3-5), I pinned it to 4.26.0, older than what `expo install` had installed. `npm ls` caught it; `npm ci` on either host would have failed on the mismatch. 4.26.2 is inside SDK 57's range; `expo-doctor` still passes 21/21. | — |
+| D-5 | **Both host flows were rehearsed from a `git archive` of the tree**, not from the working directory: clean `npm ci`, the Vercel console build with the API URL baked in, and the Railway first boot and restart. | My first rehearsal hand-copied files and put `apps/api/package.json` at the clone's root, which invalidated both its `npm ci` and its build result. The archive is exactly what the hosts receive. | Trusting a build that passes in the working directory. |

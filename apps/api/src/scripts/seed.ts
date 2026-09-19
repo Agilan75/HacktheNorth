@@ -378,13 +378,20 @@ export async function runSeed(deps: Deps, options: SeedOptions = {}): Promise<Se
   return summary;
 }
 
-/** `npm run seed [--force] [--no-enrich] [--no-sweep] [--no-actions]`. */
+/** `npm run seed [--force] [--no-enrich] [--no-sweep] [--no-actions] [--if-empty]`. */
 export async function main(): Promise<void> {
   const args = new Set(process.argv.slice(2));
   const env = getEnv();
   const handle = createDb({ url: env.DATABASE_URL });
   try {
     migrate(handle);
+    // --if-empty: seed only a fresh database. A hosted container runs this on
+    // every boot (DEPLOY.md), so the first boot loads the book and every
+    // restart after that goes straight to serving. DECISIONS D-2.
+    if (args.has('--if-empty') && createRepos(handle.db).submissions.all().length > 0) {
+      console.log('Seed skipped: the database already holds submissions (--if-empty).');
+      return;
+    }
     const deps: Deps = {
       db: handle.db,
       adapter: createAdapter({ env: federatoEnv(env) }),
