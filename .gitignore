@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.expo/
+.env
+.env.*
+!.env.example
+apps/api/data/*.db*
+packages/federato/probe-output.json
+.DS_Store

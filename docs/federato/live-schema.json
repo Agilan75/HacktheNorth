@@ -1,0 +1,938 @@
+{
+  "Claim": {
+    "type": "object",
+    "fields": {
+      "id": {
+        "type": "number",
+        "optional": false
+      },
+      "policy": {
+        "type": "reference",
+        "optional": false,
+        "resource": "Policy",
+        "cardinality": "one"
+      },
+      "status": {
+        "type": "string",
+        "optional": false
+      },
+      "claimant": {
+        "type": "string",
+        "optional": true
+      },
+      "coverage": {
+        "type": "reference",
+        "optional": true,
+        "resource": "Coverage",
+        "cardinality": "one"
+      },
+      "litigated": {
+        "type": "boolean",
+        "optional": false
+      },
+      "closed_date": {
+        "type": "string",
+        "optional": true
+      },
+      "claim_number": {
+        "type": "string",
+        "optional": false
+      },
+      "date_of_loss": {
+        "type": "string",
+        "optional": false
+      },
+      "paid_expense": {
+        "type": "number",
+        "optional": false
+      },
+      "cause_of_loss": {
+        "type": "string",
+        "optional": false
+      },
+      "exposure_unit": {
+        "type": "reference",
+        "optional": true,
+        "resource": "ExposureUnit",
+        "cardinality": "one"
+      },
+      "reported_date": {
+        "type": "string",
+        "optional": false
+      },
+      "paid_indemnity": {
+        "type": "number",
+        "optional": false
+      },
+      "reserve_expense": {
+        "type": "number",
+        "optional": false
+      },
+      "reserve_indemnity": {
+        "type": "number",
+        "optional": false
+      }
+    },
+    "optional": false
+  },
+  "Broker": {
+    "type": "object",
+    "fields": {
+      "id": {
+        "type": "number",
+        "optional": false
+      },
+      "name": {
+        "type": "string",
+        "optional": false
+      },
+      "tier": {
+        "type": "string",
+        "optional": false
+      },
+      "region": {
+        "type": "string",
+        "optional": false
+      },
+      "commission_pct": {
+        "type": "number",
+        "optional": false
+      },
+      "license_number": {
+        "type": "string",
+        "optional": false
+      }
+    },
+    "optional": false
+  },
+  "Policy": {
+    "type": "object",
+    "fields": {
+      "id": {
+        "type": "number",
+        "optional": false
+      },
+      "dates": {
+        "type": "object",
+        "fields": {
+          "bound": {
+            "type": "string",
+            "optional": true
+          },
+          "quoted": {
+            "type": "string",
+            "optional": true
+          },
+          "cancelled": {
+            "type": "string",
+            "optional": true
+          },
+          "effective": {
+            "type": "string",
+            "optional": false
+          },
+          "expiration": {
+            "type": "string",
+            "optional": false
+          },
+          "submission_received": {
+            "type": "string",
+            "optional": true
+          }
+        },
+        "optional": false
+      },
+      "limit": {
+        "type": "number",
+        "optional": false
+      },
+      "terms": {
+        "type": "object",
+        "fields": {
+          "prior_acts": {
+            "type": "boolean",
+            "optional": true
+          },
+          "funding_type": {
+            "type": "string",
+            "optional": true
+          },
+          "coverage_basis": {
+            "type": "string",
+            "optional": false
+          },
+          "aggregate_limit": {
+            "type": "number",
+            "optional": true
+          },
+          "attachment_point": {
+            "type": "number",
+            "optional": true
+          },
+          "retroactive_date": {
+            "type": "string",
+            "optional": true
+          },
+          "participation_pct": {
+            "type": "number",
+            "optional": true
+          }
+        },
+        "optional": false
+      },
+      "claims": {
+        "type": "reference",
+        "optional": false,
+        "resource": "Claim",
+        "cardinality": "many"
+      },
+      "status": {
+        "type": "string",
+        "optional": false
+      },
+      "insured": {
+        "type": "reference",
+        "optional": false,
+        "resource": "Insured",
+        "cardinality": "one"
+      },
+      "premium": {
+        "type": "number",
+        "optional": false
+      },
+      "currency": {
+        "type": "string",
+        "optional": false
+      },
+      "producer": {
+        "type": "object",
+        "fields": {
+          "broker": {
+            "type": "reference",
+            "optional": false,
+            "resource": "Broker",
+            "cardinality": "one"
+          },
+          "contact": {
+            "type": "reference",
+            "optional": false,
+            "resource": "Contact",
+            "cardinality": "one"
+          }
+        },
+        "optional": false
+      },
+      "coverages": {
+        "type": "reference",
+        "optional": false,
+        "resource": "Coverage",
+        "cardinality": "many"
+      },
+      "deductible": {
+        "type": "number",
+        "optional": false
+      },
+      "submission": {
+        "type": "reference",
+        "optional": true,
+        "resource": "Submission",
+        "cardinality": "one"
+      },
+      "rate_change": {
+        "type": "number",
+        "optional": true
+      },
+      "underwriter": {
+        "type": "reference",
+        "optional": true,
+        "resource": "Underwriter",
+        "cardinality": "one"
+      },
+      "endorsements": {
+        "type": "reference",
+        "optional": false,
+        "resource": "Endorsement",
+        "cardinality": "many"
+      },
+      "business_type": {
+        "type": "string",
+        "optional": false
+      },
+      "policy_number": {
+        "type": "string",
+        "optional": false
+      },
+      "commission_pct": {
+        "type": "number",
+        "optional": false
+      },
+      "exposure_units": {
+        "type": "reference",
+        "optional": false,
+        "resource": "ExposureUnit",
+        "cardinality": "many"
+      },
+      "target_premium": {
+        "type": "number",
+        "optional": true
+      },
+      "line_of_business": {
+        "type": "string",
+        "optional": false
+      },
+      "technical_premium": {
+        "type": "number",
+        "optional": true
+      }
+    },
+    "optional": false
+  },
+  "Contact": {
+    "type": "object",
+    "fields": {
+      "id": {
+        "type": "number",
+        "optional": false
+      },
+      "name": {
+        "type": "string",
+        "optional": false
+      },
+      "email": {
+        "type": "string",
+        "optional": false
+      },
+      "phone": {
+        "type": "string",
+        "optional": false
+      },
+      "title": {
+        "type": "string",
+        "optional": true
+      },
+      "broker": {
+        "type": "reference",
+        "optional": false,
+        "resource": "Broker",
+        "cardinality": "one"
+      }
+    },
+    "optional": false
+  },
+  "Insured": {
+    "type": "object",
+    "fields": {
+      "hq": {
+        "type": "reference",
+        "optional": true,
+        "resource": "Location",
+        "cardinality": "one"
+      },
+      "id": {
+        "type": "number",
+        "optional": false
+      },
+      "dba": {
+        "type": "string",
+        "optional": true
+      },
+      "fein": {
+        "type": "string",
+        "optional": true
+      },
+      "name": {
+        "type": "string",
+        "optional": false
+      },
+      "parent": {
+        "type": "reference",
+        "optional": true,
+        "resource": "Insured",
+        "cardinality": "one"
+      },
+      "website": {
+        "type": "string",
+        "optional": true
+      },
+      "sic_code": {
+        "type": "string",
+        "optional": true
+      },
+      "naics_code": {
+        "type": "string",
+        "optional": false
+      },
+      "entity_type": {
+        "type": "string",
+        "optional": false
+      },
+      "year_founded": {
+        "type": "number",
+        "optional": false
+      },
+      "annual_revenue": {
+        "type": "number",
+        "optional": false
+      },
+      "employee_count": {
+        "type": "number",
+        "optional": false
+      }
+    },
+    "optional": false
+  },
+  "Building": {
+    "type": "object",
+    "fields": {
+      "id": {
+        "type": "number",
+        "optional": false
+      },
+      "tiv": {
+        "type": "number",
+        "optional": false
+      },
+      "name": {
+        "type": "string",
+        "optional": false
+      },
+      "stories": {
+        "type": "number",
+        "optional": true
+      },
+      "occupancy": {
+        "type": "string",
+        "optional": true
+      },
+      "roof_year": {
+        "type": "number",
+        "optional": true
+      },
+      "year_built": {
+        "type": "number",
+        "optional": false
+      },
+      "sprinklered": {
+        "type": "boolean",
+        "optional": false
+      },
+      "building_value": {
+        "type": "number",
+        "optional": false
+      },
+      "contents_value": {
+        "type": "number",
+        "optional": false
+      },
+      "square_footage": {
+        "type": "number",
+        "optional": false
+      },
+      "construction_type": {
+        "type": "string",
+        "optional": false
+      },
+      "business_interruption_value": {
+        "type": "number",
+        "optional": true
+      }
+    },
+    "optional": false
+  },
+  "Coverage": {
+    "type": "object",
+    "fields": {
+      "id": {
+        "type": "number",
+        "optional": false
+      },
+      "code": {
+        "type": "string",
+        "optional": false
+      },
+      "name": {
+        "type": "string",
+        "optional": false
+      },
+      "basis": {
+        "type": "string",
+        "optional": false
+      },
+      "sublimit": {
+        "type": "number",
+        "optional": true
+      },
+      "retention": {
+        "type": "number",
+        "optional": true
+      },
+      "deductible": {
+        "type": "number",
+        "optional": true
+      },
+      "limit_aggregate": {
+        "type": "number",
+        "optional": true
+      },
+      "limit_occurrence": {
+        "type": "number",
+        "optional": true
+      },
+      "waiting_period_hours": {
+        "type": "number",
+        "optional": true
+      }
+    },
+    "optional": false
+  },
+  "Location": {
+    "type": "object",
+    "fields": {
+      "id": {
+        "type": "number",
+        "optional": false
+      },
+      "zip": {
+        "type": "string",
+        "optional": false
+      },
+      "city": {
+        "type": "string",
+        "optional": false
+      },
+      "name": {
+        "type": "string",
+        "optional": false
+      },
+      "state": {
+        "type": "string",
+        "optional": false
+      },
+      "county": {
+        "type": "string",
+        "optional": true
+      },
+      "address": {
+        "type": "string",
+        "optional": false
+      },
+      "country": {
+        "type": "string",
+        "optional": false
+      },
+      "latitude": {
+        "type": "number",
+        "optional": true
+      },
+      "buildings": {
+        "type": "reference",
+        "optional": false,
+        "resource": "Building",
+        "cardinality": "many"
+      },
+      "longitude": {
+        "type": "number",
+        "optional": true
+      },
+      "occupancy": {
+        "type": "string",
+        "optional": true
+      },
+      "hazard_tags": {
+        "type": "array",
+        "itemType": "string",
+        "optional": false
+      },
+      "protection_class": {
+        "type": "number",
+        "optional": true
+      }
+    },
+    "optional": false
+  },
+  "Submission": {
+    "type": "object",
+    "fields": {
+      "id": {
+        "type": "number",
+        "optional": false
+      },
+      "broker": {
+        "type": "reference",
+        "optional": false,
+        "resource": "Broker",
+        "cardinality": "one"
+      },
+      "status": {
+        "type": "string",
+        "optional": false
+      },
+      "contact": {
+        "type": "reference",
+        "optional": false,
+        "resource": "Contact",
+        "cardinality": "one"
+      },
+      "insured": {
+        "type": "reference",
+        "optional": false,
+        "resource": "Insured",
+        "cardinality": "one"
+      },
+      "competitor": {
+        "type": "string",
+        "optional": true
+      },
+      "underwriter": {
+        "type": "reference",
+        "optional": true,
+        "resource": "Underwriter",
+        "cardinality": "one"
+      },
+      "received_date": {
+        "type": "string",
+        "optional": false
+      },
+      "decline_reason": {
+        "type": "string",
+        "optional": true
+      },
+      "requested_limit": {
+        "type": "number",
+        "optional": false
+      },
+      "line_of_business": {
+        "type": "string",
+        "optional": false
+      },
+      "submission_number": {
+        "type": "string",
+        "optional": false
+      },
+      "target_effective_date": {
+        "type": "string",
+        "optional": false
+      }
+    },
+    "optional": false
+  },
+  "Endorsement": {
+    "type": "object",
+    "fields": {
+      "id": {
+        "type": "number",
+        "optional": false
+      },
+      "type": {
+        "type": "string",
+        "optional": false
+      },
+      "title": {
+        "type": "string",
+        "optional": false
+      },
+      "form_number": {
+        "type": "string",
+        "optional": false
+      },
+      "edition_date": {
+        "type": "string",
+        "optional": false
+      },
+      "effective_date": {
+        "type": "string",
+        "optional": false
+      },
+      "premium_change": {
+        "type": "number",
+        "optional": false
+      }
+    },
+    "optional": false
+  },
+  "Underwriter": {
+    "type": "object",
+    "fields": {
+      "id": {
+        "type": "number",
+        "optional": false
+      },
+      "name": {
+        "type": "string",
+        "optional": false
+      },
+      "team": {
+        "type": "string",
+        "optional": false
+      },
+      "email": {
+        "type": "string",
+        "optional": false
+      },
+      "region": {
+        "type": "string",
+        "optional": false
+      },
+      "authority_limit": {
+        "type": "number",
+        "optional": false
+      }
+    },
+    "optional": false
+  },
+  "ExposureUnit": {
+    "type": "object",
+    "fields": {
+      "id": {
+        "type": "number",
+        "optional": false
+      },
+      "kind": {
+        "type": "string",
+        "optional": false
+      },
+      "name": {
+        "type": "string",
+        "optional": false
+      },
+      "basis": {
+        "type": "string",
+        "optional": false
+      },
+      "driver": {
+        "type": "object",
+        "fields": {
+          "hire_date": {
+            "type": "string",
+            "optional": false
+          },
+          "mvr_points": {
+            "type": "number",
+            "optional": false
+          },
+          "accidents_3yr": {
+            "type": "number",
+            "optional": false
+          },
+          "date_of_birth": {
+            "type": "string",
+            "optional": false
+          },
+          "license_state": {
+            "type": "string",
+            "optional": false
+          },
+          "license_number": {
+            "type": "string",
+            "optional": false
+          }
+        },
+        "optional": true
+      },
+      "vehicle": {
+        "type": "object",
+        "fields": {
+          "vin": {
+            "type": "string",
+            "optional": false
+          },
+          "make": {
+            "type": "string",
+            "optional": false
+          },
+          "year": {
+            "type": "number",
+            "optional": false
+          },
+          "model": {
+            "type": "string",
+            "optional": false
+          },
+          "cost_new": {
+            "type": "number",
+            "optional": false
+          },
+          "body_type": {
+            "type": "string",
+            "optional": false
+          },
+          "use_class": {
+            "type": "string",
+            "optional": false
+          },
+          "garaging_zip": {
+            "type": "string",
+            "optional": false
+          },
+          "radius_miles": {
+            "type": "number",
+            "optional": false
+          }
+        },
+        "optional": true
+      },
+      "location": {
+        "type": "reference",
+        "optional": true,
+        "resource": "Location",
+        "cardinality": "one"
+      },
+      "basis_amount": {
+        "type": "number",
+        "optional": false
+      },
+      "professional": {
+        "type": "object",
+        "fields": {
+          "role": {
+            "type": "string",
+            "optional": false
+          },
+          "billable_pct": {
+            "type": "number",
+            "optional": false
+          },
+          "practice_areas": {
+            "type": "array",
+            "itemType": "string",
+            "optional": false
+          },
+          "bar_admission_year": {
+            "type": "number",
+            "optional": false
+          }
+        },
+        "optional": true
+      },
+      "digital_asset": {
+        "type": "object",
+        "fields": {
+          "hosting": {
+            "type": "string",
+            "optional": false
+          },
+          "controls": {
+            "type": "object",
+            "fields": {
+              "edr": {
+                "type": "boolean",
+                "optional": false
+              },
+              "mfa": {
+                "type": "boolean",
+                "optional": false
+              },
+              "siem": {
+                "type": "boolean",
+                "optional": false
+              },
+              "training": {
+                "type": "boolean",
+                "optional": false
+              },
+              "offline_backups": {
+                "type": "boolean",
+                "optional": false
+              },
+              "pen_test_annual": {
+                "type": "boolean",
+                "optional": false
+              }
+            },
+            "optional": false
+          },
+          "pci_records": {
+            "type": "number",
+            "optional": false
+          },
+          "phi_records": {
+            "type": "number",
+            "optional": false
+          },
+          "pii_records": {
+            "type": "number",
+            "optional": false
+          }
+        },
+        "optional": true
+      },
+      "census_segment": {
+        "type": "object",
+        "fields": {
+          "tier": {
+            "type": "string",
+            "optional": false
+          },
+          "state": {
+            "type": "string",
+            "optional": false
+          },
+          "avg_age": {
+            "type": "number",
+            "optional": false
+          },
+          "age_band": {
+            "type": "string",
+            "optional": false
+          },
+          "member_count": {
+            "type": "number",
+            "optional": false
+          }
+        },
+        "optional": true
+      },
+      "classification": {
+        "type": "object",
+        "fields": {
+          "state": {
+            "type": "string",
+            "optional": false
+          },
+          "class_code": {
+            "type": "string",
+            "optional": false
+          },
+          "description": {
+            "type": "string",
+            "optional": false
+          }
+        },
+        "optional": true
+      },
+      "underlying_layer": {
+        "type": "object",
+        "fields": {
+          "policy": {
+            "type": "reference",
+            "optional": true,
+            "resource": "Policy",
+            "cardinality": "one"
+          },
+          "layer_limit": {
+            "type": "number",
+            "optional": false
+          },
+          "carrier_name": {
+            "type": "string",
+            "optional": false
+          },
+          "attachment_point": {
+            "type": "number",
+            "optional": false
+          },
+          "participation_pct": {
+            "type": "number",
+            "optional": false
+          },
+          "carrier_policy_number": {
+            "type": "string",
+            "optional": false
+          }
+        },
+        "optional": true
+      }
+    },
+    "optional": false
+  }
+}
