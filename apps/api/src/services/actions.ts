@@ -247,7 +247,7 @@ async function draftFor(deps: Deps, sel: RequestSelection, draftsOff: boolean): 
     draft = template;
     note = `Gemini draft unavailable (${error.message}); template used.`;
   }
-  let actor = sameDraft(draft, template) ? 'code' : 'gemini:draft-request';
+  let actor = sameDraft(draft, template) ? 'code' : 'llm:draft-request';
 
   // Second, independent check (F13): every field named, nothing else asked.
   const check = validateDraft(sel, `${draft.subject}\n\n${draft.body}`);

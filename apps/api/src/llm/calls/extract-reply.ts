@@ -393,11 +393,21 @@ function uniqueSpecs(fields: readonly ExtractReplyFieldSpec[]): ExtractReplyFiel
   });
 }
 
+/**
+ * `failed` is set when the model call itself did not succeed, so a caller can
+ * tell "the broker did not answer" apart from "we could not read the reply"
+ * (DECISIONS L-4). `model` is the model that actually answered.
+ */
+export type ExtractReplyResult = ExtractReplyOutput & {
+  readonly failed?: string;
+  readonly model?: string;
+};
+
 export async function extractReplyCall(
   provider: LlmProvider,
   input: ExtractReplyInput,
   pdf?: LlmPdfPart,
-): Promise<ExtractReplyOutput> {
+): Promise<ExtractReplyResult> {
   const specs = uniqueSpecs(input.requestedFields);
   const allNotFound = (): ExtractReplyOutput => ({
     values: [],
@@ -424,9 +434,12 @@ export async function extractReplyCall(
     });
   } catch (error) {
     if (error instanceof LlmUnavailableError) throw error;
-    return allNotFound();
+    const reason = error instanceof Error ? error.message : String(error);
+    return { ...allNotFound(), failed: reason.slice(0, 300) };
   }
-  if (result.degraded) return allNotFound();
+  if (result.degraded) {
+    return { ...allNotFound(), failed: 'the model call kept failing after retries', model: result.model };
+  }
 
-  return validateReply(result.data, { ...input, requestedFields: specs }, pdf !== undefined);
+  return { ...validateReply(result.data, { ...input, requestedFields: specs }, pdf !== undefined), model: result.model };
 }

@@ -274,11 +274,14 @@ export async function applyBrokerReply(
   const confirmDto = application.needsConfirmation.map(dto);
   // A clean value the engine has no slot for is reported, never counted as accepted (R-I4-2).
   const notApplied = rejectedDto.filter((v) => v.rejection === 'not_applied').map((v) => v.canonicalPath);
+  // A failed model call must never read as "the broker did not answer" (L-4).
   const noteParts = [
-    `${acceptedDto.length} accepted, ${confirmDto.length} to confirm, ${rejectedDto.length} rejected` +
-      (notApplied.length > 0 ? `; not applied: ${[...new Set(notApplied)].join(', ')}` : '') +
-      (extraction.notFound.length > 0 ? `; not answered: ${extraction.notFound.join(', ')}` : '') +
-      '.',
+    extraction.failed !== undefined
+      ? `Could not read the reply: the extraction call failed (${extraction.failed}). Nothing was extracted or changed; the broker's answers are still unread.`
+      : `${acceptedDto.length} accepted, ${confirmDto.length} to confirm, ${rejectedDto.length} rejected` +
+        (notApplied.length > 0 ? `; not applied: ${[...new Set(notApplied)].join(', ')}` : '') +
+        (extraction.notFound.length > 0 ? `; not answered: ${extraction.notFound.join(', ')}` : '') +
+        '.',
     newContradictions.length > 0
       ? `The reply disagrees with the submission on ${newContradictions.map((c) => c.canonicalPath).join(', ')}.`
       : null,
@@ -288,7 +291,7 @@ export async function applyBrokerReply(
     submissionId: row.id,
     type: 'reply',
     status: acceptedDto.length > 0 ? 'applied' : 'replied',
-    actor: 'gemini:extract-reply',
+    actor: `${extraction.model ?? 'llm'}:extract-reply`,
     payload: {
       fields: [...asked.fields],
       extracted: extractedDto,

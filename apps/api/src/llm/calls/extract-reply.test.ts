@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { ExtractReplyFieldSpec, ExtractReplyInput } from '@retrofit/contracts';
-import { createFakeLlm } from '../fake-provider';
+import { FAKE_MODEL, createFakeLlm } from '../fake-provider';
 import type { AnyGenerateJsonRequest, LlmPdfPart } from '../types';
 import {
   CONFLICT_CONFIDENCE_CAP,
@@ -211,10 +211,14 @@ describe('offline: extract-reply', () => {
   it('degrades to everything notFound; no source or no fields skips the call', async () => {
     const failing = createFakeLlm({ failFor: ['extract-reply'] });
     const out = await extractReplyCall(failing, extractInput({ requestedFields: [YEAR, TIV] }));
-    expect(out).toEqual({ values: [], notFound: ['buildings.yearBuilt', 'buildings.tiv'] });
+    expect(out.values).toEqual([]);
+    expect(out.notFound).toEqual(['buildings.yearBuilt', 'buildings.tiv']);
+    // A failed call is reported as a failure, never as "the broker did not answer" (L-4).
+    expect(out.failed).toEqual(expect.any(String));
     expect(failing.callsFor('extract-reply')).toHaveLength(2);
 
     const fake = createFakeLlm();
+    // No reply text is a genuine non-answer, not a failure: no `failed` flag.
     expect(await extractReplyCall(fake, extractInput({ sourceText: '   ', requestedFields: [YEAR] }))).toEqual({
       values: [],
       notFound: ['buildings.yearBuilt'],
@@ -242,6 +246,8 @@ describe('offline: extract-reply', () => {
     expect(out).toEqual({
       values: [{ canonicalPath: 'buildings.yearBuilt', value: 1978, confidence: 0.92, quote: 'Building C was built in 1978.' }],
       notFound: [],
+      model: FAKE_MODEL,
     });
+    expect(out.failed).toBeUndefined();
   });
 });

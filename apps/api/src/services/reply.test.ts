@@ -135,7 +135,7 @@ describe('applyBrokerReply', () => {
     expect(res.action).toMatchObject({
       type: 'reply',
       status: 'applied',
-      actor: 'gemini:extract-reply',
+      actor: 'fake-deterministic-1:extract-reply', // the model that actually answered (L-4)
       sourceText: REPLY,
       before,
       after: res.after,
