@@ -106,5 +106,5 @@ A second, independent review of the **real** Federato data (not synthetic cases)
 
 The only live evidence is the end-to-end smoke (`docs/status/smoke.md`): one conversational broker reply produced **4 of 4 fields correct**, each with a verbatim source quote checked by code. That is one reply, not an accuracy rate.
 
-To measure it: top up the Gemini credits, then run `npm run verify:llm`.
+To measure it: run `npm run verify:llm`. Reply extraction has since moved to Claude Sonnet 5 (DECISIONS L-1, L-2) and works live, so the check now calls Claude rather than the exhausted Gemini key.
 
