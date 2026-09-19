@@ -328,8 +328,12 @@ function factorRows(result: Result): FactorRowView[] {
 
 function queryTraceView(entries: readonly QueryTraceEntryDto[]): QueryTraceEntryView[] {
   return entries.map((e) => {
-    const noteParts = [e.adaptation, ...e.notes, e.error?.message ?? ''].filter((s) => s.length > 0);
-    return {
+    // R3-2: `adaptation` is the literal 'none' on every un-adapted entry; it maps to
+    // null. The adaptation and the error each get their own field, so `note` holds
+    // only the planner's free-text notes.
+    const adaptation = e.adaptation === 'none' || e.adaptation === '' ? null : e.adaptation;
+    const noteParts = e.notes.filter((s) => s.length > 0);
+    const view: QueryTraceEntryView = {
       step: e.seq,
       phase: e.pass,
       resource: e.pathChosen.rootResource,
@@ -339,7 +343,15 @@ function queryTraceView(entries: readonly QueryTraceEntryDto[]): QueryTraceEntry
       durationMs: e.durationMs,
       adapted: e.adaptedFrom !== null,
       note: noteParts.length > 0 ? noteParts.join(' · ') : null,
+      // R3-2 (PRD §7.5 step 6): the reasoning half of the trace, rendered by QueryTrace.tsx.
+      path: e.pathChosen.path,
+      why: e.pathChosen.why,
+      alternativesRejected: e.pathChosen.alternativesRejected,
+      requiredBy: e.requiredBy,
+      adaptation,
+      error: e.error?.message ?? null,
     };
+    return view;
   });
 }
 
@@ -383,16 +395,27 @@ function pricingView(price: SubmissionDetailDto['price']): PricingView {
     const d = price.expectedLossDetail;
     notes.push(`Loss credibility ${d.credibility} (n = ${d.n}, k = ${d.k}).`);
   }
-  return {
+  const view: PricingView = {
     quotedPremium: price.quotedPremium,
     predictedPremium: price.predictedPremium,
     adequacy: price.adequacy,
     expectedLoss: price.expectedAnnualLoss,
     ratePer100Tiv: price.ratePer100,
-    currency: 'USD',
+    currency: 'USD' as const,
     factors: price.factors.map((f) => ({ label: f.name, multiplier: f.factor, basis: f.input || null })),
+    // R5-7 (PRD §6.7, §10 d): the per-building rating steps (TIV/100 × base rate ×
+    // four multipliers = premium) that the account-level factors multiply. Kept
+    // per building, never merged into `factors`. Rendered by Pricing.tsx.
+    buildings: price.perBuilding.map((b) => ({
+      buildingExternalId: b.buildingExternalId,
+      tiv: b.tiv,
+      baseRate: b.baseRate,
+      factors: b.factors.map((f) => ({ label: f.name, multiplier: f.factor, input: f.input || null })),
+      premium: b.premium,
+    })),
     notes,
   };
+  return view;
 }
 
 function peerView(peers: SubmissionDetailDto['peers']): PeerBenchmarkView {
@@ -574,7 +597,8 @@ function draftViews(dto: SubmissionDetailDto): RequestDraftView[] {
       requestedFields: a.fields.map((f) => ({
         path: f.canonicalPath,
         label: f.label,
-        voi: swing.get(f.canonicalPath) ?? (f.componentKey !== null ? swing.get(f.componentKey) : undefined) ?? 0,
+        // R5-8: no ranked VOI entry means the DTO has no number; never invent a 0.
+        voi: swing.get(f.canonicalPath) ?? (f.componentKey !== null ? swing.get(f.componentKey) : undefined) ?? null,
       })),
     }));
 }

@@ -83,7 +83,7 @@ function Unavailable(props: { readonly flip: FlipView }): ReactElement {
           <dd>{formatScore(flip.scoreBefore, { decimals: 1 })}</dd>
         </div>
         <div className="rf-stat" data-testid="flip-premium-before">
-          <dt>Quoted premium</dt>
+          <dt>Predicted premium</dt>
           <dd>{formatMoney(flip.premiumBefore)}</dd>
         </div>
       </dl>
@@ -97,6 +97,10 @@ function Unavailable(props: { readonly flip: FlipView }): ReactElement {
  * The smallest move (at most two movable components, INTERPRETATIONS F-1, F-2)
  * that lands the account in FIT, with the score and premium after it. Every
  * number comes from `flip`; nothing is recomputed (PRD 10, 13).
+ *
+ * `premiumBefore` / `premiumAfter` are the engine's *predicted* premium (flip.ts
+ * prices the vector, not the quote), so they are labelled "Predicted premium"
+ * (R5-2). The quoted figure lives in panel (d).
  */
 export function Flip(props: FlipPanelProps): ReactElement {
   const { flip } = props;
@@ -125,7 +129,7 @@ export function Flip(props: FlipPanelProps): ReactElement {
             />
             <Stat
               testId="flip-premium"
-              label="Premium"
+              label="Predicted premium"
               before={formatMoney(flip.premiumBefore)}
               after={formatMoney(flip.premiumAfter)}
             />

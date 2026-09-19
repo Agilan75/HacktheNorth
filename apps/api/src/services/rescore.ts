@@ -30,6 +30,7 @@ import {
   LOSS_WINDOW_YEARS,
   computeBookStats,
   math,
+  peers as peerStage,
   rank,
   readQuestions,
   readRatingTable,
@@ -159,6 +160,18 @@ function known(vector: FeatureVector, index: number | undefined): number | null 
 }
 
 /**
+ * A peer candidate may carry the insured's annual revenue beside its vector
+ * (PRD 6.4 coarse match). Revenue is not a vector component, so it never
+ * reaches scoring; `peers` reads it only when placing a no-policy account.
+ */
+type PeerCandidate = PeerVectorEntry & { readonly revenue: number | null };
+
+function revenueOf(submission: CanonicalSubmission): number | null {
+  const v = firstValue(submission.insured.revenue);
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+/**
  * A book account as a peer candidate. Rate and annual loss follow the same
  * definitions `computeBookStats` uses: premium per $100 of TIV, and the
  * five-year loss over the five-year window. No quoted premium means no policy,
@@ -169,7 +182,8 @@ function peerEntry(
   label: string | null,
   vector: FeatureVector,
   spec: VectorSpec,
-): PeerVectorEntry {
+  revenue: number | null,
+): PeerCandidate {
   const totalTiv = known(vector, indexOfKey(spec, 'totalTiv'));
   const quotedPremium = known(vector, indexOfKey(spec, 'quotedPremium'));
   const fiveYearLoss = known(vector, indexOfKey(spec, 'fiveYearLoss'));
@@ -184,6 +198,7 @@ function peerEntry(
       totalTiv === null || quotedPremium === null ? null : math.safeDiv(quotedPremium, totalTiv / 100),
     annualLoss: fiveYearLoss === null ? null : fiveYearLoss / LOSS_WINDOW_YEARS,
     coarse,
+    revenue,
   };
 }
 
@@ -216,16 +231,37 @@ function fullPass(
   peerVectors: readonly PeerVectorEntry[],
   asOf: string,
 ): EngineResult {
+  const isProperty = item.submission.lineOfBusiness === 'commercial_property';
   const result = runEngine(
     {
       submission: item.submission,
       enrichment: item.enrichment,
       asOf,
-      ...(item.submission.lineOfBusiness === 'commercial_property' ? { peerVectors } : {}),
+      ...(isProperty ? { peerVectors } : {}),
     },
     { ...config, bookStats },
   );
-  return withExplanation(result, item.row.insuredName);
+  return withExplanation(isProperty ? withCoarsePeers(result, config, bookStats, peerVectors) : result, item.row.insuredName);
+}
+
+/**
+ * PRD 6.4: an account with no policy has only the reduced vector, which on the
+ * live book carries no comparable component, so the engine's own peers pass
+ * finds nobody. Re-run peers with the account's merged canonical record, so
+ * its requested limit, HQ state and revenue place it among the policy book as
+ * a coarse match. Only `peers` changes: the vector, score, price and verdict
+ * were computed without these inputs and stay exactly as they are.
+ */
+function withCoarsePeers(
+  result: EngineResult,
+  config: EngineConfig,
+  bookStats: BookStats,
+  peerVectors: readonly PeerVectorEntry[],
+): EngineResult {
+  if (peerVectors.length === 0) return result;
+  const placed = peerStage(result.vector, config.spec, peerVectors, bookStats, undefined, result.canonical);
+  if (!placed.coarse) return result;
+  return { ...result, peers: placed };
 }
 
 /**
@@ -288,7 +324,7 @@ export async function rescoreOne(deps: Deps, input: RescoreOneInput): Promise<Re
         ? stored
         : vectorPass(scorable(repos, other), config, asOf);
     vectors.push(vector);
-    peers.push(peerEntry(other.id, insuredNameOf(other), vector, config.spec));
+    peers.push(peerEntry(other.id, insuredNameOf(other), vector, config.spec, revenueOf(engineSubmission(other))));
   }
   const bookStats = computeBookStats(vectors, config.spec);
 
@@ -335,7 +371,7 @@ export async function rescoreBook(deps: Deps): Promise<number> {
     const vectors = items.map((item) => vectorPass(item, config, asOf));
     const bookStats = computeBookStats(vectors, config.spec);
     const entries = items.map((item, i) =>
-      peerEntry(item.row.id, item.row.insuredName, vectors[i]!, config.spec),
+      peerEntry(item.row.id, item.row.insuredName, vectors[i]!, config.spec, revenueOf(item.submission)),
     );
 
     // Pass 2: the full engine with the book's statistics and everyone else as peers.

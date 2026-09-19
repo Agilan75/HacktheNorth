@@ -302,6 +302,12 @@ interface Entity {
   readonly data: Record<string, unknown>;
   readonly key: string;
   readonly order: number;
+  /**
+   * Keys of the grouped entities this one was hydrated beneath, outermost
+   * first. `prefix` carries no array index, so it cannot tell two sibling
+   * locations apart; this can (R2-fixer-6, R1-1).
+   */
+  readonly ancestors: readonly string[];
 }
 
 const MAX_DEPTH = 8;
@@ -312,19 +318,22 @@ function collectEntities(
   group: Group,
   out: Entity[],
   depth: number,
+  ancestors: readonly string[] = [],
 ): void {
   if (depth > MAX_DEPTH) return;
   if (Array.isArray(value)) {
     for (const item of value) {
-      if (isPlainObject(item)) collectEntities(item, `${prefix}[]`, group, out, depth);
+      if (isPlainObject(item)) collectEntities(item, `${prefix}[]`, group, out, depth, ancestors);
     }
     return;
   }
   if (!isPlainObject(value)) return;
+  let childAncestors = ancestors;
   if (group !== 'other') {
     const id = value['id'];
     const key = id === null || id === undefined ? JSON.stringify(value) : `${group}:${String(id)}`;
-    out.push({ group, prefix, data: value, key, order: out.length });
+    out.push({ group, prefix, data: value, key, order: out.length, ancestors });
+    childAncestors = [...ancestors, key];
   }
   for (const [childKey, child] of Object.entries(value)) {
     // An ungrouped container (e.g. `exposure_units[]`) is walked through, never
@@ -332,7 +341,7 @@ function collectEntities(
     const childGroup = groupOf(childKey);
     if (childGroup === 'other' && !isPlainObject(child) && !Array.isArray(child)) continue;
     const nextPrefix = prefix === '' ? childKey : `${prefix}.${childKey}`;
-    collectEntities(child, nextPrefix, childGroup, out, depth + 1);
+    collectEntities(child, nextPrefix, childGroup, out, depth + 1, childAncestors);
   }
 }
 
@@ -532,7 +541,7 @@ export function normalize(
     // Which location this building sits at: either it was hydrated underneath
     // the location, or the location lists it by id.
     const owner = locationEntities.find((loc) => {
-      if (entity.prefix.startsWith(`${loc.prefix}.`)) return true;
+      if (entity.ancestors.includes(loc.key)) return true;
       const rawId = entity.data['id'];
       if (rawId === null || rawId === undefined) return false;
       return Object.entries(loc.data).some(([key, value]) => {

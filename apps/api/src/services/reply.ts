@@ -83,7 +83,9 @@ const LEAF_SPEC: Readonly<Record<string, SpecShape>> = {
   tivWeightedProtectionClass: { type: 'number', min: 1, max: 10 },
   stories: { type: 'number', min: 1, max: 200 },
   constructionType: { type: 'string', options: CONSTRUCTION_TYPES },
-  submissionType: { type: 'string', options: ['new_business', 'renewal'] },
+  // No `options`: extract-reply only case-folds an option match, so a verbatim
+  // "new business" would be dropped. F13's validator applies G-11 (R2 R4-6).
+  submissionType: { type: 'string' },
   state: { type: 'string' },
 };
 
@@ -224,6 +226,7 @@ export async function applyBrokerReply(
   /* 2. Validate: type, range, quote in source, the 0.8 gate (F13). */
   const extracted: ExtractedFieldValue[] = extraction.values.map((v) => ({
     canonicalPath: v.canonicalPath,
+    // Prose dates ("December 13, 2025") are read by F13's validator (R4-4).
     value: v.value,
     confidence: v.confidence,
     quote: v.quote,
@@ -269,8 +272,11 @@ export async function applyBrokerReply(
   const acceptedDto = application.accepted.map(dto);
   const rejectedDto = application.rejected.map(dto);
   const confirmDto = application.needsConfirmation.map(dto);
+  // A clean value the engine has no slot for is reported, never counted as accepted (R-I4-2).
+  const notApplied = rejectedDto.filter((v) => v.rejection === 'not_applied').map((v) => v.canonicalPath);
   const noteParts = [
     `${acceptedDto.length} accepted, ${confirmDto.length} to confirm, ${rejectedDto.length} rejected` +
+      (notApplied.length > 0 ? `; not applied: ${[...new Set(notApplied)].join(', ')}` : '') +
       (extraction.notFound.length > 0 ? `; not answered: ${extraction.notFound.join(', ')}` : '') +
       '.',
     newContradictions.length > 0

@@ -1,6 +1,7 @@
 /** Stage 10 — flip. Body owned by Run 1 unit E08. */
 import type {
   BookStats,
+  BuildingFacts,
   CanonicalSubmission,
   Condition,
   FeatureVector,
@@ -15,6 +16,9 @@ import type {
 } from '../types.js';
 import { evaluateCondition, vectorResolver } from '../util/conditions.js';
 import { isFiniteNumber } from '../util/math.js';
+import { bestValue } from '../util/fields.js';
+import { ACCEPTABLE_CONSTRUCTION, ASSUMED_ACCEPTABLE_CONSTRUCTION } from '../constants.js';
+import { canonicalConstructionType } from './normalize.js';
 import { scaleVector, tiersFor } from './vectorize.js';
 import { evaluate } from './evaluate.js';
 import { verdict } from './verdict.js';
@@ -356,7 +360,14 @@ interface Candidate {
   readonly fixHint: string | undefined;
 }
 
-/** The shortest scaled move over at most 2 movable components that reaches FIT. */
+/**
+ * The shortest scaled move over at most 2 movable components that reaches FIT.
+ *
+ * `extensions` are the same extension rules stage 7 evaluates with; the FIT test
+ * before and after every candidate move includes them, so an extension refer is
+ * never reported as FIT (F-6, R2-fixer-6 R1-2). Open contradictions stay out of
+ * the search (V05 decision 6).
+ */
 export function flip(
   vector: FeatureVector,
   spec: VectorSpec,
@@ -364,10 +375,11 @@ export function flip(
   table: RatingTable,
   submission: CanonicalSubmission,
   bookStats: BookStats | null,
+  extensions?: Rulebook,
 ): FlipResult {
   const components = spec.components as readonly ComponentSpec[];
 
-  const evaluatedBefore = evaluate(vector, spec, rulebook, submission);
+  const evaluatedBefore = evaluate(vector, spec, rulebook, submission, extensions);
   const verdictBefore = verdict(evaluatedBefore, []);
   const scoreBefore = evaluatedBefore.appetiteScore;
   const premiumBefore = predictedPremium(vector, spec, table, submission, bookStats);
@@ -389,7 +401,29 @@ export function flip(
     };
   }
 
-  const resolved = resolveBounds(vector, spec, rulebook).filter((r) => !r.bound.satisfied);
+  // An extension refer on an immovable component can never be cleared by a move.
+  const extensionBlocked = [
+    ...new Set(
+      evaluatedBefore.firedRules
+        .filter((r) => r.extension && r.tier === 'refer')
+        .flatMap((r) => r.conditions.map((c) => c.field))
+        .filter((field) => components.some((c) => c.key === field && c.immovable === true)),
+    ),
+  ];
+  if (extensionBlocked.length > 0) {
+    return {
+      flip: null,
+      reason: `An extension rule refers the account on an immovable component: ${extensionBlocked.join(', ')}.`,
+      blockedByImmovable: extensionBlocked,
+    };
+  }
+
+  // Extension rules are candidates too: a REFER raised only by a MOVABLE
+  // extension rule (e.g. sprinklers) gets a real move, not a null. DECISIONS R2-6.
+  const searchBook: Rulebook = extensions
+    ? { ...rulebook, rules: [...rulebook.rules, ...extensions.rules] }
+    : rulebook;
+  const resolved = resolveBounds(vector, spec, searchBook).filter((r) => !r.bound.satisfied);
   const failing = resolved.map((r) => r.bound);
   const blockedByImmovable = failing.filter((b) => b.immovable).map((b) => b.componentKey);
 
@@ -452,7 +486,7 @@ export function flip(
 
   for (const set of sets) {
     const moved = applyMoves(vector, spec, rulebook, set);
-    const evaluatedAfter = evaluate(moved, spec, rulebook, submission);
+    const evaluatedAfter = evaluate(moved, spec, rulebook, submission, extensions);
     if (verdict(evaluatedAfter, []).verdict !== 'FIT') continue; // F-6
 
     const distance = Math.hypot(...set.map((c) => c.deltaScaled));
@@ -496,7 +530,13 @@ export function flip(
     scoreBefore,
     scoreAfter: bestScore,
     premiumBefore,
-    premiumAfter: predictedPremium(bestVector, spec, table, submission, bookStats),
+    premiumAfter: predictedPremium(
+      bestVector,
+      spec,
+      table,
+      movedSubmission(submission, bestMoves),
+      bookStats,
+    ),
     verdictAfter: 'FIT',
     distanceScaled: bestDistance,
   };
@@ -534,6 +574,145 @@ function applyMoves(
   const t = tiersFor(x, spec, rulebook);
   const m = x.map((value) => (value === null ? 0 : 1)) as (0 | 1)[];
   return { lineOfBusiness: vector.lineOfBusiness, specVersion: vector.specVersion, x, t, m };
+}
+
+/* -------------------------------------------------------------------------- */
+/* The moved submission (R2-fixer-6, R1-3)                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Commercial pricing reads the buildings, not the vector, so the price after a
+ * move needs the buildings the move describes. Mirrors rollup's class aliases
+ * (private there, docs/decisions/E03.md).
+ */
+const CLASS_ALIASES: Readonly<Record<string, string>> = {
+  steel_frame: 'steel',
+  jm: 'joisted_masonry',
+  noncombustible: 'non_combustible',
+  masonry_noncombustible: 'masonry_non_combustible',
+};
+
+/** The class a construction move re-rates shifted TIV at, when no building has one. */
+const DEFAULT_ACCEPTABLE_CLASS = 'Joisted Masonry';
+
+function slotNumber(slot: BuildingFacts['tiv']): number | null {
+  const best = bestValue(slot);
+  return best !== null && isFiniteNumber(best.value) ? best.value : null;
+}
+
+function isAcceptableClass(building: BuildingFacts): boolean {
+  const raw = bestValue(building.constructionType)?.value;
+  const snake = canonicalConstructionType(raw);
+  if (snake === null) return false;
+  const key = CLASS_ALIASES[snake] ?? snake;
+  return ACCEPTABLE_CONSTRUCTION.includes(key) || ASSUMED_ACCEPTABLE_CONSTRUCTION.includes(key);
+}
+
+function isSprinklered(building: BuildingFacts): boolean {
+  return bestValue(building.sprinklered)?.value === true;
+}
+
+function withTiv(building: BuildingFacts, tiv: number): BuildingFacts {
+  const slot = building.tiv ?? [];
+  const provenance = bestValue(slot)?.provenance ?? { source: 'self_reported' as const };
+  return { ...building, tiv: [{ value: tiv, provenance }] };
+}
+
+/**
+ * Move `amount` of TIV from buildings outside a class into it, in building
+ * order. A building moved in part is split: the rest keeps its facts, the moved
+ * part becomes a sibling with the converted fact.
+ */
+function shiftTiv(
+  buildings: readonly BuildingFacts[],
+  inClass: (b: BuildingFacts) => boolean,
+  convert: (b: BuildingFacts) => BuildingFacts,
+  amount: number,
+): BuildingFacts[] {
+  let remaining = amount;
+  const out: BuildingFacts[] = [];
+  for (const building of buildings) {
+    const tiv = slotNumber(building.tiv);
+    if (remaining <= 0 || tiv === null || tiv <= 0 || inClass(building)) {
+      out.push(building);
+      continue;
+    }
+    const moved = Math.min(tiv, remaining);
+    remaining -= moved;
+    if (moved === tiv) {
+      out.push(convert(building));
+    } else {
+      out.push(withTiv(building, tiv - moved));
+      out.push(withTiv({ ...convert(building), externalId: `${building.externalId}~flip` }, moved));
+    }
+  }
+  return out;
+}
+
+/** A copy of the submission with the flip's moves applied to the facts pricing reads. */
+function movedSubmission(
+  submission: CanonicalSubmission,
+  moves: readonly Candidate[],
+): CanonicalSubmission {
+  let buildings: BuildingFacts[] = submission.buildings.slice();
+  let pricing = submission.pricing;
+  const ordered = moves.slice().sort((a, b) => a.component.index - b.component.index);
+
+  for (const move of ordered) {
+    const knownTiv = buildings.reduce((acc, b) => acc + Math.max(0, slotNumber(b.tiv) ?? 0), 0);
+    switch (move.component.key) {
+      case 'totalTiv': {
+        if (move.from === null || move.from <= 0) break;
+        const k = move.to / move.from;
+        buildings = buildings.map((b) => {
+          const tiv = slotNumber(b.tiv);
+          return tiv === null ? b : withTiv(b, tiv * k);
+        });
+        break;
+      }
+      case 'pctTivAcceptableConstruction': {
+        const from = move.from ?? 0;
+        if (move.to <= from || knownTiv <= 0) break;
+        const target =
+          buildings
+            .filter(isAcceptableClass)
+            .sort((a, b) => (slotNumber(b.tiv) ?? 0) - (slotNumber(a.tiv) ?? 0))[0]
+            ?.constructionType ?? [
+            { value: DEFAULT_ACCEPTABLE_CLASS, provenance: { source: 'self_reported' as const } },
+          ];
+        buildings = shiftTiv(
+          buildings,
+          isAcceptableClass,
+          (b) => ({ ...b, constructionType: target }),
+          (move.to - from) * knownTiv,
+        );
+        break;
+      }
+      case 'pctTivSprinklered': {
+        const from = move.from ?? 0;
+        if (move.to <= from || knownTiv <= 0) break;
+        buildings = shiftTiv(
+          buildings,
+          isSprinklered,
+          (b) => ({
+            ...b,
+            sprinklered: [{ value: true, provenance: { source: 'self_reported' as const } }],
+          }),
+          (move.to - from) * knownTiv,
+        );
+        break;
+      }
+      case 'quotedPremium':
+        pricing = {
+          ...pricing,
+          quotedPremium: [{ value: move.to, provenance: { source: 'self_reported' as const } }],
+        };
+        break;
+      default:
+        break;
+    }
+  }
+  return { ...submission, buildings, pricing };
 }
 
 /** The first `fixHint` the rulebook offers for a component, if any. */

@@ -193,6 +193,16 @@ interface BuildingRow {
 /* Stage 3                                                                    */
 /* -------------------------------------------------------------------------- */
 
+/** True when a raw row holds an expanded claims list: an array of claim objects, or empty. */
+function claimsListExpanded(data: unknown): boolean {
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) return false;
+  const claims = (data as Readonly<Record<string, unknown>>)['claims'];
+  return (
+    Array.isArray(claims) &&
+    claims.every((c) => typeof c === 'object' && c !== null && !Array.isArray(c))
+  );
+}
+
 /**
  * `asOf` is an ISO-8601 date. The five-year loss window is
  * (asOf - 5 years, asOf], inclusive of both endpoints as pinned in
@@ -361,11 +371,17 @@ export function rollup(submission: CanonicalSubmission, asOf: string): Rollup {
   }
 
   // I-4: zero claims in the window is a KNOWN 0, unless the claims list was
-  // never fetched — which is only observable through the raw bundle.
+  // never fetched — which is only observable through the raw bundle. A
+  // records.Claim key marks it fetched (W0-2.8); so does a raw row carrying an
+  // expanded claims list (empty, or claim objects), which is how the deep
+  // pass returns claims embedded in the Policy row. Bare claim ids do not count.
   const claimsNeverFetched =
     claimCount === 0 &&
     submission.raw !== undefined &&
-    !Object.prototype.hasOwnProperty.call(submission.raw.records, 'Claim');
+    !Object.prototype.hasOwnProperty.call(submission.raw.records, 'Claim') &&
+    !Object.values(submission.raw.records).some((rows) =>
+      rows.some((row) => claimsListExpanded(row.data)),
+    );
   const fiveYearLoss = claimsNeverFetched || lossWindow === null ? null : windowTotal;
 
   return {

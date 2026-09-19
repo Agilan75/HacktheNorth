@@ -264,3 +264,61 @@ describe('G-11 canonicalizers (exported for stage 6, CP1 FX1)', () => {
     expect(canonicalConstructionType('  ')).toBeNull();
   });
 });
+
+describe('normalize — building ownership on a multi-location hydrated policy (R1-1, I-1)', () => {
+  const policy = (HYDRATED_BUNDLE.records['Policy']?.[0]?.data ?? {}) as Record<string, unknown>;
+  const TWO_LOCATIONS: RawBundle = {
+    ...HYDRATED_BUNDLE,
+    records: {
+      Policy: [
+        record('Policy', {
+          ...policy,
+          exposure_units: [
+            {
+              id: 51,
+              kind: 'location',
+              location: {
+                id: 601,
+                state: 'CO',
+                protection_class: 2,
+                buildings: [{ id: 701, tiv: 12_000_000, year_built: 2001, construction_type: 'Steel Frame' }],
+              },
+            },
+            {
+              id: 52,
+              kind: 'location',
+              location: {
+                id: 602,
+                state: 'TX',
+                protection_class: 6,
+                buildings: [
+                  { id: 702, tiv: 15_000_000, year_built: 1995, construction_type: 'Steel Frame' },
+                  { id: 703, tiv: 14_000_000, year_built: 1998, construction_type: 'Steel Frame' },
+                ],
+              },
+            },
+          ],
+        }),
+      ],
+    },
+  };
+
+  const result = normalize(
+    TWO_LOCATIONS,
+    discover(TWO_LOCATIONS, undefined, COMMERCIAL_SPEC),
+    'commercial_property',
+  );
+
+  it('links each building to the location it was hydrated under, not the first one', () => {
+    expect(result.locations.map((l) => l.externalId)).toEqual(['601', '602']);
+    expect(result.buildings.map((b) => [b.externalId, b.locationExternalId])).toEqual([
+      ['701', '601'],
+      ['702', '602'],
+      ['703', '602'],
+    ]);
+  });
+
+  it('inherits the protection class of the building\'s own location', () => {
+    expect(result.buildings.map((b) => one(b.protectionClass))).toEqual([2, 6, 6]);
+  });
+});

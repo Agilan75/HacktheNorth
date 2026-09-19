@@ -8,7 +8,26 @@
  * Reviewers grep for `process.env` outside this file; there must be no hits.
  */
 
+import { isAbsolute, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
+
+/**
+ * The repo root. This module sits at `apps/api/src/env.ts` (and, if built, at
+ * `apps/api/dist/env.js`), three levels below it either way.
+ */
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+
+/**
+ * R6-1: a relative database path is resolved against the repo root, never the
+ * cwd, so root `npm run dev:api`, the api package's own `dev`/`start` (cwd
+ * `apps/api`) and `npm run seed` all open the same git-ignored file.
+ * `:memory:` and `file:` URIs pass through unchanged.
+ */
+function resolveDatabaseUrl(url: string): string {
+  if (url === ':memory:' || url.startsWith('file:') || isAbsolute(url)) return url;
+  return resolve(REPO_ROOT, url);
+}
 
 /**
  * An optional variable. A missing key and an empty string both read as
@@ -36,7 +55,7 @@ const envSchema = z.object({
   FEDERATO_CLIENT_SECRET: optionalNonEmpty,
 
   /** One SQLite file. `:memory:` in tests. */
-  DATABASE_URL: z.string().trim().min(1).default('apps/api/data/retrofit.db'),
+  DATABASE_URL: z.string().trim().min(1).default('apps/api/data/retrofit.db').transform(resolveDatabaseUrl),
 
   /** Sentry is added last and is never integral (PRD §14). */
   SENTRY_DSN: optionalNonEmpty,

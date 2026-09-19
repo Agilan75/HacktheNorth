@@ -196,6 +196,13 @@ interface SubmissionOptions {
   readonly quotedPremium?: number | null;
   readonly oldestYearBuilt?: number | null;
   readonly pctTivPre1990?: number;
+  readonly byConstruction?: readonly {
+    constructionType: string;
+    share: number;
+    acceptable: boolean;
+    assumedAcceptable: boolean;
+  }[];
+  readonly pctTivAcceptableConstruction?: number;
 }
 
 function submissionOf(options: SubmissionOptions = {}): CanonicalSubmission {
@@ -231,8 +238,8 @@ function submissionOf(options: SubmissionOptions = {}): CanonicalSubmission {
       tivKnownBuildingCount: 2,
       pctTivPre1990: options.pctTivPre1990 ?? 0,
       pctTivPost2010: 0,
-      pctTivByConstruction: [],
-      pctTivAcceptableConstruction: 0.5,
+      pctTivByConstruction: (options.byConstruction ?? []).map((c) => ({ ...c, tiv: c.share * 150_000_000 })),
+      pctTivAcceptableConstruction: options.pctTivAcceptableConstruction ?? 0.5,
       pctTivSprinklered: null,
       tivWeightedProtectionClass: null,
       primaryState: 'OH',
@@ -469,7 +476,7 @@ describe('evaluate — fired rules and interpretations', () => {
   });
 
   it('surfaces only the interpretations a fired rule touched', () => {
-    const result = evaluate(vectorOf(B1_X), SPEC, RULEBOOK, submissionOf());
+    const result = evaluate(vectorOf(B1_X), SPEC, RULEBOOK, submissionOf({ byConstruction: FR_DECIDES }));
     expect(result.interpretationsApplied.map((i) => i.id)).toEqual(['I-3']);
   });
 
@@ -477,5 +484,68 @@ describe('evaluate — fired rules and interpretations', () => {
     const a = evaluate(vectorOf(B1_X), SPEC, RULEBOOK, submissionOf());
     const b = evaluate(vectorOf(B1_X), SPEC, RULEBOOK, submissionOf());
     expect(a).toEqual(b);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* R2 fixer 5 — I-3 is surfaced only when the construction tier depends on it  */
+/* -------------------------------------------------------------------------- */
+
+const FR_DECIDES = [
+  { constructionType: 'fire_resistive', share: 0.5, acceptable: true, assumedAcceptable: true },
+  { constructionType: 'frame', share: 0.5, acceptable: false, assumedAcceptable: false },
+];
+
+function withConstruction(share: number): (number | null)[] {
+  const x = [...B1_X];
+  x[7] = share;
+  return x;
+}
+
+describe('evaluate — I-3 dependency (INTERPRETATIONS I-3)', () => {
+  const ids = (share: number, byConstruction: SubmissionOptions['byConstruction']): string[] =>
+    evaluate(
+      vectorOf(withConstruction(share)),
+      SPEC,
+      RULEBOOK,
+      submissionOf({ byConstruction, pctTivAcceptableConstruction: share }),
+    ).interpretationsApplied.map((i) => i.id);
+
+  it('attaches I-3 when removing FR/MFR TIV would flip the construction tier', () => {
+    expect(ids(0.5, FR_DECIDES)).toContain('I-3');
+    expect(
+      ids(0.7, [
+        { constructionType: 'modified_fire_resistive', share: 0.4, acceptable: true, assumedAcceptable: true },
+        { constructionType: 'joisted_masonry', share: 0.3, acceptable: true, assumedAcceptable: false },
+        { constructionType: 'frame', share: 0.3, acceptable: false, assumedAcceptable: false },
+      ]),
+    ).toContain('I-3');
+  });
+
+  it('does not attach I-3 when the account has no FR/MFR building', () => {
+    expect(
+      ids(1, [{ constructionType: 'joisted_masonry', share: 1, acceptable: true, assumedAcceptable: false }]),
+    ).not.toContain('I-3');
+    expect(
+      ids(0, [{ constructionType: 'frame', share: 1, acceptable: false, assumedAcceptable: false }]),
+    ).not.toContain('I-3');
+  });
+
+  it('does not attach I-3 when FR/MFR is present but the tier holds without it', () => {
+    // Acceptable either way: 0.9 with FR, 0.8 without.
+    expect(
+      ids(0.9, [
+        { constructionType: 'joisted_masonry', share: 0.8, acceptable: true, assumedAcceptable: false },
+        { constructionType: 'fire_resistive', share: 0.1, acceptable: true, assumedAcceptable: true },
+        { constructionType: 'frame', share: 0.1, acceptable: false, assumedAcceptable: false },
+      ]),
+    ).not.toContain('I-3');
+    // Not Acceptable either way: 0.3 with FR, 0 without.
+    expect(
+      ids(0.3, [
+        { constructionType: 'fire_resistive', share: 0.3, acceptable: true, assumedAcceptable: true },
+        { constructionType: 'frame', share: 0.7, acceptable: false, assumedAcceptable: false },
+      ]),
+    ).not.toContain('I-3');
   });
 });

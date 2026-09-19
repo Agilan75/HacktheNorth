@@ -1,5 +1,6 @@
 /** Stage 4 — merge. Body owned by Run 1 unit E04. */
 import { HIGH_VALUE_LABELS, OBJECT_VOCAB } from '../constants.js';
+import { bestValue } from '../util/fields.js';
 import type {
   CanonicalSubmission,
   ExternalValue,
@@ -165,12 +166,85 @@ function findByExternalId(list: readonly Bag[], id: string): Bag | null {
   return null;
 }
 
+/*
+ * Wildcard and rollup answers (R-I4-2, docs/decisions/R2b-G2.md).
+ *
+ * A request for an account with no buildings asks for `buildings.*.tiv`, and
+ * one whose claims were never listed asks for `rollup.fiveYearLoss`. Neither
+ * names a slot the account has, but the broker's answer is still a fact about
+ * it. These paths land where stage 3 reads them:
+ *
+ * - `buildings.*` / `locations.*`: the account's only entity, or — when it has
+ *   none — one entity reported by the broker. Several entities make `*`
+ *   ambiguous, so the value is dropped.
+ * - `rollup.totalTiv`: the TIV of the account's only (or reported) building.
+ * - `rollup.fiveYearLoss`: one aggregate claim dated at the received date (the
+ *   inclusive end of the I-4 window), when no claim is listed. A second answer
+ *   joins the same aggregate claim.
+ * - Every other `rollup.*` path is derived arithmetic and is dropped.
+ *
+ * A concrete id the account does not have is still dropped, never invented.
+ */
+const REPORTED_ID: Readonly<Record<string, string>> = {
+  buildings: 'reply-building-1',
+  locations: 'reply-location-1',
+};
+const REPORTED_BUILDING_LABEL = 'reported by broker';
+const AGGREGATE_CLAIM_ID = 'reply-five-year-loss';
+
+/** The one entity a `*` names: the only entry, or a new reported one. Null when ambiguous. */
+function wildcardEntry(draft: Bag, list: string): Bag | null {
+  const entries = draft[list] as Bag[];
+  if (entries.length === 1) return entries[0] ?? null;
+  if (entries.length > 1) return null;
+  const id = REPORTED_ID[list];
+  if (id === undefined) return null;
+  const created: Bag =
+    list === 'buildings' ? { externalId: id, label: REPORTED_BUILDING_LABEL } : { externalId: id };
+  entries.push(created);
+  return created;
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The aggregate claim a five-year-loss answer lands on, or null when it cannot land. */
+function aggregateClaim(draft: Bag, provenance: Provenance): Bag | null {
+  const history = draft.history as Bag[];
+  const existing = findByExternalId(history, AGGREGATE_CLAIM_ID);
+  if (existing !== null) return existing;
+  if (history.length > 0) return null;
+  const received = bestValue(draft.receivedDate as readonly Field<unknown>[] | undefined);
+  const date = typeof received?.value === 'string' ? received.value.trim() : '';
+  if (!ISO_DATE.test(date)) return null;
+  const claim: Bag = {
+    externalId: AGGREGATE_CLAIM_ID,
+    // The window's inclusive end (I-4), carried by the answer that placed it.
+    dateOfLoss: [{ value: date, provenance }],
+  };
+  history.push(claim);
+  return claim;
+}
+
+function rollupSlot(draft: Bag, key: string, provenance: Provenance): Slot | null {
+  if (key === 'totalTiv') {
+    const building = wildcardEntry(draft, 'buildings');
+    return building === null ? null : { container: building, key: 'tiv' };
+  }
+  if (key === 'fiveYearLoss') {
+    const claim = aggregateClaim(draft, provenance);
+    return claim === null ? null : { container: claim, key: 'paidIndemnity' };
+  }
+  return null;
+}
+
 /**
  * Resolve a dotted canonical path to the object and key that hold its
  * `Sourced` slot. Returns null when the path names nothing this submission has
  * — an unresolvable external value is dropped, never invented into the tree.
+ * The one exception is a `*` or `rollup.*` answer (see `wildcardEntry`), which
+ * may create the single reported building, location or aggregate claim.
  */
-function resolveSlot(draft: Bag, path: string): Slot | null {
+function resolveSlot(draft: Bag, path: string, provenance: Provenance): Slot | null {
   const seg = path.split('.').filter((s) => s.length > 0);
   if (seg.length === 0) return null;
   const head = seg[0] ?? '';
@@ -205,8 +279,16 @@ function resolveSlot(draft: Bag, path: string): Slot | null {
   if (listKeys !== undefined) {
     if (seg.length !== 3) return null;
     if (!listKeys.includes(third)) return null;
+    if (second === '*') {
+      const entry = head === 'history' ? null : wildcardEntry(draft, head);
+      return entry ? { container: entry, key: third } : null;
+    }
     const entry = findByExternalId(draft[head] as Bag[], second);
     return entry ? { container: entry, key: third } : null;
+  }
+
+  if (head === 'rollup') {
+    return seg.length === 2 ? rollupSlot(draft, second, provenance) : null;
   }
 
   if (head === 'coverage') {
@@ -223,7 +305,7 @@ function resolveSlot(draft: Bag, path: string): Slot | null {
 /** Append one field. Nothing is ever removed, reordered or overwritten. */
 function applyWrite(draft: Bag, write: Write): void {
   if (!isPresent(write.value)) return;
-  const slot = resolveSlot(draft, write.path);
+  const slot = resolveSlot(draft, write.path, write.provenance);
   if (slot === null) return;
   const existing = slot.container[slot.key];
   const before: readonly Field<unknown>[] = Array.isArray(existing)
@@ -330,7 +412,9 @@ function observationWrites(observations: readonly Observation[]): Write[] {
  * dropped rather than appended, so a missing enrichment can never masquerade as
  * a competing value at stage 5.
  *
- * `rollup` is carried through untouched: merge does no arithmetic. When a merge
+ * `rollup` is carried through untouched: merge does no arithmetic. A
+ * `rollup.totalTiv` / `rollup.fiveYearLoss` answer lands on the building or
+ * claim stage 3 sums, never on `rollup` itself (R-I4-2). When a merge
  * writes a rollup-feeding path (`buildings.*`, `locations.*`, `history.*`,
  * `receivedDate`), the composer must re-run stage 3 before vectorizing.
  */

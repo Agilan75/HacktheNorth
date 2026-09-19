@@ -71,7 +71,8 @@ describe('Vector', () => {
     expect(screen.getByTestId('vector-raw-isNewBusiness')).toHaveTextContent('1 (yes)');
     expect(screen.getByTestId('vector-raw-tivWeightedProtectionClass')).toHaveTextContent('4.0');
     expect(screen.getByTestId('vector-tier-quotedPremium')).toHaveTextContent('0.6 · Acceptable');
-    expect(screen.getByTestId('vector-tier-fiveYearLoss')).toHaveTextContent('1 · Target');
+    // T-BLANK: loss value has no Target column; tier 1 is Acceptable, as panel (b) says.
+    expect(screen.getByTestId('vector-tier-fiveYearLoss')).toHaveTextContent('1 · Acceptable');
     expect(screen.getByTestId('vector-mask-totalTiv')).toHaveTextContent('1 · known');
     expect(screen.getByTestId('vector-completeness')).toHaveTextContent('100.0%');
     expect(screen.getByTestId('vector-known')).toHaveTextContent('11 of 11');
@@ -95,6 +96,15 @@ describe('Vector', () => {
     for (const key of movable) expect(screen.getByTestId(`vector-movable-${key}`)).toHaveTextContent('Movable');
     // Components 9 and 10 are not appetite factors.
     expect(screen.getByTestId('vector-tier-pctTivSprinklered')).toHaveTextContent('Not scored');
+  });
+
+  it('R5-10 / T-BLANK: tier 1 on a blank-Target factor reads Acceptable, elsewhere Target', () => {
+    render(<Vector vector={B2} />);
+    for (const key of ['isNewBusiness', 'isPropertyLine', 'pctTivAcceptableConstruction', 'fiveYearLoss']) {
+      expect(screen.getByTestId(`vector-tier-${key}`)).toHaveTextContent('1 · Acceptable');
+      expect(screen.getByTestId(`vector-tier-${key}`)).not.toHaveTextContent('Target');
+    }
+    expect(screen.getByTestId('vector-tier-stateTier')).toHaveTextContent('1 · Target');
   });
 
   it('T-SPAN: notes that components 5 and 6 share the building-age tier', () => {

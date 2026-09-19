@@ -1,1 +1,1 @@
-{"version":3,"file":"Flip.d.ts","sourceRoot":"","sources":["../../src/panels/Flip.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,OAAO,CAAC;AAM1C,OAAO,KAAK,EAAgB,cAAc,EAAY,MAAM,YAAY,CAAC;AAuFzE;;;;;;GAMG;AACH,wBAAgB,IAAI,CAAC,KAAK,EAAE,cAAc,GAAG,YAAY,CA8CxD"}
+{"version":3,"file":"Flip.d.ts","sourceRoot":"","sources":["../../src/panels/Flip.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,OAAO,CAAC;AAM1C,OAAO,KAAK,EAAgB,cAAc,EAAY,MAAM,YAAY,CAAC;AAuFzE;;;;;;;;;;GAUG;AACH,wBAAgB,IAAI,CAAC,KAAK,EAAE,cAAc,GAAG,YAAY,CA8CxD"}

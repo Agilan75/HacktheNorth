@@ -1,4 +1,4 @@
-import { jsxs as _jsxs, jsx as _jsx } from "react/jsx-runtime";
+import { jsxs as _jsxs, jsx as _jsx, Fragment as _Fragment } from "react/jsx-runtime";
 import { formatScore, pluralize } from '@retrofit/contracts';
 import { cssVar, SPACE } from '@retrofit/design';
 import { Badge } from '../components/atoms/Badge';
@@ -48,7 +48,20 @@ const noteStyle = {
     margin: `${SPACE.xs}px 0 0`,
     fontSize: cssVar('size-small'),
     lineHeight: cssVar('leading-small'),
-    color: cssVar('red-deep'),
+    color: cssVar('ink'),
+};
+const errorStyle = { ...noteStyle, color: cssVar('red-deep') };
+const labelStyle = { fontWeight: 600 };
+const subListStyle = {
+    margin: `${SPACE.xs}px 0 0`,
+    paddingLeft: SPACE.lg,
+    fontSize: cssVar('size-small'),
+    lineHeight: cssVar('leading-small'),
+    color: cssVar('ink'),
+};
+const codeStyle = {
+    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+    fontSize: '0.95em',
 };
 const payloadStyle = {
     margin: `${SPACE.xs}px 0 0`,
@@ -86,14 +99,40 @@ function formatDuration(ms) {
         return `${formatScore(ms / 1000, { decimals: 2 })} s`;
     return `${formatScore(ms)} ms`;
 }
+/**
+ * Plain-language readings of the planner's adaptation kinds
+ * (packages/federato/src/planner/adapt.ts). An unknown kind is shown verbatim.
+ */
+const ADAPTATION_TEXT = {
+    elem_match_swap: 'the previous attempt returned no rows through a dot-path into an array, so the planner retried with $elemMatch instead.',
+    drop_narrowest_filter: 'the previous attempt returned no rows, so the planner dropped its narrowest filter and retried.',
+};
+function adaptationText(kind) {
+    return ADAPTATION_TEXT[kind] ?? kind;
+}
+function hasText(value) {
+    return value !== null && value !== undefined && value.trim() !== '';
+}
+function pathText(resource, path) {
+    return [resource, ...(path ?? [])].join(' → ');
+}
+/** Ends a clause with a full stop unless it already carries terminal punctuation. */
+function sentence(text) {
+    const t = text.trim();
+    return /[.!?:]$/.test(t) ? t : `${t}.`;
+}
 function TraceEntry({ entry }) {
-    return (_jsxs("li", { style: entryStyle, "data-testid": "query-trace-entry", "data-step": entry.step, children: [_jsxs("div", { style: entryHeadStyle, children: [_jsxs("span", { style: stepStyle, children: ["Step ", entry.step] }), _jsx(Badge, { label: entry.phase, tone: "quiet", title: "Planner pass" }), _jsx("span", { style: resourceStyle, children: entry.resource }), entry.adapted ? (_jsx(Badge, { label: "Adapted", tone: "attention", title: "The planner rewrote this query after a first attempt" })) : null] }), _jsx("p", { style: purposeStyle, children: entry.purpose }), _jsxs("p", { style: metaStyle, children: [pluralize(entry.resultCount, 'row'), " \u00B7 ", formatDuration(entry.durationMs)] }), entry.note !== null && entry.note !== '' ? _jsx("p", { style: noteStyle, children: entry.note }) : null, _jsxs("details", { children: [_jsx("summary", { style: metaStyle, children: "Query payload" }), _jsx("pre", { style: payloadStyle, children: _jsx("code", { children: payloadText(entry.payload) }) })] })] }));
+    const needs = entry.requiredBy;
+    const rejected = entry.alternativesRejected ?? [];
+    const adaptation = hasText(entry.adaptation) && entry.adaptation !== 'none' ? entry.adaptation : null;
+    return (_jsxs("li", { style: entryStyle, "data-testid": "query-trace-entry", "data-step": entry.step, children: [_jsxs("div", { style: entryHeadStyle, children: [_jsxs("span", { style: stepStyle, children: ["Step ", entry.step] }), _jsx(Badge, { label: entry.phase, tone: "quiet", title: "Planner pass" }), _jsx("span", { style: resourceStyle, children: entry.resource }), entry.adapted ? (_jsx(Badge, { label: "Adapted", tone: "attention", title: "The planner rewrote this query after a first attempt" })) : null] }), _jsxs("p", { style: purposeStyle, "data-testid": "trace-goal", children: [_jsx("span", { style: labelStyle, children: "Goal:" }), " ", entry.purpose] }), needs === undefined ? null : needs.length === 0 ? (_jsx("p", { style: noteStyle, "data-testid": "trace-needs-none", children: "No scoring rule needed this query; it gathers context for the ones that do." })) : (_jsxs(_Fragment, { children: [_jsx("p", { style: noteStyle, children: _jsx("span", { style: labelStyle, children: "Needed by:" }) }), _jsx("ul", { style: subListStyle, "aria-label": `Rules that needed step ${entry.step}`, children: needs.map((n, i) => (_jsxs("li", { "data-testid": "trace-need", children: ["Rule ", _jsx("code", { style: codeStyle, children: n.ruleId }), n.factor !== null && n.factor !== '' ? ` (${n.factor})` : '', " needs", ' ', _jsx("code", { style: codeStyle, children: n.canonicalPath }), hasText(n.why) ? `: ${n.why}` : ''] }, `${n.ruleId}-${n.canonicalPath}-${i}`))) })] })), hasText(entry.why) || (entry.path !== undefined && entry.path.length > 0) ? (_jsxs("p", { style: noteStyle, "data-testid": "trace-path", children: [_jsx("span", { style: labelStyle, children: "Path chosen:" }), " Went to ", pathText(entry.resource, entry.path), hasText(entry.why) ? ` because ${sentence(entry.why)}` : '.'] })) : null, rejected.length > 0 ? (_jsxs(_Fragment, { children: [_jsx("p", { style: noteStyle, children: _jsx("span", { style: labelStyle, children: "Considered and rejected:" }) }), _jsx("ul", { style: subListStyle, "aria-label": `Alternatives rejected at step ${entry.step}`, children: rejected.map((a, i) => (_jsxs("li", { "data-testid": "trace-rejected", children: [pathText(a.rootResource, a.path), ": ", sentence(a.why)] }, `${a.rootResource}-${i}`))) })] })) : null, _jsxs("p", { style: metaStyle, "data-testid": "trace-result", children: ["Returned ", pluralize(entry.resultCount, 'row'), " in ", formatDuration(entry.durationMs), "."] }), adaptation !== null ? (_jsxs("p", { style: noteStyle, "data-testid": "trace-adaptation", children: [_jsx("span", { style: labelStyle, children: "Adapted:" }), " ", adaptationText(adaptation)] })) : null, hasText(entry.note) ? (_jsxs("p", { style: noteStyle, "data-testid": "trace-note", children: [_jsx("span", { style: labelStyle, children: "Note:" }), " ", entry.note] })) : null, hasText(entry.error) ? (_jsxs("p", { style: errorStyle, "data-testid": "trace-error", children: [_jsx("span", { style: labelStyle, children: "Error:" }), " ", entry.error] })) : null, _jsxs("details", { children: [_jsx("summary", { style: metaStyle, children: "Query payload" }), _jsx("pre", { style: payloadStyle, children: _jsx("code", { children: payloadText(entry.payload) }) })] })] }));
 }
 /**
  * PRD 10 (c) How the agent got here: the query trace.
  *
- * Stub frozen by W0-4. Unit C07 replaces this body only — never the signature,
- * never the import list's shape, never this file's path.
+ * Each query reads as prose (R3-2, PRD 7.5 step 6): the goal, which rule needed
+ * it, the path chosen and why, the alternatives rejected, the row count and
+ * duration, and any adaptation. The raw payload stays behind a disclosure.
  */
 export function QueryTrace(props) {
     const entries = [...props.entries].sort((a, b) => a.step - b.step);

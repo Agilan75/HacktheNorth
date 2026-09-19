@@ -145,3 +145,63 @@ describe('conflictingPaths', () => {
     expect(conflictingPaths([v('buildings.B1.yearBuilt', 1980)], c)).toEqual([]);
   });
 });
+
+/* R-I4-2: an accepted value must land where the engine reads it, or say it did not. */
+describe('applyReply — values the engine cannot place', () => {
+  const BARE: CanonicalSubmission = {
+    id: 'SUB-9',
+    lineOfBusiness: 'commercial_property',
+    receivedDate: [{ value: '2025-08-15', provenance: SR }],
+    insured: {},
+    locations: [],
+    buildings: [],
+    hazards: { present: {} },
+    exposure: {},
+    coverage: { lines: [] },
+    history: [],
+    pricing: {},
+  };
+
+  it('keeps wildcard and five-year-loss answers for an account with no buildings or claims', () => {
+    const app = applyReply({
+      submissionId: 'SUB-9',
+      sourceText: 'x',
+      validated: [v('buildings.*.tiv', 64_500_000), v('locations.*.state', 'OH'), v('rollup.fiveYearLoss', 42_000)],
+      canonical: BARE,
+    });
+    expect(app.accepted.map((x) => x.canonicalPath)).toEqual([
+      'buildings.*.tiv',
+      'locations.*.state',
+      'rollup.fiveYearLoss',
+    ]);
+    expect(app.externalValues.map((x) => x.canonicalPath)).toEqual([
+      'buildings.*.tiv',
+      'locations.*.state',
+      'rollup.fiveYearLoss',
+    ]);
+    expect(app.rejected).toEqual([]);
+  });
+
+  it('reports a clean value that lands nowhere as not applied, never as accepted', () => {
+    const app = applyReply({
+      submissionId: 'SUB-1',
+      sourceText: 'x',
+      validated: [
+        v('buildings.*.tiv', 5_000_000), // two buildings: ambiguous
+        v('rollup.pctTivSprinklered', 0.5), // derived arithmetic
+        v('lineOfBusiness', 'property'), // not a Sourced slot
+        v('pricing.quotedPremium', 175_000),
+      ],
+      canonical: CANONICAL,
+    });
+    expect(app.accepted.map((x) => x.canonicalPath)).toEqual(['pricing.quotedPremium']);
+    expect(app.externalValues.map((x) => x.canonicalPath)).toEqual(['pricing.quotedPremium']);
+    expect(app.rejected.map((x) => [x.canonicalPath, x.rejection, x.accepted, x.needsConfirmation])).toEqual([
+      ['buildings.*.tiv', 'not_applied', false, false],
+      ['rollup.pctTivSprinklered', 'not_applied', false, false],
+      ['lineOfBusiness', 'not_applied', false, false],
+    ]);
+    // The log's full list says the same thing.
+    expect(app.extracted.filter((x) => x.accepted).map((x) => x.canonicalPath)).toEqual(['pricing.quotedPremium']);
+  });
+});

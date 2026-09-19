@@ -187,14 +187,48 @@ describe('contradict — severity', () => {
     expect(out[0]!.affectedRules).toEqual(['X-CANDLE']);
   });
 
-  it('marks a disputed received date HIGH, because it moves the loss window (I-4)', () => {
-    const out = contradict(
-      base({ receivedDate: two('2025-05-17', '2025-06-01') }),
-      book([rule('R-LOSS', 'fiveYearLoss', { factor: 'loss_value' })]),
-    );
+  // A disputed received date only moves the five-year loss window (I-4), so it
+  // can change a verdict only when the loss-value tier differs between the two
+  // windows. Every real property account carries such a conflict (Policy and
+  // Submission disagree on all 27), so treating each as HIGH blocked FIT
+  // book-wide. DECISIONS R2-4.
+  const lossRule = rule('R-LOSS', 'fiveYearLoss', { factor: 'loss_value' });
+  const claim = (id: string, date: string, paid: number) => ({
+    externalId: id,
+    dateOfLoss: one(date, broker),
+    paidIndemnity: one(paid, broker),
+  });
 
-    expect(out[0]!.severity).toBe('HIGH');
+  it('marks a disputed received date LOW when the loss tier is the same under both dates', () => {
+    const out = contradict(
+      base({ receivedDate: two('2025-05-17', '2025-06-01'), history: [claim('C1', '2023-01-10', 40_000)] }),
+      book([lossRule]),
+    );
+    expect(out[0]!.severity).toBe('LOW');
     expect(out[0]!.affectedRules).toEqual(['R-LOSS']);
+    expect(out[0]!.note).toContain('immaterial');
+    expect(out[0]!.note).toContain('$40,000 / $40,000');
+  });
+
+  it('keeps a disputed received date HIGH when a claim falls in only one window and crosses the loss tier', () => {
+    // 2025-05-25 is after 2025-05-17 but on or before 2025-06-01: in one window only.
+    const out = contradict(
+      base({ receivedDate: two('2025-05-17', '2025-06-01'), history: [claim('C1', '2025-05-25', 150_000)] }),
+      book([lossRule]),
+    );
+    expect(out[0]!.severity).toBe('HIGH');
+    expect(out[0]!.note).not.toContain('immaterial');
+  });
+
+  it('keeps a disputed received date HIGH when the loss is unknown, because materiality cannot be shown', () => {
+    const out = contradict(
+      base({
+        receivedDate: two('2025-05-17', '2025-06-01'),
+        raw: { records: { Policy: [{ id: 1, data: { id: 1, claims: [3, 4] } }] } } as never,
+      }),
+      book([lossRule]),
+    );
+    expect(out[0]!.severity).toBe('HIGH');
   });
 });
 
@@ -223,5 +257,71 @@ describe('contradict — determinism', () => {
     );
 
     expect(out.every((c) => c.status === 'open')).toBe(true);
+  });
+});
+
+describe('contradict — a broker answer resolves a contradiction (PRD 7.6)', () => {
+  const lossBook = book([rule('R-LOSS', 'fiveYearLoss', { factor: 'loss_value' })]);
+  const dates = (...entries: [string, Provenance][]): Sourced<string> =>
+    entries.map(([value, provenance]) => ({ value, provenance }));
+
+  it('resolves when the answer confirms one of the competing values', () => {
+    const out = contradict(
+      base({
+        receivedDate: dates(['2025-12-13', broker], ['2025-12-29', broker], ['2025-12-13', reply]),
+        // A $150K claim between the two dates makes the conflict material (HIGH),
+        // so this test exercises resolution of a contradiction that actually matters.
+        history: [{ externalId: 'C1', dateOfLoss: [{ value: '2025-12-20', provenance: broker }], paidIndemnity: [{ value: 150_000, provenance: broker }] }],
+      }),
+      lossBook,
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0]!.severity).toBe('HIGH');
+    expect(out[0]!.status).toBe('resolved');
+  });
+
+  it('stays open when the answer conflicts with every submitted value', () => {
+    const out = contradict(
+      base({
+        receivedDate: dates(['2025-12-13', broker], ['2025-12-29', broker], ['2026-01-05', reply]),
+      }),
+      lossBook,
+    );
+    expect(out[0]!.status).toBe('open');
+  });
+
+  it('uses the latest answer when the broker replied twice', () => {
+    const out = contradict(
+      base({
+        receivedDate: dates(
+          ['2025-12-13', broker],
+          ['2025-12-29', broker],
+          ['2025-12-29', reply],
+          ['2026-01-05', reply],
+        ),
+      }),
+      lossBook,
+    );
+    expect(out[0]!.status).toBe('open');
+  });
+
+  it('stays open when a higher-confidence source still outranks the confirmed value', () => {
+    // The engine would score on the public record, not the confirmed broker value.
+    const out = contradict(
+      base({
+        buildings: [
+          {
+            externalId: 'B1',
+            tiv: [
+              { value: 1_000_000, provenance: broker },
+              { value: 2_500_000, provenance: publicRecord },
+              { value: 1_000_000, provenance: reply },
+            ],
+          },
+        ],
+      }),
+      book([rule('R-TIV', 'totalTiv')]),
+    );
+    expect(out[0]!.status).toBe('open');
   });
 });

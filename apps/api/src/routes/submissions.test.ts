@@ -19,7 +19,7 @@ import type {
 } from '@retrofit/engine';
 import type { FederatoAdapter } from '@retrofit/federato';
 import { explain } from '@retrofit/federato';
-import { readVectorSpec } from '@retrofit/engine';
+import { readVectorSpec, rollup } from '@retrofit/engine';
 import { createApp } from '../app';
 import { createDb } from '../db/client';
 import type { DbHandle } from '../db/client';
@@ -151,8 +151,9 @@ function makeResult(o: Opts): EngineResult {
       pctTivPre1990: 40 / 65,
       pctTivPost2010: 25 / 65,
       pctTivByConstruction: [
-        { constructionType: 'Joisted Masonry', tiv: 40_000_000, share: 40 / 65, acceptable: false, assumedAcceptable: false },
-        { constructionType: 'Fire Resistive', tiv: 25_000_000, share: 25 / 65, acceptable: true, assumedAcceptable: true },
+        // Engine rollup keys are canonical classes (rollup.ts canonicalClass), never raw spellings.
+        { constructionType: 'joisted_masonry', tiv: 40_000_000, share: 40 / 65, acceptable: false, assumedAcceptable: false },
+        { constructionType: 'fire_resistive', tiv: 25_000_000, share: 25 / 65, acceptable: true, assumedAcceptable: true },
       ],
       pctTivAcceptableConstruction: 25 / 65,
       pctTivSprinklered: 40 / 65,
@@ -553,6 +554,33 @@ describe('GET /submissions/:id', () => {
         acceptableConstruction: true,
         assumedAcceptableConstruction: true,
       },
+    ]);
+  });
+
+  it('flags construction from the engine rollup key, so a Steel Frame building is acceptable (R4-9 / R5-3)', async () => {
+    setup();
+    // Ingest stores the G-8 snake_case class ("Steel Frame" -> steel_frame); the
+    // engine rollup aliases it to its canonical `steel`, which is acceptable
+    // (docs/decisions/E03.md D1). The rollup here is the real engine stage.
+    const canonical: CanonicalSubmission = {
+      ...CANONICAL,
+      id: 'SUB-STEEL',
+      buildings: [
+        { ...CANONICAL.buildings[0]!, constructionType: sr('steel_frame') },
+        { ...CANONICAL.buildings[1]!, constructionType: sr('joisted_masonry') },
+      ],
+    };
+    const base = makeResult({ id: 'SUB-STEEL', verdict: 'FIT' });
+    const result = { ...base, canonical, rollup: rollup(canonical, '2026-09-19') } as EngineResult;
+    expect(result.rollup.pctTivByConstruction.map((c) => [c.constructionType, c.acceptable])).toEqual([
+      ['steel', true],
+      ['joisted_masonry', true],
+    ]);
+    insert('SUB-STEEL', result, 1);
+    const { buildings } = await detail('SUB-STEEL');
+    expect(buildings.map((b) => [b.constructionType, b.acceptableConstruction])).toEqual([
+      ['steel_frame', true],
+      ['joisted_masonry', true],
     ]);
   });
 

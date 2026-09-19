@@ -24,7 +24,7 @@ import type {
   LocationFacts,
   VectorSpec,
 } from '@retrofit/engine';
-import { bestValue, readVectorSpec } from '@retrofit/engine';
+import { bestValue, readVectorSpec, rollup } from '@retrofit/engine';
 import { explain, narrateGuard } from '@retrofit/federato';
 import type { Explanation } from '@retrofit/federato';
 import type { ApiEnv } from '../app';
@@ -199,6 +199,19 @@ function toQueueRow(
 
 const value = <T>(field: Parameters<typeof bestValue<T>>[0]): T | null => bestValue(field)?.value ?? null;
 
+/**
+ * R4-9 / R5-3: the rollup keys `pctTivByConstruction` by the engine's canonical
+ * class (normalize + a private alias table, e.g. steel_frame -> steel), which
+ * the engine barrel does not export. Rather than restate that table here, the
+ * key is read back from the engine's own rollup over this one building, so the
+ * classification stays in the engine. A building with no known TIV is not in
+ * the rollup at all and yields null (as before: no share, not acceptable).
+ */
+function constructionClassKey(building: BuildingFacts, result: EngineResult): string | null {
+  const probe = rollup({ ...result.canonical, locations: [], buildings: [building], history: [] }, result.asOf);
+  return probe.pctTivByConstruction[0]?.constructionType ?? null;
+}
+
 function toBuildingRow(
   building: BuildingFacts,
   locations: ReadonlyMap<string, LocationFacts>,
@@ -208,12 +221,9 @@ function toBuildingRow(
     building.locationExternalId === undefined ? undefined : locations.get(building.locationExternalId);
   const yearBuilt = value(building.yearBuilt);
   const constructionType = value(building.constructionType);
+  const key = constructionClassKey(building, result);
   const share =
-    constructionType === null
-      ? undefined
-      : result.rollup.pctTivByConstruction.find(
-          (c) => c.constructionType.trim().toLowerCase() === constructionType.trim().toLowerCase(),
-        );
+    key === null ? undefined : result.rollup.pctTivByConstruction.find((c) => c.constructionType === key);
   return {
     externalId: building.externalId,
     name: building.label ?? null,

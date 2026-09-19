@@ -211,3 +211,45 @@ Thanks.`;
     expect(none.problems[0]).toContain('does not qualify');
   });
 });
+
+/* R4-4: the gate itself reads the prose dates a broker writes. */
+describe('validateExtraction — dates', () => {
+  const DATE_SOURCE =
+    'We received the submission on December 13, 2025. The loss was 3 Feb 2024, reported 02/29/2024. Inception is Sept. 1st, 2026.';
+  const DATE_SEL = selection([
+    field('receivedDate', 'received date', 'fiveYearLoss'),
+    field('history.C1.dateOfLoss', 'date of loss for claim C1', 'fiveYearLoss'),
+    field('effectiveDate', 'effective date'),
+  ]);
+  const runDates = (extracted: ExtractedFieldValue[]) =>
+    validateExtraction({ extracted, requested: DATE_SEL, spec: SPEC, sourceText: DATE_SOURCE });
+
+  it('accepts ISO, "Month D, YYYY", "D Mon YYYY" and US "M/D/YYYY", returning ISO', () => {
+    const out = runDates([
+      ex('receivedDate', 'December 13, 2025', 'We received the submission on December 13, 2025.'),
+      ex('history.C1.dateOfLoss', '3 Feb 2024', 'The loss was 3 Feb 2024'),
+      ex('history.C1.dateOfLoss', '02/03/2024', 'The loss was 3 Feb 2024'),
+      ex('effectiveDate', 'Sept. 1st, 2026', 'Inception is Sept. 1st, 2026.'),
+      ex('receivedDate', ' 2025-12-13 ', 'We received the submission on December 13, 2025.'),
+    ]);
+    expect(out.map((v) => v.value)).toEqual(['2025-12-13', '2024-02-03', '2024-02-03', '2026-09-01', '2025-12-13']);
+    expect(out.map((v) => v.accepted)).toEqual([true, true, true, true, true]);
+  });
+
+  it('rejects a date that is not on the calendar, however it is written', () => {
+    const out = runDates([
+      ex('receivedDate', 'February 30, 2025', 'We received the submission on December 13, 2025.'),
+      ex('receivedDate', '2025-02-29', 'We received the submission on December 13, 2025.'),
+      ex('receivedDate', '13/12/2025', 'We received the submission on December 13, 2025.'),
+      ex('receivedDate', 'mid December', 'We received the submission on December 13, 2025.'),
+    ]);
+    expect(out.map((v) => v.rejection)).toEqual(['unparseable', 'unparseable', 'unparseable', 'unparseable']);
+    expect(out.every((v) => !v.accepted)).toBe(true);
+  });
+
+  it('accepts a leap day in a leap year', () => {
+    const [v] = runDates([ex('history.C1.dateOfLoss', '02/29/2024', 'reported 02/29/2024')]);
+    expect(v?.value).toBe('2024-02-29');
+    expect(v?.accepted).toBe(true);
+  });
+});

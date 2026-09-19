@@ -70,8 +70,12 @@ describe('planActions', () => {
     expect(res.routed).toBe(2);
     expect(res.needsSeniorReferral).toBe(1);
     expect(res.drafted).toBe(1);
-    // SUB-1001 (FIT), SUB-1002 (REFER, nothing missing) and SUB-1005 get no request.
-    expect(res.skipped).toBe(3);
+    // SUB-1001 (FIT), SUB-1002 (REFER, nothing missing), SUB-1005 and SUB-1003 get
+    // no request. SUB-1003 (cyber) is a triage knockout that ingest now stores
+    // and scores (R4-1): knocked out, so never routed, and nothing a broker
+    // could send moves a line-of-business knockout (PRD 7.6; R2b-G2).
+    expect(res.skipped).toBe(4);
+    expect(res.actions.some((a) => a.submissionId === 'SUB-1003')).toBe(false);
 
     const routes = byType(res, 'route');
     expect(routes.map((a) => a.submissionId)).toEqual(['SUB-1001', 'SUB-1002', 'SUB-1004']);

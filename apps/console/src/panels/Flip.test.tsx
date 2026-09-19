@@ -120,4 +120,31 @@ describe('Flip', () => {
     expect(screen.getByText('In appetite')).toBeInTheDocument();
     expect(screen.getByText(/already in appetite/)).toBeInTheDocument();
   });
+
+  it('R5-2: names the flip premium "Predicted premium", never "Quoted premium"', () => {
+    const unavailable = render(
+      <Flip
+        flip={{
+          available: false,
+          reason: 'No flip.',
+          moves: [],
+          scoreBefore: 40,
+          scoreAfter: null,
+          premiumBefore: 63835,
+          premiumAfter: null,
+          verdictAfter: null,
+          distanceToAppetite: null,
+        }}
+      />,
+    );
+    const before = screen.getByTestId('flip-premium-before');
+    expect(before).toHaveTextContent('Predicted premium');
+    expect(before).toHaveTextContent('$63,835');
+    expect(screen.queryByText(/Quoted premium/)).toBeNull();
+    unavailable.unmount();
+
+    render(<Flip flip={B2_FLIP} />);
+    expect(screen.getByTestId('flip-premium')).toHaveTextContent('Predicted premium');
+    expect(screen.queryByText(/Quoted premium/)).toBeNull();
+  });
 });

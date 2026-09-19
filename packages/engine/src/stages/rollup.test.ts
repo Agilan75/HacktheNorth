@@ -362,6 +362,45 @@ describe('rollup — five-year loss (I-4)', () => {
     expect(r.claimCount).toBe(0);
   });
 
+  // R1-1 / R1-2 / R2-2 / R3-6: the deep pass embeds claims in the Policy row
+  // (`claims: []` when the account has none) and never emits a records.Claim key.
+  it('is a known 0 when a raw Policy row carries an expanded, empty claims list', () => {
+    const r = rollup(
+      submission({
+        raw: {
+          externalId: 'SUB-2026-00038',
+          records: { Policy: [{ resource: 'Policy', id: 1038, data: { id: 1038, claims: [] } }] },
+        },
+      }),
+      ASOF,
+    );
+    expect(r.fiveYearLoss).toBe(0);
+    expect(r.claimCount).toBe(0);
+  });
+
+  it('stays null when the Policy row holds only unexpanded claim ids', () => {
+    const r = rollup(
+      submission({
+        raw: {
+          externalId: 'P1',
+          records: { Policy: [{ resource: 'Policy', id: 1, data: { id: 1, claims: [11, 12] } }] },
+        },
+      }),
+      ASOF,
+    );
+    expect(r.fiveYearLoss).toBeNull();
+  });
+
+  it('stays null when the Policy row has no claims key at all', () => {
+    const r = rollup(
+      submission({
+        raw: { externalId: 'P1', records: { Policy: [{ resource: 'Policy', id: 1, data: { id: 1 } }] } },
+      }),
+      ASOF,
+    );
+    expect(r.fiveYearLoss).toBeNull();
+  });
+
   it('is a known 0 when the bundle did fetch claims and found none', () => {
     const r = rollup(
       submission({ raw: { externalId: 'P1', records: { Claim: [] } } }),

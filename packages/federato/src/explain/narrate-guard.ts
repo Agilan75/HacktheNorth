@@ -100,6 +100,32 @@ export function narrateGuard(explanation: Explanation, polished: string): Narrat
     problems.push(`number ${display(n)} does not appear in the template`);
   }
 
+  // R4-8: positional. The set checks above pass a swap (quoted <-> predicted
+  // premium) or a dropped repeat, so the numbers must also appear in the
+  // template's order and multiplicity — each value keeps the slot, and so the
+  // label, it had in the template. Same rule as apps/api llm/calls/narrate.ts.
+  if (problems.length === 0) {
+    const want = extractNumbers(template);
+    const keyOf = (v: number): string => {
+      for (const [key, value] of expected) if (sameNumber(value, v)) return key;
+      return `unexpected:${display(v)}`;
+    };
+    const moved: string[] = [];
+    for (let i = 0; i < Math.max(want.length, found.length); i += 1) {
+      const w = want[i];
+      const f = found[i];
+      if (w !== undefined && f !== undefined && sameNumber(w, f)) continue;
+      const key = w === undefined ? keyOf(f as number) : keyOf(w);
+      if (!moved.includes(key)) moved.push(key);
+    }
+    if (moved.length > 0) {
+      changedNumbers.push(...moved);
+      problems.push(
+        `numbers must appear in the template's order (${want.map(display).join(', ')}); ${moved.join(', ')} moved`,
+      );
+    }
+  }
+
   // The recommendation must still be stated, and no other one introduced.
   const rec = explanation.recommendation;
   let recommendationChanged = false;

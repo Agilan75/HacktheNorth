@@ -75,7 +75,11 @@ function toShareDto(slug: string, row: SubmissionRow): ShareDto | null {
   const deciding = result.verdict.decidingRule;
   return {
     slug,
-    lineOfBusiness: result.lineOfBusiness,
+    // The row's line, not the engine's: a triage knockout's engine result
+    // carries Federato's raw line (`cyber`, R2-fixer-1 F1-1), which is not a
+    // LineOfBusiness. The row is always `commercial_property` | `tenant`, and
+    // it is what GET /submissions/:id reports too.
+    lineOfBusiness: row.lineOfBusiness,
     verdict: result.verdict.verdict,
     appetiteScore: result.evaluate.appetiteScore,
     explanation: result.explanation,

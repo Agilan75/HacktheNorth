@@ -341,7 +341,7 @@ describe('createApiClient', () => {
         expect(view.vector.components[3]).toMatchObject({ key: 'totalTiv', label: 'Total insured value (from the DTO)', raw: 150000000, tier: 0.6, mask: 1, immovable: false, appetiteFactor: true });
         expect(view.vector.components[9]).toMatchObject({ key: 'pctTivSprinklered', raw: null, tier: null, mask: 0 });
         expect(view.vector.components.filter((c) => c.immovable).map((c) => c.index)).toEqual([0, 1, 2, 5, 6, 8, 10]);
-        expect(view.queryTrace[0]).toMatchObject({ step: 1, phase: 'deep', resource: 'Policy', resultCount: 27, adapted: true, note: 'retried with $elemMatch' });
+        expect(view.queryTrace[0]).toMatchObject({ step: 1, phase: 'deep', resource: 'Policy', resultCount: 27, adapted: true, note: null, adaptation: 'retried with $elemMatch' });
         expect(view.schema).toEqual({
             resources: [{ name: 'Policy', fieldCount: 2, mappedCount: 1 }],
             mapped: [{ sourcePath: 'Policy.total_premium', canonicalPath: 'pricing.quotedPremium', method: 'exact', score: 1 }],
@@ -471,6 +471,59 @@ describe('createApiClient', () => {
         const client = createApiClient({ baseUrl: BASE, fetchImpl: impl });
         expect((await client.getRules()).rulebooks).toHaveLength(1);
         expect(await client.getGlossary()).toEqual({ entries: [{ term: 'TIV', definition: 'Total insured value.', source: 'GLOSSARY.pdf, p. 4' }] });
+    });
+    it('never shows the adaptation kind "none" as a note, and carries the trace reasoning (R3-2)', async () => {
+        const dto = detailDto();
+        const base = dto.queryTrace[0];
+        const requiredBy = [{ ruleId: 'commercial.tiv', factor: 'tiv', canonicalPath: 'buildings.*.tiv', why: 'TIV band rule' }];
+        const alternativesRejected = [{ rootResource: 'Submission', path: [], why: 'Submission has no TIV field' }];
+        const withReasons = {
+            ...base,
+            requiredBy,
+            pathChosen: { rootResource: 'Policy', path: ['exposure_units'], why: 'Policy carries premium and TIV', alternativesRejected },
+        };
+        dto.queryTrace = [
+            { ...withReasons, seq: 0, adaptedFrom: null, adaptation: 'none', notes: [] },
+            { ...withReasons, seq: 1, adaptedFrom: null, adaptation: 'none', notes: ['Server-side aggregation declined.'] },
+            { ...withReasons, seq: 2, adaptedFrom: 'q-0', adaptation: 'elem_match_swap', notes: [] },
+        ];
+        const { impl } = fakeFetch({ 'GET /submissions/sub-1': dto });
+        const view = await createApiClient({ baseUrl: BASE, fetchImpl: impl }).getSubmission('sub-1');
+        expect(view.queryTrace.map((e) => e.note)).toEqual([null, 'Server-side aggregation declined.', null]);
+        expect(view.queryTrace.map((e) => e.adaptation)).toEqual([null, null, 'elem_match_swap']);
+        expect(view.queryTrace[0].path).toEqual(['exposure_units']);
+        expect(view.queryTrace[0].error).toBeNull();
+        expect(view.queryTrace[0]).toMatchObject({
+            why: 'Policy carries premium and TIV',
+            alternativesRejected,
+            requiredBy,
+        });
+    });
+    it('maps a requested field with no VOI entry to null, never a fake 0 (R5-8)', async () => {
+        const dto = detailDto();
+        const voi = { ...dto.result.voi, ranked: [] };
+        dto.result = { ...dto.result, voi };
+        dto.voi = voi;
+        const { impl } = fakeFetch({ 'GET /submissions/sub-1': dto });
+        const view = await createApiClient({ baseUrl: BASE, fetchImpl: impl }).getSubmission('sub-1');
+        expect(view.drafts[0].requestedFields).toEqual([{ path: 'pricing.quotedPremium', label: 'Quoted premium', voi: null }]);
+    });
+    it('carries the per-building rating steps behind the predicted premium (R5-7)', async () => {
+        const dto = detailDto();
+        const construction = { name: 'construction', input: 'steel', factor: 0.981 };
+        const perBuilding = [{ buildingExternalId: 'B-1', tiv: 1_000_000, baseRate: 0.05, factors: [construction], premium: 490.5 }];
+        dto.price = { ...dto.price, perBuilding };
+        const { impl } = fakeFetch({ 'GET /submissions/sub-1': dto });
+        const view = await createApiClient({ baseUrl: BASE, fetchImpl: impl }).getSubmission('sub-1');
+        expect(view.pricing.buildings).toEqual([
+            {
+                buildingExternalId: 'B-1',
+                tiv: 1_000_000,
+                baseRate: 0.05,
+                factors: [{ label: 'construction', multiplier: 0.981, input: 'steel' }],
+                premium: 490.5,
+            },
+        ]);
     });
     it('throws the ErrorDto message on a non-2xx answer', async () => {
         const { impl } = fakeFetch({

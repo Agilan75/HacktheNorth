@@ -452,6 +452,38 @@ export function evaluate(
     }
   }
 
+  /**
+   * INTERPRETATIONS I-3: surfaced only when removing the Fire Resistive /
+   * Modified Fire Resistive TIV from the numerator would change the 3.5
+   * outcome. Re-fires the rules that read the construction share against the
+   * share without the assumed classes and compares which of them fire.
+   */
+  const constructionTierDependsOnAssumed = (): boolean => {
+    const byClass = submission.rollup?.pctTivByConstruction ?? [];
+    const knownTiv = byClass.reduce((s, c) => s + c.tiv, 0);
+    const assumedTiv = byClass.filter((c) => c.assumedAcceptable).reduce((s, c) => s + c.tiv, 0);
+    if (!(knownTiv > 0) || !(assumedTiv > 0)) return false;
+
+    const FIELD = 'pctTivAcceptableConstruction';
+    const PATH = `rollup.${FIELD}`;
+    const readsShare = (rule: Rule): boolean =>
+      rule.when.some((c) => c.field === FIELD || c.field === PATH || canonicalPathFor(c.field, spec) === PATH);
+    const actual = resolve(FIELD) ?? resolve(PATH);
+    if (!isFiniteNumber(actual)) return false;
+    const without = Math.max(0, actual - assumedTiv / knownTiv);
+    const counterfactual: ConditionResolver = (field) =>
+      field === FIELD || field === PATH || canonicalPathFor(field, spec) === PATH ? without : resolve(field);
+
+    const allRules = [...rulebook.rules, ...(extensions?.rules ?? [])].filter(readsShare);
+    const firedNow = new Set(hits.filter((h) => readsShare(h.rule)).map((h) => h.rule.id));
+    const firedWithout = new Set(
+      fireRules(allRules, vector, counterfactual, false, 0).map((h) => h.rule.id),
+    );
+    if (firedNow.size !== firedWithout.size) return true;
+    for (const id of firedNow) if (!firedWithout.has(id)) return true;
+    return false;
+  };
+
   const interpretationsApplied: AppliedInterpretation[] = [];
   const seenInterpretations = new Set<string>();
   for (const source of [rulebook.interpretations ?? [], extensions?.interpretations ?? []]) {
@@ -461,6 +493,7 @@ export function evaluate(
         interpretation.affects.length === 0 ||
         interpretation.affects.some((path) => touched.has(path));
       if (!relevant) continue;
+      if (interpretation.id === 'I-3' && !constructionTierDependsOnAssumed()) continue;
       seenInterpretations.add(interpretation.id);
       interpretationsApplied.push(interpretation);
     }

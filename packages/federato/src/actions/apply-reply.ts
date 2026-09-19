@@ -4,9 +4,9 @@
  * Body owned by Run 1 unit F13.
  */
 import type { CanonicalSubmission, ExternalValue, Field } from '@retrofit/engine';
-import { math } from '@retrofit/engine';
+import { math, merge } from '@retrofit/engine';
 import { truncateQuote } from '@retrofit/contracts';
-import type { ReplyApplication, ScoreSnapshot, ValidatedFieldValue } from '../types';
+import type { ExtractionRejection, ReplyApplication, ScoreSnapshot, ValidatedFieldValue } from '../types';
 
 export interface ApplyReplyInput {
   readonly submissionId: string;
@@ -85,24 +85,54 @@ function present(v: unknown): boolean {
   return true;
 }
 
+/**
+ * A clean value the engine has no slot for (R-I4-2). `ExtractionRejection` is
+ * frozen in types.ts and has no member for it yet; the DTO carries any string.
+ * `'not_applied'` is a member of `ExtractionRejection` (added at Run 2, R2-7).
+ */
+const NOT_APPLIED: ExtractionRejection = 'not_applied';
+
+/** Keys that hold no broker fact: skipped when counting what a merge wrote. */
+const NOT_FACTS = new Set(['raw', 'fieldMap', 'rollup']);
+
+/** Every `{ value, provenance }` field in the canonical facts. */
+function countFields(node: unknown, top = true): number {
+  if (Array.isArray(node)) return node.reduce((n: number, e: unknown) => n + countFields(e, false), 0);
+  if (typeof node !== 'object' || node === null) return 0;
+  const bag = node as Bag;
+  if ('value' in bag && 'provenance' in bag) return 1;
+  let n = 0;
+  for (const [k, child] of Object.entries(bag)) {
+    if (top && NOT_FACTS.has(k)) continue;
+    n += countFields(child, false);
+  }
+  return n;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Public                                                                     */
 /* -------------------------------------------------------------------------- */
 
 export function applyReply(input: ApplyReplyInput): ReplyApplication {
   const extracted = [...input.validated];
-  const accepted = extracted.filter((v) => v.accepted);
-  const needsConfirmation = extracted.filter((v) => !v.accepted && v.needsConfirmation);
-  const rejected = extracted.filter((v) => !v.accepted && !v.needsConfirmation);
 
   // One value per path goes to the engine; `validateExtraction` has already
   // withheld paths whose clean values disagree, so the first is the value.
-  const seen = new Set<string>();
+  // Each is merged, in order, onto the canonical exactly as the re-score will
+  // merge it: a value that writes no field would change nothing, so it is
+  // reported as not applied instead of accepted (R-I4-2).
+  const landed = new Set<string>();
+  const unplaced = new Set<string>();
   const externalValues: ExternalValue[] = [];
-  for (const v of accepted) {
-    if (seen.has(v.canonicalPath) || !present(v.value)) continue;
-    seen.add(v.canonicalPath);
-    externalValues.push({
+  let working = input.canonical;
+  let fields = countFields(working);
+  for (const v of extracted) {
+    if (!v.accepted || landed.has(v.canonicalPath) || unplaced.has(v.canonicalPath)) continue;
+    if (!present(v.value)) {
+      unplaced.add(v.canonicalPath);
+      continue;
+    }
+    const ev: ExternalValue = {
       canonicalPath: v.canonicalPath,
       value: v.value,
       // Confidence is omitted on purpose: `answer` takes the fixed table's 0.8
@@ -111,8 +141,27 @@ export function applyReply(input: ApplyReplyInput): ReplyApplication {
         source: 'answer',
         sourceDetail: `broker reply to ${input.submissionId}: "${truncateQuote(v.quote, 160)}"`,
       },
-    });
+    };
+    const next = merge(working, [], [], [ev]);
+    const nextFields = countFields(next);
+    if (nextFields > fields) {
+      landed.add(v.canonicalPath);
+      externalValues.push(ev);
+      working = next;
+      fields = nextFields;
+    } else {
+      unplaced.add(v.canonicalPath);
+    }
   }
+  for (let i = 0; i < extracted.length; i++) {
+    const v = extracted[i];
+    if (v === undefined || !v.accepted || !unplaced.has(v.canonicalPath)) continue;
+    extracted[i] = { ...v, accepted: false, rejection: NOT_APPLIED, needsConfirmation: false };
+  }
+
+  const accepted = extracted.filter((v) => v.accepted);
+  const needsConfirmation = extracted.filter((v) => !v.accepted && v.needsConfirmation);
+  const rejected = extracted.filter((v) => !v.accepted && !v.needsConfirmation);
 
   return {
     submissionId: input.submissionId,

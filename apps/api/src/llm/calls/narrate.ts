@@ -79,13 +79,20 @@ function survivalProblems(input: NarrateInput, polished: string): string[] {
   if (text.length > MAX_TEXT_CHARS) problems.push(`longer than ${MAX_TEXT_CHARS} characters`);
   if (sentenceCount(text) > MAX_SENTENCES) problems.push(`more than ${MAX_SENTENCES} sentences`);
 
-  const expected = new Set(numberTokens(input.template));
-  const actual = new Set(numberTokens(text));
-  for (const token of expected) {
-    if (!actual.has(token)) problems.push(`number ${token} missing`);
+  // Compared as ordered lists, not sets: a swap (quoted <-> predicted premium)
+  // or a dropped repeat keeps the same set of numbers but changes what they say.
+  const expected = numberTokens(input.template);
+  const actual = numberTokens(text);
+  const expectedSet = new Set(expected);
+  const actualSet = new Set(actual);
+  for (const token of expectedSet) {
+    if (!actualSet.has(token)) problems.push(`number ${token} missing`);
   }
-  for (const token of actual) {
-    if (!expected.has(token)) problems.push(`number ${token} not in the template`);
+  for (const token of actualSet) {
+    if (!expectedSet.has(token)) problems.push(`number ${token} not in the template`);
+  }
+  if (problems.length === 0 && expected.join('\u0000') !== actual.join('\u0000')) {
+    problems.push(`numbers must appear in the template's order: ${expected.join(', ')}`);
   }
 
   if (!containsWord(text, input.recommendation)) {

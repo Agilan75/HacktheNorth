@@ -108,3 +108,45 @@ describe('offline: draft-request', () => {
     await expect(draftRequestCall(createFakeLlm(), draftInput({ fields: [] }))).rejects.toThrow(/at least one/);
   });
 });
+
+describe('offline: draft-request — a plain request sentence for something unrequested (R4-7, PRD §9.2)', () => {
+  const ok = 'Hello,\n\n- Year built for Building C: age factor.\n- Sprinkler status: protection.\n\nThank you.';
+  const extra =
+    'Please also send us the signed ACORD 125 application and a copy of the current lease agreement.';
+
+  it('rejects a declarative ask that names no requested field', () => {
+    expect(draftProblems({ subject: 'Info', body: `${ok}\n${extra}` }, twoFields)).toMatch(/extra request/);
+    for (const sentence of [
+      'We will also need your current statement of values.',
+      'Kindly provide five years of loss runs.',
+      'Let us know the roof age as well.',
+      'Please reply with the signed ACORD 125.',
+      'Please send the lease; we need the following:',
+    ]) {
+      expect(draftProblems({ subject: 'Info', body: `${ok}\n${sentence}` }, twoFields), sentence).toMatch(
+        /extra request/,
+      );
+    }
+  });
+
+  it('still accepts a request sentence that names a requested field, and the reply-only closers', () => {
+    for (const sentence of [
+      'Please confirm the sprinkler status for each building.',
+      'Please reply with these values when you can.',
+      'Please reply with this value when you can.',
+      'Please reply when you can.',
+      'To finish our review of Harbor Freight Storage LLC we need the following:',
+    ]) {
+      expect(draftProblems({ subject: 'Info', body: `${ok}\n${sentence}` }, twoFields), sentence).toBeNull();
+    }
+  });
+
+  it('falls back to the template when the model slips the extra ask in', async () => {
+    const body = `Hello Dana,\n\n- Year built for Building C: decides building age.\n- Sprinkler status: decides protection.\n\n${extra}\n\nThank you.`;
+    const fake = createFakeLlm({ overrides: { 'draft-request': { subject: 'Info needed', body } } });
+    const input = draftInput({ fields: twoFields });
+    const out = await draftRequestCall(fake, input);
+    expect(out).toEqual(templateDraft(input));
+    expect(out.body).not.toContain('ACORD');
+  });
+});

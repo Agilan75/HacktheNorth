@@ -96,6 +96,40 @@ describe('narrateGuard', () => {
     expect(g.recommendationChanged).toBe(true);
   });
 
+  it('R4-8: rejects a swap of two numbers even though the set is unchanged', () => {
+    const t =
+      'Coastal Freight is referred with an appetite score of 88/100: TIV $18.5M, quoted premium $63,835 against a predicted $58,800. ' +
+      'Recommendation: investigate.';
+    const e: Explanation = {
+      ...explanation,
+      text: t,
+      template: t,
+      recommendation: 'investigate',
+      numbers: {
+        appetiteScore: 88,
+        n0: 100,
+        totalTiv: 18_500_000,
+        quotedPremium: 63_835,
+        predictedPremium: 58_800,
+      },
+    };
+    const swapped = t.replace('$63,835 against a predicted $58,800', '$58,800 against a predicted $63,835');
+    const g = narrateGuard(e, swapped);
+    expect(g.ok).toBe(false);
+    expect(g.text).toBe(t);
+    expect(g.changedNumbers).toEqual(['quotedPremium', 'predictedPremium']);
+    expect(g.problems.some((p) => p.includes('order'))).toBe(true);
+    // The unswapped template still passes.
+    expect(narrateGuard(e, t).ok).toBe(true);
+  });
+
+  it('R4-8: rejects a dropped repeat of a number the template states twice', () => {
+    const t = 'Premium $175,000 is at the ceiling; move premium to $175,000. Recommendation: review.';
+    const e: Explanation = { ...explanation, text: t, template: t, numbers: { quotedPremium: 175_000 } };
+    const g = narrateGuard(e, 'Premium $175,000 is at the ceiling. Recommendation: review.');
+    expect(g.ok).toBe(false);
+  });
+
   it('rejects empty narration', () => {
     const g = narrateGuard(explanation, '   ');
     expect(g.ok).toBe(false);

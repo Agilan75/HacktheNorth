@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { flip, flipBounds } from './flip.js';
+import { price } from './price.js';
 import { FACTOR_WEIGHTS } from '../constants.js';
 import type {
   BookStats,
@@ -367,5 +368,120 @@ describe('flip', () => {
   it('is deterministic: the same input gives the same flip', () => {
     const x = withX({ 4: 40_000, 7: 0.3 });
     expect(run(x)).toEqual(run(x));
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* R2 fixer 6 — extensions in the FIT test (R1-2), price after the move (R1-3) */
+/* -------------------------------------------------------------------------- */
+
+const EXTENSIONS: Rulebook = {
+  id: 'extensions',
+  lineOfBusiness: 'commercial_property',
+  version: '1.0.0',
+  source: 'Retrofit extension rules',
+  weights: FACTOR_WEIGHTS,
+  rules: [
+    {
+      ...rule('X-PPC-UNPROTECTED', 'protection_class', 'refer', [
+        { field: 'tivWeightedProtectionClass', op: 'gte', value: 9 },
+      ]),
+      extension: true,
+    } as Rule,
+  ],
+  interpretations: [],
+} as unknown as Rulebook;
+
+describe('flip — extension rules count in the FIT test (R1-2, F-6, V-9)', () => {
+  it('an account referred only by an extension rule is not "0 moves from FIT"', () => {
+    const result = flip(vectorOf(withX({ 10: 9 })), SPEC, RULEBOOK, TABLE, SUBMISSION, null, EXTENSIONS);
+    expect(result.flip).toBeNull();
+    expect(result.reason).not.toBeNull();
+  });
+
+  it('never proposes a premium move whose verdictAfter FIT an extension refer contradicts', () => {
+    const result = flip(
+      vectorOf(withX({ 4: 200_000, 10: 9 })),
+      SPEC,
+      RULEBOOK,
+      TABLE,
+      SUBMISSION,
+      null,
+      EXTENSIONS,
+    );
+    expect(result.flip).toBeNull();
+  });
+
+  it('without an extension refer the premium flip still reaches FIT', () => {
+    const result = flip(vectorOf(withX({ 4: 200_000, 10: 5 })), SPEC, RULEBOOK, TABLE, SUBMISSION, null, EXTENSIONS);
+    expect(result.flip?.moves.map((m) => [m.componentKey, m.to])).toEqual([['quotedPremium', 175_000]]);
+  });
+});
+
+describe('flip — premiumAfter prices the moved account (R1-3, PRD 6.3 stage 10)', () => {
+  const RATING = JSON.parse(
+    readFileSync(fileURLToPath(new URL('../../rating/commercial.json', import.meta.url)), 'utf8'),
+  ) as RatingTable;
+
+  const building = (id: string, tiv: number, construction: string, sprinklered = true) => ({
+    externalId: id,
+    locationExternalId: 'L1',
+    tiv: sourced(tiv),
+    yearBuilt: sourced(2005),
+    constructionType: sourced(construction),
+    sprinklered: sourced(sprinklered),
+    protectionClass: sourced(3),
+  });
+
+  const withBuildings = (
+    buildings: ReturnType<typeof building>[],
+    rollup: Record<string, unknown>,
+  ): CanonicalSubmission =>
+    ({
+      ...SUBMISSION,
+      buildings,
+      rollup: { ...(SUBMISSION.rollup as object), ...rollup },
+    }) as unknown as CanonicalSubmission;
+
+  const priceOf = (s: CanonicalSubmission, x: (number | null)[]) =>
+    price(vectorOf(x), SPEC, RATING, s, null, null).predictedPremium as number;
+
+  it('a totalTiv move scales the price with the TIV', () => {
+    const x = withX({ 3: 200_000_000 });
+    const s = withBuildings(
+      [building('B1', 120_000_000, 'Joisted Masonry'), building('B2', 80_000_000, 'Steel Frame')],
+      { totalTiv: 200_000_000 },
+    );
+    const result = flip(vectorOf(x), SPEC, RULEBOOK, RATING, s, null);
+    expect(result.flip?.moves.map((m) => [m.componentKey, m.to])).toEqual([['totalTiv', 150_000_000]]);
+    const before = result.flip?.premiumBefore as number;
+    const after = result.flip?.premiumAfter as number;
+    expect(before).toBeGreaterThan(0);
+    expect(after).toBeCloseTo(before * 0.75, 6);
+  });
+
+  it('a construction move re-rates the shifted TIV at an acceptable class', () => {
+    const x = withX({ 7: 0.3 });
+    const s = withBuildings(
+      [building('B1', 105_000_000, 'Wood Frame'), building('B2', 45_000_000, 'Joisted Masonry')],
+      { pctTivAcceptableConstruction: 0.3 },
+    );
+    const result = flip(vectorOf(x), SPEC, RULEBOOK, RATING, s, null);
+    expect(result.flip?.moves.map((m) => [m.componentKey, m.to])).toEqual([
+      ['pctTivAcceptableConstruction', 0.5],
+    ]);
+    const expected = priceOf(
+      withBuildings(
+        [
+          building('B1', 75_000_000, 'Wood Frame'),
+          building('B2', 45_000_000, 'Joisted Masonry'),
+          building('B1b', 30_000_000, 'Joisted Masonry'),
+        ],
+        {},
+      ),
+      x,
+    );
+    expect(result.flip?.premiumAfter).not.toBe(result.flip?.premiumBefore);
+    expect(result.flip?.premiumAfter as number).toBeCloseTo(expected, 6);
   });
 });

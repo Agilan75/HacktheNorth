@@ -16,7 +16,7 @@ import {
   readRulebook,
   readVectorSpec,
 } from '@retrofit/engine';
-import type { PlannerResult, QueryTraceEntry, RunPlannerInput } from '@retrofit/federato';
+import type { PlannerResult, QueryTraceEntry, RunPlannerInput, TriageKnockout } from '@retrofit/federato';
 import { runFollowUps, runPlanner } from '@retrofit/federato';
 import { createRepos } from '../db/repos';
 import type { Repos } from '../db/repos';
@@ -55,7 +55,46 @@ function traceFor(bundle: RawBundle, trace: readonly QueryTraceEntry[]): readonl
   return trace.filter((e) => ids.has(e.id)) as readonly QueryTraceEntryDto[];
 }
 
-/** discover -> normalize -> store. The engine runs over the whole book afterwards. */
+/**
+ * A triage knockout as a bundle: the one Submission row triage already read
+ * (same shape `toBundles` gives a survivor with no policy), traced to the
+ * triage queries only.
+ */
+function knockoutBundle(
+  knockout: TriageKnockout,
+  schema: SchemaDocument,
+  trace: readonly QueryTraceEntry[],
+  fetchedAt: string,
+): RawBundle {
+  return {
+    externalId: knockout.externalId,
+    records: {
+      Submission: [
+        {
+          resource: 'Submission',
+          id: knockout.submissionId,
+          data: {
+            id: knockout.submissionId,
+            submission_number: knockout.externalId,
+            status: knockout.status === '' ? null : knockout.status,
+            line_of_business: knockout.lineOfBusiness,
+          },
+        },
+      ],
+    },
+    schema,
+    fetchedAt,
+    queryTraceIds: trace.filter((e) => e.pass === 'triage').map((e) => e.id),
+  };
+}
+
+/**
+ * discover -> normalize -> store. The engine runs over the whole book afterwards.
+ * `federatoLine` is set for a triage knockout: the canonical line becomes
+ * Federato's own line, which stage 6 tiers 0 on line_of_business (G-11,
+ * INTERPRETATIONS 3.8), so the row scores as a line-of-business knockout. The
+ * row itself stays on FEDERATO_LINE: it is scored with the commercial spec.
+ */
 function store(
   repos: Repos,
   bundle: RawBundle,
@@ -63,12 +102,14 @@ function store(
   spec: VectorSpec,
   trace: readonly QueryTraceEntry[],
   nowIso: string,
+  federatoLine?: string,
 ): void {
   const existing = repos.submissions.byExternalId(bundle.externalId);
   const id = existing?.id ?? bundle.externalId;
   const fieldMap = discover(bundle, schema, spec);
   const canonical: CanonicalSubmission = {
     ...normalize(bundle, fieldMap, FEDERATO_LINE),
+    ...(federatoLine === undefined ? {} : { lineOfBusiness: federatoLine as LineOfBusiness }),
     id,
   };
   repos.submissions.upsertByExternalId({
@@ -136,16 +177,21 @@ export async function ingestFederato(
       ? null
       : new Set(request.externalIds.map((s) => s.trim()).filter((s) => s !== ''));
   const bundles = planned.bundles.filter((b) => wanted === null || wanted.has(b.externalId));
+  // PRD 15 / 11 / INTERPRETATIONS 3.8: triage knockouts are stored and scored
+  // too (as line-of-business knockouts), never queried in depth.
+  const bundleIds = new Set(bundles.map((b) => b.externalId));
+  const knockouts = planned.plan.knockedOut.filter(
+    (k) => (wanted === null || wanted.has(k.externalId)) && !bundleIds.has(k.externalId),
+  );
   if (wanted !== null) {
-    const found = new Set(bundles.map((b) => b.externalId));
     const knocked = new Map(planned.plan.knockedOut.map((k) => [k.externalId, k.reason]));
     for (const id of [...wanted].sort()) {
-      if (found.has(id)) continue;
+      if (bundleIds.has(id)) continue;
       const reason = knocked.get(id);
       warnings.push(
         reason === undefined
           ? `${id} was not returned by the planner; nothing stored.`
-          : `${id} was knocked out at triage (${reason}); nothing stored.`,
+          : `${id} was knocked out at triage (${reason}); stored as out of appetite.`,
       );
     }
   }
@@ -167,9 +213,22 @@ export async function ingestFederato(
     else updated += 1;
     touched.push(bundle.externalId);
   }
+  const touchedKnockouts = new Set<string>();
+  for (const knockout of knockouts) {
+    const existing = repos.submissions.byExternalId(knockout.externalId);
+    if (existing !== null && existing.canonical !== null && existing.canonical !== undefined && request.force !== true) {
+      skipped += 1;
+      continue;
+    }
+    const bundle = knockoutBundle(knockout, planned.schema, planned.trace, nowIso);
+    store(repos, bundle, planned.schema, config.spec, planned.trace, nowIso, knockout.lineOfBusiness);
+    if (existing === null) ingested += 1;
+    else updated += 1;
+    touchedKnockouts.add(knockout.externalId);
+  }
 
   const unscored = repos.submissions.all().some((r) => r.canonical != null && r.result == null);
-  if (touched.length > 0 || unscored) {
+  if (touched.length > 0 || touchedKnockouts.size > 0 || unscored) {
     await rescoreBook(deps);
 
     // PRD 7.5 step 5: accounts that scored well (not knocked out) get one more
@@ -207,6 +266,6 @@ export async function ingestFederato(
     queryCount: planned.counts.queries,
     durationMs: Math.max(0, deps.clock.nowMs() - startedMs),
     warnings,
-    externalIds: bundles.map((b) => b.externalId),
+    externalIds: [...bundles.map((b) => b.externalId), ...knockouts.map((k) => k.externalId)],
   };
 }

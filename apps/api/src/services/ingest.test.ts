@@ -54,6 +54,8 @@ const { MINI_SNAPSHOT } = (await import(/* @vite-ignore */ MINI_PATH)) as {
 };
 
 const PROPERTY_IDS = ['SUB-1001', 'SUB-1002', 'SUB-1004', 'SUB-1005'];
+/** Every stored id: the property survivors plus SUB-1003, knocked out at triage (cyber). */
+const ALL_IDS = [...PROPERTY_IDS, 'SUB-1003'].sort();
 
 let handle: DbHandle;
 let deps: Deps;
@@ -91,19 +93,19 @@ describe('ingestFederato', () => {
   it('stores every triage survivor, scores the book and ranks it', async () => {
     const res = await ingestFederato(deps, {});
     expect(res.adapter).toBe('mock');
-    expect(res.ingested).toBe(4);
+    expect(res.ingested).toBe(5);
     expect(res.updated).toBe(0);
     expect(res.skipped).toBe(0);
     expect(res.knockedOutAtTriage).toBe(1); // SUB-1003, cyber
     expect(res.noPolicy).toBe(1); // SUB-1004
-    expect([...res.externalIds].sort()).toEqual(PROPERTY_IDS);
+    expect([...res.externalIds].sort()).toEqual(ALL_IDS);
     expect(res.queryCount).toBeGreaterThanOrEqual(3);
 
     const stored = rows();
-    expect(stored.map((r) => r.externalId).sort()).toEqual(PROPERTY_IDS);
+    expect(stored.map((r) => r.externalId).sort()).toEqual(ALL_IDS);
     expect(stored.every((r) => r.result !== null && r.canonical !== null && r.source === 'federato')).toBe(true);
     // Ranks are a 1..n permutation, and the result id is the row id.
-    expect(stored.map((r) => r.rank).sort()).toEqual([1, 2, 3, 4]);
+    expect(stored.map((r) => r.rank).sort()).toEqual([1, 2, 3, 4, 5]);
     for (const r of stored) expect(r.result!.id).toBe(r.id);
     // Every row keeps the trace entries that produced it.
     expect(stored.every((r) => r.queryTrace.length > 0)).toBe(true);
@@ -121,6 +123,29 @@ describe('ingestFederato', () => {
     expect(typeof resultOf('SUB-1001').explanation).toBe('string');
   });
 
+  it('stores every triage knockout as an out-of-appetite row with its triage trace (PRD 15, 11; INTERPRETATIONS 3.8)', async () => {
+    const res = await ingestFederato(deps, {});
+    expect(res.knockedOutAtTriage).toBe(1);
+    expect(rows().map((r) => r.externalId).sort()).toEqual([...PROPERTY_IDS, 'SUB-1003'].sort());
+
+    const ko = row('SUB-1003');
+    expect(ko.source).toBe('federato');
+    expect(ko.canonical).not.toBeNull();
+    // Federato's own line stays on the raw record for the queue's display line.
+    expect(ko.raw?.records['Submission']?.[0]?.data['line_of_business']).toBe('cyber');
+    // The trace is the triage query that knocked it out, and nothing else.
+    expect(ko.queryTrace.length).toBeGreaterThan(0);
+    expect(ko.queryTrace.every((e) => e.pass === 'triage')).toBe(true);
+
+    const r = resultOf('SUB-1003');
+    expect(r.evaluate.knockout).toBe(true);
+    expect(r.evaluate.knockoutFactors).toContain('line_of_business');
+    expect(r.verdict.verdict).toBe('DOES_NOT_FIT');
+    expect(typeof r.explanation).toBe('string');
+    // Knocked out on line of business, it ranks last.
+    expect(ko.rank).toBe(5);
+  });
+
   it('computes peers against book-wide statistics over every account but itself', async () => {
     await ingestFederato(deps, {});
     const results = PROPERTY_IDS.map(resultOf);
@@ -135,10 +160,13 @@ describe('ingestFederato', () => {
     // no peer component at all (only isPropertyLine), so P-1 drops the pair.
     expect(p.peers.map((m) => m.id).sort()).toEqual(['SUB-1002', 'SUB-1005']);
     expect(p.peers.every((m) => !m.coarse)).toBe(true);
-    // SUB-1004 itself is matched on the reduced vector and labelled coarse.
+    // SUB-1004 (no policy) is placed among the policy book on the reduced
+    // vector -- requested limit, insured revenue, HQ state (PRD 6.4) -- and
+    // every match is labelled coarse and is a policy account (R2-9).
     const noPolicy = resultOf('SUB-1004').peers!;
     expect(noPolicy.coarse).toBe(true);
-    expect(noPolicy.peers).toHaveLength(0);
+    expect(noPolicy.peers.length).toBeGreaterThan(0);
+    expect(noPolicy.peers.every((m) => m.coarse && m.quotedPremium !== null)).toBe(true);
     // P-3: median rate, mean loss over the matched peers.
     const rates = p.peers.map((m) => m.ratePer100);
     expect(p.medianRatePer100).toBe(math.median(rates));
@@ -176,14 +204,14 @@ describe('ingestFederato', () => {
 
     const later = depsAt('2026-09-20T08:00:00.000Z');
     const again = await ingestFederato(later, {});
-    expect(again).toMatchObject({ ingested: 0, updated: 0, skipped: 4 });
-    expect(rows()).toHaveLength(4);
+    expect(again).toMatchObject({ ingested: 0, updated: 0, skipped: 5 });
+    expect(rows()).toHaveLength(5);
     expect(row('SUB-1001').updatedAt).toBe(firstUpdated);
     expect(resultOf('SUB-1001')).toEqual(firstResult);
 
     const forced = await ingestFederato(later, { force: true });
-    expect(forced).toMatchObject({ ingested: 0, updated: 4, skipped: 0 });
-    expect(rows()).toHaveLength(4);
+    expect(forced).toMatchObject({ ingested: 0, updated: 5, skipped: 0 });
+    expect(rows()).toHaveLength(5);
     expect(row('SUB-1001').updatedAt).toBe('2026-09-20T08:00:00.000Z');
     // Same data, same numbers: the re-run reproduces the score exactly.
     expect(resultOf('SUB-1001').evaluate.appetiteScore).toBe(firstResult.evaluate.appetiteScore);
@@ -191,10 +219,12 @@ describe('ingestFederato', () => {
 
   it('ingests only the requested external ids and explains the ones it could not', async () => {
     const res = await ingestFederato(deps, { externalIds: ['SUB-1002', 'SUB-1003', 'SUB-9999'] });
-    expect(res.ingested).toBe(1);
-    expect(res.externalIds).toEqual(['SUB-1002']);
-    expect(rows().map((r) => r.externalId)).toEqual(['SUB-1002']);
+    // SUB-1003 is a triage knockout: stored as out of appetite, and said so.
+    expect(res.ingested).toBe(2);
+    expect(res.externalIds).toEqual(['SUB-1002', 'SUB-1003']);
+    expect(rows().map((r) => r.externalId).sort()).toEqual(['SUB-1002', 'SUB-1003']);
     expect(row('SUB-1002').rank).toBe(1);
+    expect(resultOf('SUB-1003').verdict.verdict).toBe('DOES_NOT_FIT');
     expect(res.warnings.some((w) => w.startsWith('SUB-1003 was knocked out at triage'))).toBe(true);
     expect(res.warnings.some((w) => w.startsWith('SUB-9999 was not returned'))).toBe(true);
   });
@@ -264,7 +294,7 @@ describe('rescore', () => {
 
   it('rescoreBook scores every account with a canonical record and returns the count', async () => {
     await ingestFederato(deps, {});
-    expect(await rescoreBook(deps)).toBe(4);
-    expect(rows().map((r) => r.rank).sort()).toEqual([1, 2, 3, 4]);
+    expect(await rescoreBook(deps)).toBe(5);
+    expect(rows().map((r) => r.rank).sort()).toEqual([1, 2, 3, 4, 5]);
   });
 });

@@ -1,14 +1,16 @@
 /** Stage 12 — peers. Body owned by Run 1 unit E10. */
 import type {
   BookStats,
+  CanonicalSubmission,
   FeatureVector,
   PeerMatch,
   PeerResult,
   PeerVectorEntry,
   VectorSpec,
 } from '../types.js';
-import { K_PEERS, PEER_COMPONENT_MIN_INDEX } from '../constants.js';
-import { isFiniteNumber, mean, median } from '../util/math.js';
+import { ACCEPTABLE_STATES, K_PEERS, PEER_COMPONENT_MIN_INDEX, TARGET_STATES } from '../constants.js';
+import { isFiniteNumber, logScale, mean, median, minMax } from '../util/math.js';
+import { canonicalStateCode } from './normalize.js';
 import { scaleVector } from './vectorize.js';
 
 /* -------------------------------------------------------------------------- */
@@ -121,30 +123,137 @@ function pairDistance(
 }
 
 /* -------------------------------------------------------------------------- */
+/* Coarse inputs (PRD 6.4: requested limit, insured revenue, HQ state)         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A candidate may carry the insured's annual revenue. It is not a vector
+ * component, so it travels beside the entry (rescore sets it); an entry
+ * without it is simply not compared on revenue.
+ */
+type CoarseCandidate = PeerVectorEntry & { readonly revenue?: number | null };
+
+/** First finite number in a canonical slot, or null. */
+function firstFinite(slot: readonly { readonly value: unknown }[] | undefined): number | null {
+  if (slot === undefined) return null;
+  for (const field of slot) if (isFiniteNumber(field.value)) return field.value;
+  return null;
+}
+
+function firstString(slot: readonly { readonly value: unknown }[] | undefined): string | null {
+  if (slot === undefined) return null;
+  for (const field of slot) if (typeof field.value === 'string' && field.value.trim() !== '') return field.value;
+  return null;
+}
+
+/** HQ state on the same 0/1/2 scale vectorize gives the primary risk state. */
+function hqStateTier(submission: CanonicalSubmission): number | null {
+  const code = canonicalStateCode(firstString(submission.insured.headquartersState));
+  if (code === null) return null;
+  if (TARGET_STATES.includes(code)) return 2;
+  if (ACCEPTABLE_STATES.includes(code)) return 1;
+  return 0;
+}
+
+/**
+ * The comparison-only vector for a no-policy account: its own known coarse
+ * components, with a missing `totalTiv` filled by the requested limit and a
+ * missing `stateTier` by the HQ state tier. A fresh object: the account's own
+ * FeatureVector (the one scoring reads) is never touched.
+ */
+function coarseComparisonVector(
+  vector: FeatureVector,
+  spec: VectorSpec,
+  submission: CanonicalSubmission,
+): FeatureVector {
+  const x = [...vector.x];
+  const m = [...vector.m];
+  const fill = (key: string, value: number | null): void => {
+    const index = spec.components.find((component) => component.key === key)?.index;
+    if (index === undefined || m[index] === 1 || value === null) return;
+    x[index] = value;
+    m[index] = 1;
+  };
+  fill('totalTiv', firstFinite(submission.exposure.requestedLimit));
+  fill('stateTier', hqStateTier(submission));
+  return { ...vector, x, m };
+}
+
+/** log, then min-max over every revenue present in this comparison. */
+function scaledRevenues(revenues: readonly (number | null)[]): (number | null)[] {
+  const logs = revenues.map((r) => (r === null || !isFiniteNumber(r) || r <= 0 ? null : logScale(r)));
+  const known = logs.filter((v): v is number => v !== null);
+  if (known.length === 0) return logs;
+  const lo = Math.min(...known);
+  const hi = Math.max(...known);
+  return logs.map((v) => (v === null ? null : minMax(v, lo, hi)));
+}
+
+/* -------------------------------------------------------------------------- */
 /* Stage                                                                       */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * `self` is optional. When it is given and this account has only the reduced
+ * vector (no policy), the PRD 6.4 coarse inputs place it among the POLICY book:
+ * requested limit against total TIV, HQ state tier against primary-state tier,
+ * and insured revenue where both sides carry it. Every such match is coarse.
+ * The coarse inputs feed this distance only; they never enter x/t/m.
+ */
 export function peers(
   vector: FeatureVector,
   spec: VectorSpec,
   candidates: readonly PeerVectorEntry[],
   bookStats: BookStats | null,
   k: number = K_PEERS,
+  self?: CanonicalSubmission,
 ): PeerResult {
   const full = peerIndices(spec);
   const coarse = coarseIndices(spec);
   const selfCoarse = isReduced(vector, full, coarse);
   const componentsUsed = selfCoarse ? coarse : full;
+  const coarseInputs = selfCoarse && self !== undefined;
 
   const effectiveK = isFiniteNumber(k) ? Math.max(0, Math.trunc(k)) : K_PEERS;
-  const selfScaled = scaleVector(vector.x, spec, bookStats);
+  const compared = coarseInputs ? coarseComparisonVector(vector, spec, self) : vector;
+  const selfScaled = scaleVector(compared.x, spec, bookStats);
+
+  // A no-policy account is benchmarked against accounts with a policy only:
+  // another no-policy account has no rate and no loss to offer.
+  const pool: readonly CoarseCandidate[] = coarseInputs
+    ? candidates.filter((candidate) => !candidate.coarse)
+    : candidates;
+
+  // Revenue rides one slot past the spec's last index, compared only on the coarse path.
+  const revenueIndex = spec.components.length;
+  const revenues = coarseInputs
+    ? scaledRevenues([
+        firstFinite(self.insured.revenue),
+        ...pool.map((candidate) => (isFiniteNumber(candidate.revenue) ? candidate.revenue : null)),
+      ])
+    : [];
+  const include = coarseInputs ? [...componentsUsed, revenueIndex] : componentsUsed;
+  const withRevenue = (
+    scaled: (number | null)[],
+    mask: readonly (0 | 1)[],
+    revenue: number | null | undefined,
+  ): { scaled: (number | null)[]; mask: (0 | 1)[] } => {
+    if (!coarseInputs) return { scaled, mask: [...mask] };
+    const known = revenue !== null && revenue !== undefined;
+    return { scaled: [...scaled, known ? revenue : null], mask: [...mask, known ? 1 : 0] };
+  };
+  const selfSide = withRevenue(selfScaled, compared.m, revenues[0]);
 
   const scored: PeerMatch[] = [];
-  for (const candidate of candidates) {
-    const candidateScaled = scaleVector(candidate.vector.x, spec, bookStats);
-    const d = pairDistance(selfScaled, candidateScaled, vector.m, candidate.vector.m, componentsUsed);
+  pool.forEach((candidate, j) => {
+    const candidateSide = withRevenue(
+      scaleVector(candidate.vector.x, spec, bookStats),
+      candidate.vector.m,
+      revenues[j + 1],
+    );
+    const d = pairDistance(selfSide.scaled, candidateSide.scaled, selfSide.mask, candidateSide.mask, include);
     // P-1: nothing compared (d.reason) means the pair is not a peer at all.
-    if (!d.ok) continue;
+    if (!d.ok) return;
     scored.push({
       id: candidate.id,
       ...(candidate.label === undefined ? {} : { label: candidate.label }),
@@ -156,7 +265,7 @@ export function peers(
       quotedPremium: candidate.quotedPremium,
       coarse: candidate.coarse || selfCoarse,
     });
-  }
+  });
 
   // P-4: ties in distance are broken by ascending id, so the set is stable.
   scored.sort((a, b) => (a.distance === b.distance ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.distance - b.distance));

@@ -67,7 +67,7 @@ const TARGETS: readonly Target[] = [
   { canonicalPath: 'exposure.requestedLimit', group: 'policy', aliases: ['limit', 'requestedlimit'] },
   // insured
   { canonicalPath: 'insured.name', group: 'insured', aliases: ['insuredname', 'legalname'] },
-  { canonicalPath: 'insured.industry', group: 'insured', aliases: ['naicscode', 'siccode', 'naics', 'sic', 'industry'] },
+  { canonicalPath: 'insured.industry', group: 'insured', aliases: ['naicscode', 'naics', 'industry'] },
   { canonicalPath: 'insured.revenue', group: 'insured', aliases: ['annualrevenue', 'revenue'] },
   { canonicalPath: 'insured.employeeCount', group: 'insured', aliases: ['employees', 'headcount', 'employeecount'] },
   { canonicalPath: 'insured.headquartersState', group: 'insured', aliases: ['state', 'hqstate', 'headquartersstate'] },
@@ -236,7 +236,16 @@ interface Resolved {
   /** True when the leaf sat under a nested object or a reference hop. */
   readonly viaGraph: boolean;
   readonly hint: string | null;
+  /** True when a `hq`-style segment pinned the leaf to the insured. */
+  readonly viaHq: boolean;
 }
+
+/**
+ * The only insured attribute a hq Location carries. Its name, city, zip and so
+ * on describe a building, not the account (R2 I3-2): `hq.name` is never
+ * `insured.name`.
+ */
+const HQ_CANONICAL = 'insured.headquartersState';
 
 /**
  * Which canonical group a leaf inside `resource` belongs to. The nearest
@@ -251,18 +260,18 @@ function resolveGroup(resource: string, path: string, schema: SchemaDocument | u
   let hint: string | null = null;
   for (let i = ancestors.length - 1; i >= 0; i -= 1) {
     const seg = ancestors[i] ?? '';
-    if (HQ_SEGMENTS.includes(norm(seg))) return { group: 'insured', viaGraph, hint: seg };
+    if (HQ_SEGMENTS.includes(norm(seg))) return { group: 'insured', viaGraph, hint: seg, viaHq: true };
     const byName = groupOf(seg);
-    if (byName !== 'other' && byName !== 'exposure') return { group: byName, viaGraph, hint: seg };
+    if (byName !== 'other' && byName !== 'exposure') return { group: byName, viaGraph, hint: seg, viaHq: false };
     const ownerPath = ancestors.slice(0, i + 1).join('.');
     const ref = referenceTarget(schema, resource, ownerPath);
     if (ref !== null) {
       const byRef = groupOf(ref);
-      if (byRef !== 'other' && byRef !== 'exposure') return { group: byRef, viaGraph, hint: ref };
+      if (byRef !== 'other' && byRef !== 'exposure') return { group: byRef, viaGraph, hint: ref, viaHq: false };
     }
     if (hint === null) hint = seg;
   }
-  return { group: groupOf(resource), viaGraph, hint };
+  return { group: groupOf(resource), viaGraph, hint, viaHq: false };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -391,6 +400,14 @@ export function discover(
       }
 
       const match = matchTarget(resolved.group, rawLeaf, tenant);
+      if (match !== null && resolved.viaHq && match.canonicalPath !== HQ_CANONICAL) {
+        unmapped.push({
+          rawPath,
+          sampleValues: leaf.samples,
+          reason: `hq location field "${rawLeaf}" is not an insured attribute`,
+        });
+        continue;
+      }
       if (match === null) {
         const guess = bestGuess(rawLeaf, tenant);
         unmapped.push({

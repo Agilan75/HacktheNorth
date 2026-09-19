@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import type {
   BookStats,
+  CanonicalSubmission,
   FeatureVector,
   PeerVectorEntry,
   VectorComponentSpec,
@@ -248,5 +249,100 @@ describe('peers — robust distance (CP1 FX2, PRD 6.4 / PRD 12)', () => {
     const ab = distance(a, b);
     expect(ab!.distance).toBeGreaterThan(0);
     expect(distance(b, a)!.distance).toBe(ab!.distance);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* Coarse inputs for accounts with no policy (PRD 6.4, findings R1-3 / I3-4)   */
+/* -------------------------------------------------------------------------- */
+
+const PROV = { source: 'self_reported' } as const;
+
+function noPolicySubmission(opts: {
+  limit?: number;
+  hq?: string;
+  revenue?: number;
+}): CanonicalSubmission {
+  return {
+    id: 'self',
+    lineOfBusiness: 'commercial_property',
+    insured: {
+      ...(opts.hq === undefined ? {} : { headquartersState: [{ value: opts.hq, provenance: PROV }] }),
+      ...(opts.revenue === undefined ? {} : { revenue: [{ value: opts.revenue, provenance: PROV }] }),
+    },
+    locations: [],
+    buildings: [],
+    hazards: { present: {} },
+    exposure: opts.limit === undefined ? {} : { requestedLimit: [{ value: opts.limit, provenance: PROV }] },
+    coverage: { lines: [] },
+    history: [],
+    pricing: {},
+  };
+}
+
+/** The real shape of the 11: only isPropertyLine is known. */
+const NO_POLICY = vec({ 1: 1 });
+
+describe('peers — coarse inputs for an account with no policy (PRD 6.4)', () => {
+  const book = [
+    entry('p-near', { ...FULL, 2: 2, 3: 1e7 }, { quotedPremium: 5e4, ratePer100: 0.5, annualLoss: 100 }),
+    entry('p-far', { ...FULL, 2: 0, 3: 1e8 }, { quotedPremium: 5e4, ratePer100: 0.9, annualLoss: 300 }),
+    entry('np-other', {}, { coarse: true }),
+  ];
+
+  it('without coarse inputs a no-policy vector finds no peer (nothing comparable)', () => {
+    const r = peers(NO_POLICY, SPEC, book, STATS);
+    expect(r.peers).toEqual([]);
+  });
+
+  it('places the account among the policy book on requested limit vs TIV and HQ state tier, labelled coarse', () => {
+    const self = noPolicySubmission({ limit: 1e7, hq: 'ca' });
+    const r = peers(NO_POLICY, SPEC, book, STATS, K_PEERS, self);
+    expect(r.coarse).toBe(true);
+    expect(r.componentsUsed).toEqual([2, 3]);
+    expect(r.peers.map((p) => p.id)).toEqual(['p-near', 'p-far']);
+    expect(r.peers.every((p) => p.coarse)).toBe(true);
+    expect(r.peers[0]!.distance).toBe(0);
+    // stateTier 2/2=1 vs 0; tiv 0.5 vs 1  ->  sqrt((1 + 0.25) / 2)
+    expect(r.peers[1]!.distance).toBeCloseTo(Math.sqrt(1.25 / 2), 12);
+    expect(r.medianRatePer100).toBeCloseTo(0.7, 12);
+  });
+
+  it('never matches another no-policy account (it carries no rate or loss to benchmark)', () => {
+    const self = noPolicySubmission({ limit: 1e7, hq: 'CA', revenue: 5e7 });
+    const others = [...book.slice(0, 2), { ...book[2]!, revenue: 5e7 }];
+    const r = peers(NO_POLICY, SPEC, others, STATS, K_PEERS, self);
+    expect(r.peers.map((p) => p.id)).not.toContain('np-other');
+  });
+
+  it('compares insured revenue where both sides have it', () => {
+    const self = noPolicySubmission({ hq: 'CA', revenue: 1e8 });
+    const a = { ...entry('a', { ...FULL, 2: 2 }, { quotedPremium: 1 }), revenue: 1e6 };
+    const b = { ...entry('b', { ...FULL, 2: 2 }, { quotedPremium: 1 }), revenue: 1e8 };
+    const r = peers(NO_POLICY, SPEC, [a, b], STATS, K_PEERS, self);
+    expect(r.peers.map((p) => p.id)).toEqual(['b', 'a']);
+    expect(r.peers[0]!.comparedComponents).toBe(2);
+    expect(r.peers[0]!.distance).toBe(0);
+    expect(r.peers[1]!.distance).toBeCloseTo(Math.sqrt(1 / 2), 12);
+  });
+
+  it('coarse inputs never touch a full account', () => {
+    const self = noPolicySubmission({ limit: 1e6, hq: 'TX' });
+    const plain = peers(vec(FULL), SPEC, book, STATS);
+    const withSelf = peers(vec(FULL), SPEC, book, STATS, K_PEERS, self);
+    expect(withSelf).toEqual(plain);
+  });
+
+  it('coarse inputs never enter the vector itself', () => {
+    const v = vec({ 1: 1 });
+    const snapshot = JSON.stringify(v);
+    peers(v, SPEC, book, STATS, K_PEERS, noPolicySubmission({ limit: 1e7, hq: 'CA' }));
+    expect(JSON.stringify(v)).toBe(snapshot);
+  });
+
+  it('with no coarse input at all the account stays unplaced', () => {
+    const r = peers(NO_POLICY, SPEC, book, STATS, K_PEERS, noPolicySubmission({}));
+    expect(r.peers).toEqual([]);
+    expect(r.coarse).toBe(true);
   });
 });

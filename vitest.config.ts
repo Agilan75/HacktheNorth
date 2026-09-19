@@ -66,6 +66,12 @@ export default defineConfig({
           include: ['tests/**/*.test.ts'],
           exclude,
           setupFiles,
+          // Projects do not inherit the root testTimeout, so this project sat on
+          // vitest's 5 s default. Each integration test seeds the whole real book
+          // (all 158 submissions since R2-1), which takes seconds under a full
+          // parallel run. DECISIONS R2-10.
+          testTimeout: 60_000,
+          hookTimeout: 60_000,
         },
       },
     ],

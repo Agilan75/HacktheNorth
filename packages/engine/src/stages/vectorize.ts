@@ -106,12 +106,35 @@ function asNumber(v: unknown): number | null {
   return isFiniteNumber(v) ? v : null;
 }
 
-/** Read a dotted path out of the submission, unwrapping any canonical slot. */
+/**
+ * Read a dotted path out of the submission, unwrapping any canonical slot.
+ *
+ * A segment may carry an array index (`buildings[0].yearBuilt`, the tenant
+ * spec's component 11). A `hazards.<key>` path that is not a direct leaf of
+ * `hazards` reads `hazards.present.<key>`, where merge writes sweep hazards
+ * (R2-fixer-6, R-I4-1 / R-I4-3).
+ */
 function readSource(submission: CanonicalSubmission, path: string): unknown {
+  const direct = walkPath(submission, path);
+  if (direct !== undefined) return direct;
+  const segments = path.split('.');
+  if (segments.length === 2 && segments[0] === 'hazards') {
+    return walkPath(submission, `hazards.present.${segments[1]}`);
+  }
+  return undefined;
+}
+
+function walkPath(submission: CanonicalSubmission, path: string): unknown {
   let cursor: unknown = submission;
   for (const segment of path.split('.')) {
+    const parts = /^([^[\]]+)(?:\[(\d+)\])?$/.exec(segment);
+    if (parts === null) return undefined;
     if (cursor === null || cursor === undefined || typeof cursor !== 'object') return undefined;
-    cursor = (cursor as Record<string, unknown>)[segment];
+    cursor = (cursor as Record<string, unknown>)[parts[1]!];
+    if (parts[2] !== undefined) {
+      if (!Array.isArray(cursor)) return undefined;
+      cursor = (cursor as readonly unknown[])[Number(parts[2])];
+    }
   }
   if (Array.isArray(cursor) && cursor.length > 0 && isCanonicalSlot(cursor)) {
     return pickValue(cursor as Sourced<unknown>);

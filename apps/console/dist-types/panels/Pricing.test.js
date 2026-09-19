@@ -68,5 +68,83 @@ describe('Pricing', () => {
         expect(screen.getByText('No rating factors were applied to this account.')).toBeInTheDocument();
         expect(screen.queryByRole('list', { name: 'Pricing notes' })).toBeNull();
     });
+    describe('R5-7: per-building rating, factor by factor (PRD 10 d)', () => {
+        const withBuildings = {
+            ...base,
+            factors: [{ label: 'lossHistory', multiplier: 1.09, basis: '$0 five-year loss' }],
+            buildings: [
+                {
+                    buildingExternalId: 'B-109',
+                    tiv: 13_800_000,
+                    baseRate: 0.0425,
+                    factors: [
+                        { label: 'construction', multiplier: 0.981, input: 'steel' },
+                        { label: 'age', multiplier: 1.1, input: 'built 1985' },
+                        { label: 'protectionClass', multiplier: 1.05, input: 'class 4' },
+                        { label: 'sprinkler', multiplier: 0.85, input: 'sprinklered' },
+                    ],
+                    premium: 5129.67,
+                },
+                {
+                    buildingExternalId: 'B-110',
+                    tiv: 4_700_000,
+                    baseRate: 0.0425,
+                    factors: [
+                        { label: 'construction', multiplier: 1.2, input: 'wood_frame' },
+                        { label: 'age', multiplier: 1, input: 'unknown' },
+                        { label: 'protectionClass', multiplier: 1.05, input: 'class 4' },
+                        { label: 'sprinkler', multiplier: 1.25, input: 'unsprinklered' },
+                    ],
+                    premium: 3146.06,
+                },
+            ],
+        };
+        it('renders one row per building with TIV, base rate, each multiplier and its input, and the premium from the DTO', () => {
+            render(_jsx(Pricing, { pricing: withBuildings }));
+            const table = screen.getByRole('table', { name: 'Per-building rating' });
+            const headers = within(table).getAllByRole('columnheader').map((h) => h.textContent);
+            expect(headers).toEqual([
+                'Building',
+                'TIV',
+                'Base rate per $100',
+                'Construction',
+                'Age',
+                'Protection class',
+                'Sprinkler',
+                'Building premium',
+            ]);
+            const rows = screen.getAllByTestId('pricing-building');
+            expect(rows).toHaveLength(2);
+            const first = rows[0];
+            expect(within(first).getByRole('rowheader')).toHaveTextContent('B-109');
+            expect(first).toHaveTextContent('$13,800,000');
+            expect(first).toHaveTextContent('$0.0425');
+            expect(first).toHaveTextContent('×0.981');
+            expect(first).toHaveTextContent('steel');
+            expect(first).toHaveTextContent('×1.10');
+            expect(first).toHaveTextContent('built 1985');
+            expect(first).toHaveTextContent('class 4');
+            expect(first).toHaveTextContent('×0.85');
+            expect(first).toHaveTextContent('sprinklered');
+            expect(within(first).getByTestId('pricing-building-premium')).toHaveTextContent('$5,129.67');
+            expect(within(rows[1]).getByTestId('pricing-building-premium')).toHaveTextContent('$3,146.06');
+        });
+        it('explains the arithmetic in words and never prints a number the DTO does not carry', () => {
+            render(_jsx(Pricing, { pricing: withBuildings }));
+            expect(screen.getByText(/TIV ÷ 100 × base rate × each multiplier = building premium/)).toBeInTheDocument();
+            // The subtotal of building premiums (8,275.73) is not in the DTO, so it is not shown.
+            expect(screen.queryByText(/8,275/)).toBeNull();
+            // Account-level factors keep their own table, with a readable label.
+            const account = screen.getByRole('table', { name: 'Account-level factors' });
+            expect(within(account).getByText('Loss history')).toBeInTheDocument();
+            expect(within(account).getByText('×1.09')).toBeInTheDocument();
+        });
+        it('shows no building table when the view has no per-building rating', () => {
+            render(_jsx(Pricing, { pricing: base }));
+            expect(screen.queryByRole('table', { name: 'Per-building rating' })).toBeNull();
+            render(_jsx(Pricing, { pricing: { ...base, buildings: [] } }));
+            expect(screen.queryByRole('table', { name: 'Per-building rating' })).toBeNull();
+        });
+    });
 });
 //# sourceMappingURL=Pricing.test.js.map

@@ -74,7 +74,9 @@ describe('toBundles', () => {
 
   it('puts the hydrated policy under Policy, with buildings reachable', () => {
     const b = bundle('SUB-1002');
-    expect(Object.keys(b.records)).toEqual(['Policy']);
+    // The deep pass expanded claims, so the bundle marks the claims list fetched (I-4, W0-2.8).
+    expect(Object.keys(b.records)).toEqual(['Policy', 'Claim']);
+    expect(b.records['Claim']).toEqual([]);
     const [rec] = b.records['Policy']!;
     expect(rec!.resource).toBe('Policy');
     expect(rec!.id).toBe(9002);
@@ -150,5 +152,40 @@ describe('toBundles', () => {
       queryTraceIds: ['q0', 'q1', 'q2'],
     });
     expect(again).toEqual(bundles);
+  });
+
+  // R1-1 / R2-2 / R3-6: a hydrated policy with `claims: []` must read as a
+  // fetched, empty claims list, not as claims never fetched.
+  it('marks the claims list fetched when a hydrated policy has an empty claims array', () => {
+    const out = toBundles({
+      policies: [{ ...MINI_HYDRATED_POLICIES[0]!, claims: [] }],
+      noPolicySubmissions: [],
+      followUps: [],
+      survivors: [],
+      schema: MINI_SCHEMA,
+      fetchedAt: MINI_FETCHED_AT,
+      queryTraceIds: [],
+    });
+    expect(out).toHaveLength(1);
+    expect(out[0]!.records['Claim']).toEqual([]);
+  });
+
+  it('does not mark claims fetched when the policy row holds only unexpanded claim ids', () => {
+    const out = toBundles({
+      policies: [{ ...MINI_HYDRATED_POLICIES[0]!, claims: [1101] }],
+      noPolicySubmissions: [],
+      followUps: [],
+      survivors: [],
+      schema: MINI_SCHEMA,
+      fetchedAt: MINI_FETCHED_AT,
+      queryTraceIds: [],
+    });
+    expect(Object.keys(out[0]!.records)).toEqual(['Policy']);
+  });
+
+  it('never marks claims fetched on a no-policy Submission bundle', () => {
+    for (const b of bundles) {
+      if (b.records['Submission'] !== undefined) expect(b.records['Claim']).toBeUndefined();
+    }
   });
 });

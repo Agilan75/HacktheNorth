@@ -101,6 +101,20 @@ const PLACEHOLDER = /\[[^\]\n]{1,40}\]|\{\{|<[a-z ]{2,30}>/i;
 const DOLLAR_FIGURE = /\$\s?\d/;
 
 /**
+ * Words that make a sentence an ask (R2-fixer-6, R4-7). Matched against the
+ * normalized sentence, so "Could you" and "could you" are the same.
+ */
+const REQUEST_CUE =
+  /\b(?:please|kindly|send|provide|share|confirm|forward|attach|upload|submit|include|advise|need|needs|needed|require|requires|required|could you|can you|would you|let us know)\b/;
+
+/** An ask that only asks for a reply, with no object beyond the requested values. */
+const REPLY_ONLY =
+  /^(?:please )?(?:reply|respond)(?: (?:with|to us|to this email))?(?: (?:this|that|these|those|the) (?:value|values|details|information|answer|answers))?(?: (?:when|as soon as) you can| at your earliest convenience)?$/;
+
+/** The list intro, e.g. "To finish our review of X we need the following:". */
+const LIST_INTRO = /(?:we )?(?:need|require|are missing) the following(?: (?:items?|details|information))?$/;
+
+/**
  * Why a draft is not acceptable, or `null` when it is. Exported for the tests
  * and for any route that wants to re-check a human-edited draft.
  */
@@ -129,6 +143,19 @@ export function draftProblems(
     if (sentence.trim().endsWith('?') && !namesAny(sentence)) {
       return `extra question: ${oneLine(sentence)}`;
     }
+  }
+  // A plain ("Please also send ...") sentence must name a requested field too,
+  // unless it only asks for a reply or introduces the list (whose items are
+  // checked above).
+  for (const sentence of sentences) {
+    if (BULLET.test(sentence) || namesAny(sentence)) continue;
+    let text = norm(sentence);
+    if (sentence.trim().endsWith(':')) {
+      const intro = LIST_INTRO.exec(text);
+      if (intro !== null) text = text.slice(0, intro.index).trim();
+    }
+    if (!REQUEST_CUE.test(text) || REPLY_ONLY.test(text)) continue;
+    return `extra request: ${oneLine(sentence)}`;
   }
 
   const inputText = fields.map((field) => `${field.label} ${field.why}`).join(' ');

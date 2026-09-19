@@ -31,7 +31,7 @@ function Unavailable(props) {
     const lead = flip.distanceToAppetite === 0
         ? 'No flip needed: this account is already in appetite.'
         : 'No flip reaches FIT within two movable components.';
-    return (_jsxs("div", { "data-testid": "flip-unavailable", children: [_jsx("p", { children: lead }), flip.reason !== null && flip.reason.trim() !== '' ? (_jsx("p", { className: "rf-flip__reason", "data-testid": "flip-reason", children: flip.reason })) : null, _jsxs("dl", { className: "rf-stats", children: [_jsxs("div", { className: "rf-stat", "data-testid": "flip-score-before", children: [_jsx("dt", { children: "Appetite score" }), _jsx("dd", { children: formatScore(flip.scoreBefore, { decimals: 1 }) })] }), _jsxs("div", { className: "rf-stat", "data-testid": "flip-premium-before", children: [_jsx("dt", { children: "Quoted premium" }), _jsx("dd", { children: formatMoney(flip.premiumBefore) })] })] })] }));
+    return (_jsxs("div", { "data-testid": "flip-unavailable", children: [_jsx("p", { children: lead }), flip.reason !== null && flip.reason.trim() !== '' ? (_jsx("p", { className: "rf-flip__reason", "data-testid": "flip-reason", children: flip.reason })) : null, _jsxs("dl", { className: "rf-stats", children: [_jsxs("div", { className: "rf-stat", "data-testid": "flip-score-before", children: [_jsx("dt", { children: "Appetite score" }), _jsx("dd", { children: formatScore(flip.scoreBefore, { decimals: 1 }) })] }), _jsxs("div", { className: "rf-stat", "data-testid": "flip-premium-before", children: [_jsx("dt", { children: "Predicted premium" }), _jsx("dd", { children: formatMoney(flip.premiumBefore) })] })] })] }));
 }
 /**
  * PRD 10 (g) Minimal flip with new score and price.
@@ -39,11 +39,15 @@ function Unavailable(props) {
  * The smallest move (at most two movable components, INTERPRETATIONS F-1, F-2)
  * that lands the account in FIT, with the score and premium after it. Every
  * number comes from `flip`; nothing is recomputed (PRD 10, 13).
+ *
+ * `premiumBefore` / `premiumAfter` are the engine's *predicted* premium (flip.ts
+ * prices the vector, not the quote), so they are labelled "Predicted premium"
+ * (R5-2). The quoted figure lives in panel (d).
  */
 export function Flip(props) {
     const { flip } = props;
     const hasFlip = flip.available && flip.moves.length > 0;
     const distance = flip.distanceToAppetite;
-    return (_jsxs("div", { className: "rf-panel rf-flip", "data-testid": "flip-panel", children: [_jsx("p", { className: "rf-flip__distance", children: _jsx(Badge, { label: distanceLabel(distance), tone: distance === 1 ? 'attention' : distance === null ? 'quiet' : 'neutral', title: "Distance to appetite: the number of moves in the minimal flip (0, 1 or 2), or none." }) }), hasFlip ? (_jsxs(_Fragment, { children: [_jsx(MoveList, { moves: flip.moves }), _jsxs("dl", { className: "rf-stats", children: [_jsx(Stat, { testId: "flip-score", label: "Appetite score", before: formatScore(flip.scoreBefore, { decimals: 1 }), after: formatScore(flip.scoreAfter, { decimals: 1 }) }), _jsx(Stat, { testId: "flip-premium", label: "Premium", before: formatMoney(flip.premiumBefore), after: formatMoney(flip.premiumAfter) }), _jsxs("div", { className: "rf-stat", "data-testid": "flip-verdict-after", children: [_jsx("dt", { children: "Verdict after" }), _jsx("dd", { children: flip.verdictAfter !== null ? _jsx(VerdictPill, { verdict: flip.verdictAfter }) : '—' })] })] }), _jsx("p", { className: "rf-footnote", children: "Immovable components (state, building age, submission type, line, past losses, protection class) are never proposed." })] })) : (_jsx(Unavailable, { flip: flip }))] }));
+    return (_jsxs("div", { className: "rf-panel rf-flip", "data-testid": "flip-panel", children: [_jsx("p", { className: "rf-flip__distance", children: _jsx(Badge, { label: distanceLabel(distance), tone: distance === 1 ? 'attention' : distance === null ? 'quiet' : 'neutral', title: "Distance to appetite: the number of moves in the minimal flip (0, 1 or 2), or none." }) }), hasFlip ? (_jsxs(_Fragment, { children: [_jsx(MoveList, { moves: flip.moves }), _jsxs("dl", { className: "rf-stats", children: [_jsx(Stat, { testId: "flip-score", label: "Appetite score", before: formatScore(flip.scoreBefore, { decimals: 1 }), after: formatScore(flip.scoreAfter, { decimals: 1 }) }), _jsx(Stat, { testId: "flip-premium", label: "Predicted premium", before: formatMoney(flip.premiumBefore), after: formatMoney(flip.premiumAfter) }), _jsxs("div", { className: "rf-stat", "data-testid": "flip-verdict-after", children: [_jsx("dt", { children: "Verdict after" }), _jsx("dd", { children: flip.verdictAfter !== null ? _jsx(VerdictPill, { verdict: flip.verdictAfter }) : '—' })] })] }), _jsx("p", { className: "rf-footnote", children: "Immovable components (state, building age, submission type, line, past losses, protection class) are never proposed." })] })) : (_jsx(Unavailable, { flip: flip }))] }));
 }
 //# sourceMappingURL=Flip.js.map

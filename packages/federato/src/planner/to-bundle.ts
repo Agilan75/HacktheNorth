@@ -65,6 +65,12 @@ function byId(a: FederatoRecord, b: FederatoRecord): number {
   return String(x ?? '').localeCompare(String(y ?? ''));
 }
 
+/** The row carries an expanded claims list: claim objects, or an empty array. Bare ids do not count. */
+function claimsExpanded(row: FederatoRecord): boolean {
+  const claims = row['claims'];
+  return Array.isArray(claims) && claims.every(isPlainObject);
+}
+
 /** Federato's `property` is the only line Retrofit scores as commercial property. */
 function lineOf(value: unknown): LineOfBusiness | undefined {
   const t = nonEmptyText(value);
@@ -125,6 +131,11 @@ export function toBundles(input: ToBundleInput): readonly RawBundle[] {
     if (policyRows.length > 0) {
       const extra = [...(followUps.get(externalId) ?? [])].sort(byId);
       records['Policy'] = [...policyRows, ...extra].map((row) => toRaw('Policy', row, externalId));
+      // The deep pass expands claims inside the Policy row. An expanded list
+      // (claim objects, or empty) means the claims list WAS retrieved, so mark
+      // it with an empty Claim key: zero claims is then a known 0, not missing
+      // (I-4, W0-2.8). Empty, so normalize never counts a claim twice.
+      if (policyRows.some(claimsExpanded)) records['Claim'] = [];
       line = lineOf(policyRows[0]?.['line_of_business']);
       if (line === undefined) {
         const sub = policyRows[0]?.['submission'];

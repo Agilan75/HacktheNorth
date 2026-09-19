@@ -52,6 +52,19 @@ const COMPONENT_LABEL: Readonly<Record<string, string>> = {
   tivWeightedProtectionClass: 'protection class',
 };
 
+/** Vector component key -> the appetite factor it scores (vectors/commercial.json). */
+const COMPONENT_FACTOR: Readonly<Record<string, AppetiteFactorId>> = {
+  isNewBusiness: 'submission_type',
+  isPropertyLine: 'line_of_business',
+  stateTier: 'primary_risk_state',
+  totalTiv: 'tiv',
+  quotedPremium: 'total_premium',
+  pctTivPre1990: 'building_age',
+  pctTivPost2010: 'building_age',
+  pctTivAcceptableConstruction: 'construction_type',
+  fiveYearLoss: 'loss_value',
+};
+
 const MONEY_COMPONENTS = new Set(['quotedPremium', 'fiveYearLoss']);
 const SHARE_COMPONENTS = new Set([
   'pctTivPre1990',
@@ -348,11 +361,28 @@ function recommendationSentence(result: EngineResult, rec: Recommendation): stri
       why = 'every appetite factor is met and nothing is missing';
       break;
     case 'decline': {
-      const outs = uniq(outFactors(result).map((f) => factorLabel(f.factor)));
-      const immovable = result.flip.blockedByImmovable.length > 0;
+      const outFs = outFactors(result);
+      const outs = uniq(outFs.map((f) => factorLabel(f.factor)));
+      // F-2: only the knockouts whose components are immovable are unchangeable.
+      const blocked = new Set(result.flip.blockedByImmovable);
+      const fixedOuts = uniq(
+        outFs
+          .filter(
+            (f) =>
+              f.componentKeys.some((k) => blocked.has(k)) ||
+              [...blocked].some((k) => COMPONENT_FACTOR[k] === f.factor),
+          )
+          .map((f) => factorLabel(f.factor)),
+      );
+      let immovableText = '';
+      if (fixedOuts.length > 0 && fixedOuts.length === outs.length) {
+        immovableText = ', which the insured cannot change';
+      } else if (fixedOuts.length > 0) {
+        immovableText = `; the insured cannot change ${joinList(fixedOuts)}`;
+      }
       why =
         outs.length > 0
-          ? `it is knocked out on ${joinList(outs)}${immovable ? ', which the insured cannot change' : ''}`
+          ? `it is knocked out on ${joinList(outs)}${immovableText}`
           : 'no change of one or two factors reaches appetite';
       break;
     }

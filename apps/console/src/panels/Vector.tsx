@@ -33,8 +33,20 @@ function formatRaw(c: VectorComponentView): string {
   return Number.isInteger(raw) ? formatScore(raw) : formatScore(raw, { decimals: 3 });
 }
 
-function tierName(tier: number): string | null {
-  if (tier === 1) return 'Target';
+/**
+ * INTERPRETATIONS T-BLANK: the components of the four factors whose Target
+ * column is blank (submission type, line of business, construction type, loss
+ * value). Tier 1 there is the engine's Acceptable, as panel (b) prints it.
+ */
+const BLANK_TARGET_KEYS: ReadonlySet<string> = new Set([
+  'isNewBusiness',
+  'isPropertyLine',
+  'pctTivAcceptableConstruction',
+  'fiveYearLoss',
+]);
+
+function tierName(key: string, tier: number): string | null {
+  if (tier === 1) return BLANK_TARGET_KEYS.has(key) ? 'Acceptable' : 'Target';
   if (tier === 0.6) return 'Acceptable';
   if (tier === 0) return 'Not acceptable';
   return null;
@@ -43,7 +55,7 @@ function tierName(tier: number): string | null {
 function formatTier(c: VectorComponentView): string {
   if (!c.appetiteFactor) return 'Not scored';
   if (c.tier === null || c.mask === 0) return '—';
-  const name = tierName(c.tier);
+  const name = tierName(c.key, c.tier);
   const value = formatScore(c.tier, { decimals: c.tier === 0 || c.tier === 1 ? 0 : 1 });
   return name !== null ? `${value} · ${name}` : value;
 }
@@ -153,7 +165,8 @@ export function Vector(props: VectorPanelProps): ReactElement {
 
       <ul className="rf-notes" aria-label="How to read the vector">
         <li>
-          Tier values are 0 (Not acceptable), 0.6 (Acceptable) and 1 (Target). A missing component is
+          Tier values are 0 (Not acceptable), 0.6 (Acceptable) and 1 (Target); where the guidelines leave
+          Target blank (submission type, line of business, construction, loss value), Acceptable scores 1. A missing component is
           never imputed: it scores 0 points, lowers completeness and forces REFER.
         </li>
         {spansBuildingAge ? (

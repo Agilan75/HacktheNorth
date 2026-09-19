@@ -314,6 +314,43 @@ describe('explain', () => {
     );
   });
 
+  it('decline: calls only the immovable knockouts unchangeable (F-2)', () => {
+    // SUB-2024-00076 shape: state (immovable) and premium (movable).
+    const mixed = explain({
+      result: makeResult({
+        verdict: 'DOES_NOT_FIT',
+        tiers: { primary_risk_state: 'not_acceptable', total_premium: 'not_acceptable' },
+        blockedByImmovable: ['stateTier'],
+      }),
+    });
+    expect(mixed.sentences[2]).toBe(
+      'Recommendation: decline, because it is knocked out on state and premium; the insured cannot change state.',
+    );
+
+    // SUB-2026-00028 shape: premium and construction out, the blocked component is elsewhere.
+    const none = explain({
+      result: makeResult({
+        verdict: 'DOES_NOT_FIT',
+        tiers: { total_premium: 'not_acceptable', construction_type: 'not_acceptable' },
+        blockedByImmovable: ['fiveYearLoss'],
+      }),
+    });
+    expect(none.sentences[2]).toBe(
+      'Recommendation: decline, because it is knocked out on premium and construction.',
+    );
+
+    const all = explain({
+      result: makeResult({
+        verdict: 'DOES_NOT_FIT',
+        tiers: { submission_type: 'not_acceptable', primary_risk_state: 'not_acceptable' },
+        blockedByImmovable: ['isNewBusiness', 'stateTier'],
+      }),
+    });
+    expect(all.sentences[2]).toBe(
+      'Recommendation: decline, because it is knocked out on submission type and state, which the insured cannot change.',
+    );
+  });
+
   it('REFER on missing premium: investigate and names what is missing', () => {
     const r = makeResult({
       verdict: 'REFER',

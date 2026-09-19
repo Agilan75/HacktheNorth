@@ -727,7 +727,9 @@ export type ExtractionRejection =
   | 'wrong_type'
   | 'out_of_range'
   | 'not_requested'
-  | 'unparseable';
+  | 'unparseable'
+  /** Passed every check but landed on no field the engine reads (R2-7). */
+  | 'not_applied';
 
 /** The same value after code checked type, range, quote and the 0.8 gate. */
 export interface ValidatedFieldValue extends ExtractedFieldValue {

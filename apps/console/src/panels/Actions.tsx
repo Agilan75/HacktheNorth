@@ -94,7 +94,7 @@ function DraftCard(props: {
                 <td>
                   <code>{f.path}</code>
                 </td>
-                <td>{`${formatScore(f.voi, { decimals: 1 })} pts`}</td>
+                <td>{f.voi === null ? '—' : `${formatScore(f.voi, { decimals: 1 })} pts`}</td>
               </tr>
             ))}
           </tbody>

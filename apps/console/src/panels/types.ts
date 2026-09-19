@@ -63,6 +63,35 @@ export interface QueryTraceEntryView {
   readonly durationMs: number;
   readonly adapted: boolean;
   readonly note: string | null;
+  /**
+   * R3-2 (PRD §7.5 step 6): the reasoning half of the trace. Optional so a view
+   * built before these fields existed still typechecks; absent renders nothing.
+   */
+  /** The path walked from `resource`, e.g. ['exposure_units', 'location']. */
+  readonly path?: readonly string[];
+  /** Why the planner chose this root resource and path. */
+  readonly why?: string | null;
+  /** The other roots it considered, and why each lost. */
+  readonly alternativesRejected?: readonly QueryTraceAlternativeView[];
+  /** The rules whose inputs this query fetches. */
+  readonly requiredBy?: readonly QueryTraceNeedView[];
+  /** The adaptation kind that produced this retry; null (never 'none') when there was none. */
+  readonly adaptation?: string | null;
+  /** The query's error message, kept apart from `note`. */
+  readonly error?: string | null;
+}
+
+export interface QueryTraceAlternativeView {
+  readonly rootResource: string;
+  readonly path: readonly string[];
+  readonly why: string;
+}
+
+export interface QueryTraceNeedView {
+  readonly ruleId: string;
+  readonly factor: string | null;
+  readonly canonicalPath: string;
+  readonly why: string;
 }
 
 /** PRD §10 (i) — discovered schema and the keys the field map could not place. */
@@ -101,6 +130,27 @@ export interface PricingView {
   readonly currency: 'USD';
   readonly factors: readonly PricingFactorView[];
   readonly notes: readonly string[];
+  /**
+   * R5-7 (PRD §6.7, §10 d): per-building rating — TIV/100 × base rate × each
+   * multiplier = building premium. `factors` above then applies to their sum.
+   * Optional so older views typecheck; absent renders no building table.
+   */
+  readonly buildings?: readonly PricingBuildingView[];
+}
+
+export interface PricingBuildingFactorView {
+  readonly label: string;
+  readonly multiplier: number;
+  readonly input: string | null;
+}
+
+export interface PricingBuildingView {
+  readonly buildingExternalId: string;
+  readonly tiv: number;
+  /** Premium per $100 of TIV before any multiplier. */
+  readonly baseRate: number;
+  readonly factors: readonly PricingBuildingFactorView[];
+  readonly premium: number;
 }
 
 /** PRD §10 (d) — the five nearest accounts. */
@@ -232,7 +282,8 @@ export interface RequestDraftView {
   readonly requestedFields: readonly {
     readonly path: string;
     readonly label: string;
-    readonly voi: number;
+    /** Expected score swing in points; null when the engine ranked no VOI for it (R5-8). */
+    readonly voi: number | null;
   }[];
 }
 

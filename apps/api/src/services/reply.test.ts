@@ -252,6 +252,136 @@ describe('applyBrokerReply', () => {
     expect(res.accepted.map((v) => v.value)).toEqual([95_000]);
   });
 
+  it('R4-4: a prose date the broker wrote is accepted as its ISO date', async () => {
+    repos().actions.insert({
+      id: 'act_request_date',
+      submissionId: 'SUB-1002',
+      type: 'request',
+      status: 'sent',
+      actor: 'code',
+      payload: {
+        fields: [
+          {
+            canonicalPath: 'receivedDate',
+            componentKey: null,
+            label: 'received date',
+            why: 'the five-year loss window runs back from it',
+            factor: 'loss_value',
+            ruleId: null,
+            currentValue: null,
+            severity: 'LOW',
+          },
+        ],
+      },
+      before: null,
+      after: null,
+      sourceText: null,
+      createdAt: '2026-09-19T12:30:00.000Z',
+    });
+    const text = 'Hi, the submission was received on December 13, 2025.';
+    for (const [value, iso] of [
+      ['December 13, 2025', '2025-12-13'],
+      ['Dec 13, 2025', '2025-12-13'],
+      ['13 December 2025', '2025-12-13'],
+      ['12/13/2025', '2025-12-13'],
+      ['2025-12-13', '2025-12-13'],
+    ] as const) {
+      const res = await applyBrokerReply(
+        depsWith(extractAnswer([{ canonicalPath: 'receivedDate', value, confidence: 0.95, quote: 'received on December 13, 2025' }])),
+        'SUB-1002',
+        { text, actionId: 'act_request_date' },
+      );
+      expect(res.accepted.map((v) => [v.canonicalPath, v.value])).toEqual([['receivedDate', iso]]);
+      expect(sub('SUB-1002').canonical!.receivedDate?.find((v) => v.provenance.source === 'answer')?.value).toBe(iso);
+    }
+    // Not a real date: still rejected, never guessed.
+    const bad = await applyBrokerReply(
+      depsWith(extractAnswer([{ canonicalPath: 'receivedDate', value: 'February 30, 2025', confidence: 0.95, quote: 'received on December 13, 2025' }])),
+      'SUB-1002',
+      { text, actionId: 'act_request_date' },
+    );
+    expect(bad.accepted).toEqual([]);
+    expect(bad.rejected[0]).toMatchObject({ rejection: 'unparseable' });
+  });
+
+  it('R4-6: a verbatim "new business" answers submissionType as new_business (G-11)', async () => {
+    const req = await requestFor('SUB-1004');
+    const text = 'This is a new business submission.';
+    const res = await applyBrokerReply(
+      depsWith(extractAnswer([{ canonicalPath: 'submissionType', value: 'new business', confidence: 0.95, quote: text }])),
+      'SUB-1004',
+      { text, actionId: req.id },
+    );
+    expect(res.accepted.map((v) => [v.canonicalPath, v.value])).toEqual([['submissionType', 'new_business']]);
+    expect(res.action.note).not.toContain('not answered: submissionType');
+    expect(sub('SUB-1004').canonical!.submissionType?.[0]?.value).toBe('new_business');
+  });
+
+  it('R-I4-2: wildcard and five-year-loss answers for an account with no buildings reach the vector', async () => {
+    const req = await requestFor('SUB-1004');
+    expect(req.fields.map((f) => f.canonicalPath)).toContain('buildings.*.tiv');
+    const text = 'TIV is $12,000,000 for the one building. Losses over five years total $30,000. It is in TX.';
+    const res = await applyBrokerReply(
+      depsWith(
+        extractAnswer([
+          { canonicalPath: 'buildings.*.tiv', value: '$12,000,000', confidence: 0.95, quote: 'TIV is $12,000,000' },
+          { canonicalPath: 'rollup.fiveYearLoss', value: '$30,000', confidence: 0.95, quote: 'Losses over five years total $30,000.' },
+          { canonicalPath: 'locations.*.state', value: 'TX', confidence: 0.95, quote: 'It is in TX.' },
+        ]),
+      ),
+      'SUB-1004',
+      { text, actionId: req.id },
+    );
+    expect(res.accepted.map((v) => v.canonicalPath).sort()).toEqual(['buildings.*.tiv', 'locations.*.state', 'rollup.fiveYearLoss']);
+    expect(res.rejected).toEqual([]);
+    expect(res.result.rollup.totalTiv).toBe(12_000_000);
+    expect(res.result.rollup.fiveYearLoss).toBe(30_000);
+    expect(res.result.rollup.primaryState).toBe('TX');
+    expect(res.after.completeness).toBeGreaterThan(res.before.completeness);
+  });
+
+  it('R-I4-2: a clean value the engine cannot place is reported as not applied and nothing is re-scored', async () => {
+    repos().actions.insert({
+      id: 'act_request_rollup',
+      submissionId: 'SUB-1002',
+      type: 'request',
+      status: 'sent',
+      actor: 'code',
+      payload: {
+        fields: [
+          {
+            canonicalPath: 'rollup.pctTivSprinklered',
+            componentKey: 'pctTivSprinklered',
+            label: 'share of TIV sprinklered',
+            why: 'it moves the account to FIT',
+            factor: 'sprinkler_protection',
+            ruleId: null,
+            currentValue: null,
+            severity: 'MEDIUM',
+          },
+        ],
+      },
+      before: null,
+      after: null,
+      sourceText: null,
+      createdAt: '2026-09-19T12:30:00.000Z',
+    });
+    const text = 'About 80% of the TIV is sprinklered.';
+    const stored = sub('SUB-1002');
+    const res = await applyBrokerReply(
+      depsWith(extractAnswer([{ canonicalPath: 'rollup.pctTivSprinklered', value: '80%', confidence: 0.95, quote: text }])),
+      'SUB-1002',
+      { text, actionId: 'act_request_rollup' },
+    );
+    expect(res.accepted).toEqual([]);
+    expect(res.rejected.map((v) => [v.canonicalPath, v.rejection])).toEqual([['rollup.pctTivSprinklered', 'not_applied']]);
+    expect(res.after).toEqual(res.before);
+    expect(res.action.status).toBe('replied');
+    expect(res.action.note).toContain('not applied: rollup.pctTivSprinklered');
+    expect(repos().actions.list({ submissionId: 'SUB-1002', type: 'rescore' }).rows).toHaveLength(0);
+    expect(sub('SUB-1002').canonical).toEqual(stored.canonical);
+  });
+
   it('throws for an unknown submission or an action of another submission', async () => {
     await expect(applyBrokerReply(depsWith(), 'SUB-9999', { text: 'x' })).rejects.toThrow(/no submission/);
     const req = await requestFor('SUB-1004');

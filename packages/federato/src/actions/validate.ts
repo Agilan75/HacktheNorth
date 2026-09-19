@@ -545,15 +545,45 @@ function parseString(value: unknown, leaf: string, exp: Expectation): Parsed {
   return { ok: true, value: trimmed };
 }
 
+const MONTHS: Readonly<Record<string, number>> = {
+  jan: 1, january: 1, feb: 2, february: 2, mar: 3, march: 3, apr: 4, april: 4, may: 5,
+  jun: 6, june: 6, jul: 7, july: 7, aug: 8, august: 8, sep: 9, sept: 9, september: 9,
+  oct: 10, october: 10, nov: 11, november: 11, dec: 12, december: 12,
+};
+
+function daysIn(year: number, month: number): number {
+  if (month === 2) return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0 ? 29 : 28;
+  return [4, 6, 9, 11].includes(month) ? 30 : 31;
+}
+
+function isoDate(year: number, month: number | undefined, day: number): string | null {
+  if (month === undefined || month < 1 || month > 12 || day < 1 || day > daysIn(year, month)) return null;
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+/**
+ * A broker writes dates as prose (R4-4): `2025-12-13`, `December 13, 2025`,
+ * `Dec. 13th 2025`, `13 Dec 2025`, or `12/13/2025` read US-style. Returns the
+ * ISO date, or null when it is not a real calendar date. No `new Date()`: it
+ * would roll Feb 30 into March.
+ */
+function proseDateToIso(text: string): string | null {
+  const t = text.trim().toLowerCase().replace(/\s+/g, ' ');
+  let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);
+  if (m !== null) return isoDate(Number(m[1]), Number(m[2]), Number(m[3]));
+  m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(t);
+  if (m !== null) return isoDate(Number(m[3]), Number(m[1]), Number(m[2]));
+  m = /^([a-z]+)\.? (\d{1,2})(?:st|nd|rd|th)?,? (\d{4})$/.exec(t);
+  if (m !== null) return isoDate(Number(m[3]), MONTHS[m[1] ?? ''], Number(m[2]));
+  m = /^(\d{1,2})(?:st|nd|rd|th)? ([a-z]+)\.?,? (\d{4})$/.exec(t);
+  if (m !== null) return isoDate(Number(m[3]), MONTHS[m[2] ?? ''], Number(m[1]));
+  return null;
+}
+
 function parseDate(value: unknown): Parsed {
   if (typeof value !== 'string') return { ok: false, reason: 'wrong_type' };
-  const t = value.trim();
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
-  if (m === null) return { ok: false, reason: 'unparseable' };
-  const month = Number(m[2]);
-  const day = Number(m[3]);
-  if (month < 1 || month > 12 || day < 1 || day > 31) return { ok: false, reason: 'unparseable' };
-  return { ok: true, value: t };
+  const iso = proseDateToIso(value);
+  return iso === null ? { ok: false, reason: 'unparseable' } : { ok: true, value: iso };
 }
 
 function parseValue(value: unknown, leaf: string, exp: Expectation): Parsed {

@@ -135,6 +135,29 @@ describe('narrateCall (fake provider)', () => {
     expect(out.text).toBe(TEMPLATE);
   });
 
+  it('falls back to the template when two numbers swap places (R4-8)', async () => {
+    const input: NarrateInput = {
+      ...NARRATE_INPUT,
+      template: 'Quoted premium $58,800 against a predicted $63,835. Recommendation: review.',
+      numbers: { quotedPremium: 58_800, predictedPremium: 63_835 },
+    };
+    const out = await narrateCall(
+      polished('The quoted premium of $63,835 sits against a predicted $58,800, so review.'),
+      input,
+    );
+    expect(out.text).toBe(input.template);
+  });
+
+  it('falls back to the template when a repeated number is dropped once (R4-8)', async () => {
+    const input: NarrateInput = {
+      ...NARRATE_INPUT,
+      template: 'Score 84 on TIV, 84 on state. Recommendation: review.',
+      numbers: { appetiteScore: 84 },
+    };
+    const out = await narrateCall(polished('Score 84 on TIV and state, so review.'), input);
+    expect(out.text).toBe(input.template);
+  });
+
   it('tidies whitespace in an accepted rewrite and tolerates a decimal number', async () => {
     const input: NarrateInput = {
       ...NARRATE_INPUT,

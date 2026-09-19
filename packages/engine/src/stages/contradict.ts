@@ -1,5 +1,6 @@
 /** Stage 5 — contradict. Body owned by Run 1 unit E04. */
-import { MONEY_TOLERANCE } from '../constants.js';
+import { LOSS_ACCEPTABLE_MAX, MONEY_TOLERANCE } from '../constants.js';
+import { rollup } from './rollup.js';
 import type {
   CanonicalSubmission,
   Contradiction,
@@ -8,6 +9,7 @@ import type {
   Rulebook,
   Severity,
 } from '../types.js';
+import { bestValue } from '../util/fields.js';
 import { approxEqual } from '../util/math.js';
 
 /* -------------------------------------------------------------------------- */
@@ -148,6 +150,29 @@ function hasConflict(values: readonly Field<unknown>[]): boolean {
   return false;
 }
 
+/**
+ * PRD 7.6: a broker answer that confirms one of the competing values resolves
+ * the contradiction. Resolved only when (a) the latest `answer` value in the
+ * slot materially equals at least one non-answer value, and (b) that answer is
+ * the value the engine scores on (`bestValue`) — otherwise a higher-confidence
+ * source still disagrees and the conflict stays open. A reply that conflicts
+ * with everything first submitted leaves it open.
+ */
+function resolvedByAnswer(values: readonly Field<unknown>[]): boolean {
+  let answer: Field<unknown> | null = null;
+  for (const f of values) {
+    if (f.provenance.source === 'answer' && isPresent(f.value)) answer = f;
+  }
+  if (answer === null) return false;
+  const a = answer.value;
+  const confirms = values.some(
+    (f) => f.provenance.source !== 'answer' && isPresent(f.value) && !materiallyDifferent(a, f.value),
+  );
+  if (!confirms) return false;
+  const best = bestValue(values);
+  return best !== null && isPresent(best.value) && !materiallyDifferent(a, best.value);
+}
+
 /* -------------------------------------------------------------------------- */
 /* Which rules depend on a canonical path                                     */
 /* -------------------------------------------------------------------------- */
@@ -221,6 +246,29 @@ function ruleDependsOn(rule: Rule, fields: ReadonlySet<string>): boolean {
   return false;
 }
 
+/**
+ * Materiality for a disputed received date (DECISIONS R2-4). The received date
+ * only anchors the five-year loss window (I-4), so a conflict between two dates
+ * can change a verdict only if the loss-value tier differs between them. Re-run
+ * the real rollup with the date pinned to each competing value and compare the
+ * tiers. Returns the per-date losses when immaterial, or null when it matters.
+ */
+function immaterialDateConflict(
+  submission: CanonicalSubmission,
+  values: readonly Field<unknown>[],
+): { readonly losses: readonly (number | null)[] } | null {
+  const losses: (number | null)[] = [];
+  for (const v of values) {
+    if (typeof v.value !== 'string') return null;
+    const pinned = { ...submission, receivedDate: [v] } as CanonicalSubmission;
+    losses.push(rollup(pinned, v.value).fiveYearLoss);
+  }
+  // Unknown loss under any date: cannot prove it immaterial.
+  if (losses.some((l) => l === null)) return null;
+  const tiers = new Set(losses.map((l) => ((l as number) <= LOSS_ACCEPTABLE_MAX ? 'ok' : 'over')));
+  return tiers.size === 1 ? { losses } : null;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Stage 5                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -235,7 +283,8 @@ function ruleDependsOn(rule: Rule, fields: ReadonlySet<string>): boolean {
  * open HIGH contradiction forces `REFER` at stage 9 (INTERPRETATIONS V-3), so a
  * LOW one must never be reported as HIGH.
  *
- * Every contradiction is returned `open`: stage 5 detects, it never resolves.
+ * A contradiction is returned `open` unless a broker answer confirms one of
+ * its values and is the value scored on (`resolvedByAnswer`, PRD 7.6).
  * Output is sorted by canonical path, so the list is deterministic.
  */
 export function contradict(
@@ -251,8 +300,11 @@ export function contradict(
 
     const fields = ruleFieldsFor(slot.path);
     const affectedRules = rules.filter((r) => ruleDependsOn(r, fields)).map((r) => r.id);
-    const severity: Severity = affectedRules.length > 0 ? 'HIGH' : 'LOW';
+    const immaterial =
+      slot.path === 'receivedDate' ? immaterialDateConflict(submission, slot.values) : null;
+    const severity: Severity = affectedRules.length > 0 && immaterial === null ? 'HIGH' : 'LOW';
     const sources = slot.values.map((f) => f.provenance.source).join(', ');
+    const resolved = resolvedByAnswer(slot.values);
 
     contradictions.push({
       id: `contradiction:${slot.path}`,
@@ -260,8 +312,16 @@ export function contradict(
       values: slot.values,
       severity,
       affectedRules,
-      status: 'open',
-      note: `${slot.values.length} competing values for ${slot.path} (${sources})`,
+      status: resolved ? 'resolved' : 'open',
+      note: `${slot.values.length} competing values for ${slot.path} (${sources})${
+        resolved ? ', resolved by broker answer' : ''
+      }${
+        immaterial !== null
+          ? `; immaterial: the five-year loss is ${immaterial.losses
+              .map((l) => `$${Math.round(l as number).toLocaleString('en-US')}`)
+              .join(' / ')} under the competing dates, the same loss-value tier either way`
+          : ''
+      }`,
     });
   }
 

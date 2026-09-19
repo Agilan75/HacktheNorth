@@ -241,6 +241,16 @@ describe('GET /s/:shareSlug', () => {
     expect(text).not.toContain('Acme Holdings');
   });
 
+  it('a triage knockout (engine line = Federato raw "cyber") still returns a valid DTO', async () => {
+    const knocked = { ...fakeResult(), lineOfBusiness: 'cyber' } as unknown as EngineResult;
+    insertSubmission('SUB-11', 'cyber1', knocked);
+    const res = await makeApp().request('/s/cyber1');
+    expect(res.status).toBe(200);
+    const parsed = shareResponseSchema.safeParse(await res.json());
+    expect(parsed.success).toBe(true);
+    expect(parsed.data?.lineOfBusiness).toBe('commercial_property');
+  });
+
   it('404s an unknown slug and 409s a shared submission with no result', async () => {
     const app = makeApp();
     const missing = await app.request('/s/nope');

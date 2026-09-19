@@ -213,23 +213,23 @@ describe('rating/commercial.json — frozen fit', () => {
 
 /** Pinned from the first full real run (see docs/decisions/E17.md D-4). */
 const GOLDEN: Readonly<Record<string, readonly [string, string | null]>> = {
-  'SUB-2024-00065': ['DOES_NOT_FIT', 'AG-AGE-NA'],
+  'SUB-2024-00065': ['DOES_NOT_FIT', 'AG-STATE-NA'], // R2-3: primary state is TX ($29.5M of $41.7M)
   'SUB-2024-00076': ['DOES_NOT_FIT', 'AG-STATE-NA'],
-  'SUB-2024-00090': ['DOES_NOT_FIT', 'AG-STATE-NA'],
+  'SUB-2024-00090': ['DOES_NOT_FIT', 'AG-PREM-NA-HIGH'], // R2-3: primary state is FL (target), not a knockout
   'SUB-2025-00001': ['DOES_NOT_FIT', 'AG-PREM-NA-HIGH'],
-  'SUB-2025-00004': ['DOES_NOT_FIT', 'AG-PREM-NA-HIGH'],
+  'SUB-2025-00004': ['DOES_NOT_FIT', 'AG-STATE-NA'], // R2-3: primary state is MA ($51.8M of $104.1M)
   'SUB-2025-00033': ['DOES_NOT_FIT', 'AG-STATE-NA'],
   'SUB-2025-00042': ['DOES_NOT_FIT', 'AG-AGE-NA'],
   'SUB-2025-00052': ['DOES_NOT_FIT', 'AG-PREM-NA-HIGH'],
   'SUB-2025-00054': ['DOES_NOT_FIT', 'AG-STATE-NA'],
-  'SUB-2025-00061': ['DOES_NOT_FIT', 'AG-STATE-NA'],
+  'SUB-2025-00061': ['DOES_NOT_FIT', 'AG-PREM-NA-HIGH'], // R2-3: primary state is CA (target), not a knockout
   'SUB-2025-00066': ['DOES_NOT_FIT', 'AG-ST-NA'],
   'SUB-2025-00070': ['DOES_NOT_FIT', 'AG-PREM-NA-HIGH'],
   'SUB-2025-00074': ['DOES_NOT_FIT', 'AG-STATE-NA'],
   'SUB-2025-00077': ['DOES_NOT_FIT', 'AG-ST-NA'],
   'SUB-2025-00083': ['DOES_NOT_FIT', 'AG-PREM-NA-HIGH'],
   'SUB-2025-00091': ['DOES_NOT_FIT', 'AG-ST-NA'],
-  'SUB-2025-00092': ['DOES_NOT_FIT', 'AG-PREM-NA-HIGH'],
+  'SUB-2025-00092': ['DOES_NOT_FIT', 'AG-STATE-NA'], // R2-3: primary state is NJ ($36.2M of $67.3M)
   'SUB-2026-00007': ['DOES_NOT_FIT', 'AG-ST-NA'],
   'SUB-2026-00014': ['DOES_NOT_FIT', 'AG-PREM-NA-HIGH'],
   'SUB-2026-00025': ['DOES_NOT_FIT', 'AG-STATE-NA'],
@@ -238,7 +238,7 @@ const GOLDEN: Readonly<Record<string, readonly [string, string | null]>> = {
   'SUB-2026-00038': ['DOES_NOT_FIT', 'AG-ST-NA'],
   'SUB-2026-00043': ['DOES_NOT_FIT', 'AG-ST-NA'],
   'SUB-2026-00047': ['DOES_NOT_FIT', 'AG-STATE-NA'],
-  'SUB-2026-00081': ['REFER', 'AG-TIV-A-LOW'],
+  'SUB-2026-00081': ['FIT', 'AG-TIV-A-LOW'], // R2-4: its receivedDate conflict is immaterial ($0 loss under both dates)
   'SUB-2026-00098': ['DOES_NOT_FIT', 'AG-STATE-NA'],
   'SUB-2025-00115': ['REFER', 'AG-LOB-A'],
   'SUB-2025-00126': ['REFER', 'AG-LOB-A'],

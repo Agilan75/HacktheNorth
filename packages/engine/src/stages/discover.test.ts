@@ -272,6 +272,51 @@ describe('discover', () => {
     expect(state.confidence).toBe(0.85);
   });
 
+  it('I3-2/R3-5/R5-4: a hq Location name is never the insured name; only hq state maps', () => {
+    const hq = discover(NO_POLICY_BUNDLE, HQ_SCHEMA, COMMERCIAL_SPEC);
+    expect(entryFor(hq.entries, 'Submission.insured.name').canonicalPath).toBe('insured.name');
+    expect(hq.entries.filter((e) => e.canonicalPath === 'insured.name').map((e) => e.rawPath)).toEqual([
+      'Submission.insured.name',
+    ]);
+    const bundle: RawBundle = {
+      ...NO_POLICY_BUNDLE,
+      records: {
+        Submission: [
+          record('Submission', {
+            id: 115,
+            insured: {
+              id: 5,
+              name: 'Halcyon Metalworks Corp',
+              hq: { id: 12, name: 'Regional Branch 1', state: 'OH', city: 'Dayton', zip: '45402' },
+            },
+          }),
+        ],
+      },
+    };
+    const map = discover(bundle, HQ_SCHEMA, COMMERCIAL_SPEC);
+    expect(map.entries.some((e) => e.rawPath === 'Submission.insured.hq.name')).toBe(false);
+    expect(map.unmapped.map((u) => u.rawPath)).toContain('Submission.insured.hq.name');
+    expect(map.entries.filter((e) => e.canonicalPath === 'insured.name').map((e) => e.rawPath)).toEqual([
+      'Submission.insured.name',
+    ]);
+    expect(entryFor(map.entries, 'Submission.insured.hq.state').canonicalPath).toBe('insured.headquartersState');
+  });
+
+  it('R5-5: NAICS and SIC are different code systems; only NAICS feeds insured.industry', () => {
+    const bundle: RawBundle = {
+      ...NO_POLICY_BUNDLE,
+      records: {
+        Insured: [record('Insured', { id: 1, name: 'Coastal Freight', naics_code: '484121', sic_code: '4213' })],
+      },
+    };
+    const map = discover(bundle, undefined, COMMERCIAL_SPEC);
+    expect(entryFor(map.entries, 'Insured.naics_code').canonicalPath).toBe('insured.industry');
+    expect(map.entries.filter((e) => e.canonicalPath === 'insured.industry').map((e) => e.rawPath)).toEqual([
+      'Insured.naics_code',
+    ]);
+    expect(map.unmapped.map((u) => u.rawPath)).toContain('Insured.sic_code');
+  });
+
   it('accepts a schema-assist match at 0.8 and above, and only then', () => {
     const rejected = discover(FLAT_BUNDLE, undefined, COMMERCIAL_SPEC, [
       { rawPath: 'Building.square_footage', canonicalPath: 'exposure.squareFeet', confidence: 0.62 },

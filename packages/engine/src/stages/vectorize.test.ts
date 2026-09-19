@@ -701,3 +701,74 @@ function submissionB1(): CanonicalSubmission {
     },
   };
 }
+
+/* -------------------------------------------------------------------------- */
+/* R2 fixer 6 — tenant source paths (R-I4-1, R-I4-3)                           */
+/* -------------------------------------------------------------------------- */
+
+describe('vectorize — tenant source paths as vectors/tenant.json writes them', () => {
+  const tenantComponent = (index: number, key: string, source: string): VectorComponentSpec => ({
+    index,
+    key,
+    label: key,
+    source,
+    type: 'binary',
+    scaling: { rule: 'none' },
+    direction: 'lower_better',
+    appetiteFactor: false,
+    factor: null,
+    extensionOnly: false,
+    immovable: false,
+    required: true,
+  });
+  const TENANT_SPEC: VectorSpec = {
+    lineOfBusiness: 'tenant',
+    version: '1.0.0',
+    components: [
+      tenantComponent(0, 'hazardPortableHeater', 'hazards.portableHeater'),
+      tenantComponent(1, 'hazardHeaterNearCombustible', 'hazards.heaterNearCombustible'),
+      tenantComponent(2, 'hazardCandle', 'hazards.candle'),
+      tenantComponent(3, 'smokeDetectorCount', 'hazards.smokeDetectorCount'),
+      tenantComponent(4, 'buildingYearBuilt', 'buildings[0].yearBuilt'),
+    ],
+  };
+  const sweep = { source: 'sweep' as const, confidence: 0.88 };
+  const tenant = (withYear: boolean): CanonicalSubmission => ({
+    id: 'T1',
+    lineOfBusiness: 'tenant' as LineOfBusiness,
+    insured: {},
+    locations: [],
+    buildings: withYear
+      ? [{ externalId: 'B1', yearBuilt: [{ value: 1962, provenance: { source: 'answer' } }] }]
+      : [],
+    hazards: {
+      present: {
+        portableHeater: [{ value: true, provenance: sweep }],
+        heaterNearCombustible: [{ value: false, provenance: sweep }],
+      },
+      smokeDetectorCount: [{ value: 2, provenance: sweep }],
+    },
+    exposure: {},
+    coverage: { lines: [] },
+    history: [],
+    pricing: {},
+  });
+
+  it('R-I4-1: a hazard merged under hazards.present.<key> is a known component', () => {
+    const v = vectorize(tenant(false), TENANT_SPEC, RULEBOOK);
+    expect(v.x[0]).toBe(1);
+    expect(v.m[0]).toBe(1);
+    expect(v.x[1]).toBe(0);
+    expect(v.m[1]).toBe(1);
+    // Not observed stays missing; a direct hazards.* leaf still reads directly.
+    expect(v.m[2]).toBe(0);
+    expect(v.x[3]).toBe(2);
+  });
+
+  it('R-I4-3: buildings[0].yearBuilt reads the first building', () => {
+    const v = vectorize(tenant(true), TENANT_SPEC, RULEBOOK);
+    expect(v.x[4]).toBe(1962);
+    expect(v.m[4]).toBe(1);
+    expect(vectorize(tenant(false), TENANT_SPEC, RULEBOOK).m[4]).toBe(0);
+  });
+});

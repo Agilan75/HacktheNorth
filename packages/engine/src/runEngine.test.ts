@@ -12,6 +12,7 @@ import { runEngine } from './runEngine.js';
 import { syntheticCases } from './fixtures/synthetic.js';
 import { RATIO_TOLERANCE, SCORE_TOLERANCE } from './constants.js';
 import type {
+  CanonicalSubmission,
   CommercialRatingTable,
   EngineConfig,
   EngineResult,
@@ -269,5 +270,92 @@ describe('runEngine composition', () => {
     const b = runEngine({ submission: c.submission, asOf: AS_OF }, CONFIG);
     expect(a).toEqual(b);
     expect(JSON.stringify(c.submission)).toBe(before);
+  });
+});
+
+/**
+ * R1-2: flip's idea of FIT must be the engine's own verdict. It runs with the
+ * extension rulebook, and a zero-move flip never sits on a non-FIT account.
+ */
+describe('runEngine flip agrees with the verdict (R1-2)', () => {
+  function perfect(): CanonicalSubmission {
+    const c = syntheticCases().find((s) => s.id === 'SYN-PERFECT');
+    if (c === undefined) throw new Error('missing SYN-PERFECT');
+    return c.submission;
+  }
+  const broker = { source: 'self_reported', sourceDetail: 'synthetic' } as const;
+  const record = { source: 'enrichment', sourceDetail: 'synthetic' } as const;
+
+  it('baseline: SYN-PERFECT is FIT with a zero-move flip', () => {
+    const r = runEngine({ submission: perfect(), asOf: AS_OF }, CONFIG);
+    expect(r.verdict.verdict).toBe('FIT');
+    expect(r.flip.flip?.moves).toEqual([]);
+    expect(r.verdict.distanceToAppetite).toBe(0);
+  });
+
+  it('REFER only on an immovable extension rule (X-PPC-UNPROTECTED): no zero-distance flip', () => {
+    const base = perfect();
+    const submission: CanonicalSubmission = {
+      ...base,
+      locations: base.locations.map((l) => ({
+        ...l,
+        protectionClass: [{ value: 9, provenance: broker }],
+      })),
+    };
+    const r = runEngine({ submission, asOf: AS_OF }, CONFIG);
+    expect(r.evaluate.knockout).toBe(false);
+    expect(r.evaluate.completeness).toBe(100);
+    expect(r.evaluate.firedRules.map((f) => f.ruleId)).toContain('X-PPC-UNPROTECTED');
+    expect(r.verdict.verdict).toBe('REFER');
+    expect(r.flip.flip).toBeNull();
+    expect(r.flip.blockedByImmovable).toContain('tivWeightedProtectionClass');
+    expect(r.verdict.distanceToAppetite).toBeNull();
+  });
+
+  // flip.ts builds its candidate bounds from the base rulebook only, so a
+  // movable extension refer yields no flip (null), never a zero-move FIT.
+  it('REFER only on a movable extension rule (X-SPRINKLER-LARGE-UNPROTECTED): no zero-distance flip', () => {
+    const base = perfect();
+    const submission: CanonicalSubmission = {
+      ...base,
+      buildings: base.buildings.map((b) => ({
+        ...b,
+        tiv: [{ value: 60_000_000, provenance: broker }],
+        sprinklered: [{ value: false, provenance: broker }],
+      })),
+    };
+    const r = runEngine({ submission, asOf: AS_OF }, CONFIG);
+    expect(r.evaluate.knockout).toBe(false);
+    expect(r.evaluate.firedRules.map((f) => f.ruleId)).toContain('X-SPRINKLER-LARGE-UNPROTECTED');
+    expect(r.verdict.verdict).toBe('REFER');
+    expect(r.verdict.distanceToAppetite).not.toBe(0);
+    if (r.flip.flip === null) {
+      expect(r.flip.reason).not.toBeNull();
+      expect(r.verdict.distanceToAppetite).toBeNull();
+    } else {
+      expect(r.flip.flip.moves.length).toBeGreaterThan(0);
+      expect(r.verdict.distanceToAppetite).toBe(r.flip.flip.moves.length);
+    }
+  });
+
+  it('REFER only on an open HIGH contradiction: no zero-distance flip', () => {
+    const base = perfect();
+    const submission: CanonicalSubmission = {
+      ...base,
+      pricing: {
+        quotedPremium: [
+          { value: 90_000, provenance: broker },
+          { value: 60_000, provenance: record },
+        ],
+      },
+    };
+    const r = runEngine({ submission, asOf: AS_OF }, CONFIG);
+    expect(r.evaluate.knockout).toBe(false);
+    expect(r.evaluate.completeness).toBe(100);
+    expect(r.verdict.openHighContradictionIds.length).toBeGreaterThan(0);
+    expect(r.verdict.verdict).toBe('REFER');
+    expect(r.flip.flip).toBeNull();
+    expect(r.flip.reason).toMatch(/contradiction/);
+    expect(r.verdict.distanceToAppetite).toBeNull();
   });
 });

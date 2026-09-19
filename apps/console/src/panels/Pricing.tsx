@@ -4,7 +4,7 @@ import { formatMoney, formatPercent, formatScore } from '@retrofit/contracts';
 
 import { Badge } from '../components/atoms/Badge.js';
 import { Card } from '../components/atoms/Card.js';
-import type { PricingFactorView, PricingPanelProps } from './types.js';
+import type { PricingBuildingView, PricingFactorView, PricingPanelProps } from './types.js';
 
 /**
  * Mirrors `ADEQUACY_UNDERPRICED` in packages/engine/src/constants.ts (PRD 6.7:
@@ -20,6 +20,31 @@ function adequacyLabel(adequacy: number | null): string | null {
 
 function formatMultiplier(multiplier: number): string {
   return `×${formatScore(multiplier, { decimals: 2 })}`;
+}
+
+/** Per-building multipliers keep up to three decimals (×0.981), never fewer than two. */
+function formatBuildingMultiplier(multiplier: number): string {
+  if (!Number.isFinite(multiplier)) return '—';
+  return `×${multiplier.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}`;
+}
+
+/** A base rate per $100 of TIV is a fraction of a dollar; show up to four decimals. */
+function formatRate(rate: number): string {
+  if (!Number.isFinite(rate)) return '—';
+  return `$${rate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 4 })}`;
+}
+
+/** Readable names for the engine's rating-factor keys (packages/engine/src/stages/price.ts). */
+const FACTOR_LABEL: Readonly<Record<string, string>> = {
+  construction: 'Construction',
+  age: 'Age',
+  protectionClass: 'Protection class',
+  sprinkler: 'Sprinkler',
+  lossHistory: 'Loss history',
+};
+
+function factorLabel(key: string): string {
+  return FACTOR_LABEL[key] ?? key;
 }
 
 function multiplierEffect(multiplier: number): string {
@@ -51,7 +76,7 @@ function FactorTable(props: { readonly factors: readonly PricingFactorView[] }):
     return <p className="rf-empty">No rating factors were applied to this account.</p>;
   }
   return (
-    <table className="rf-table" aria-label="Rating factors">
+    <table className="rf-table" aria-label="Account-level factors">
       <thead>
         <tr>
           <th scope="col">Factor</th>
@@ -63,7 +88,7 @@ function FactorTable(props: { readonly factors: readonly PricingFactorView[] }):
       <tbody>
         {props.factors.map((f, i) => (
           <tr key={`${f.label}-${i}`} data-testid="pricing-factor">
-            <th scope="row">{f.label}</th>
+            <th scope="row">{factorLabel(f.label)}</th>
             <td>{formatMultiplier(f.multiplier)}</td>
             <td>{multiplierEffect(f.multiplier)}</td>
             <td>{f.basis ?? '—'}</td>
@@ -71,6 +96,59 @@ function FactorTable(props: { readonly factors: readonly PricingFactorView[] }):
         ))}
       </tbody>
     </table>
+  );
+}
+
+/**
+ * R5-7: one row per building, TIV ÷ 100 × base rate × each multiplier = building
+ * premium. Every figure is the DTO's own; the subtotal is not in the DTO and is
+ * not shown.
+ */
+function BuildingTable(props: { readonly buildings: readonly PricingBuildingView[] }): ReactElement {
+  const columns: string[] = [];
+  for (const b of props.buildings) {
+    for (const f of b.factors) if (!columns.includes(f.label)) columns.push(f.label);
+  }
+  return (
+    <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+      <table className="rf-table" aria-label="Per-building rating">
+        <thead>
+          <tr>
+            <th scope="col">Building</th>
+            <th scope="col">TIV</th>
+            <th scope="col">Base rate per $100</th>
+            {columns.map((c) => (
+              <th scope="col" key={c}>
+                {factorLabel(c)}
+              </th>
+            ))}
+            <th scope="col">Building premium</th>
+          </tr>
+        </thead>
+        <tbody>
+          {props.buildings.map((b, i) => (
+            <tr key={`${b.buildingExternalId}-${i}`} data-testid="pricing-building">
+              <th scope="row">{b.buildingExternalId}</th>
+              <td>{formatMoney(b.tiv)}</td>
+              <td>{formatRate(b.baseRate)}</td>
+              {columns.map((c) => {
+                const f = b.factors.find((x) => x.label === c);
+                if (f === undefined) return <td key={c}>—</td>;
+                return (
+                  <td key={c}>
+                    {formatBuildingMultiplier(f.multiplier)}
+                    {f.input !== null && f.input !== '' ? (
+                      <span className="rf-stat__hint">{` (${f.input})`}</span>
+                    ) : null}
+                  </td>
+                );
+              })}
+              <td data-testid="pricing-building-premium">{formatMoney(b.premium, { decimals: 2 })}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -128,6 +206,17 @@ export function Pricing(props: PricingPanelProps): ReactElement {
       </dl>
 
       <h3 className="rf-card__subtitle">Factor by factor</h3>
+      {pricing.buildings !== undefined && pricing.buildings.length > 0 ? (
+        <>
+          <p className="rf-footnote">
+            Each building: TIV ÷ 100 × base rate × each multiplier = building premium. The
+            account-level factors below then multiply the sum of the building premiums to give the
+            predicted premium.
+          </p>
+          <BuildingTable buildings={pricing.buildings} />
+          <h4 className="rf-card__subtitle">Account-level factors</h4>
+        </>
+      ) : null}
       <FactorTable factors={pricing.factors} />
 
       {pricing.notes.length > 0 ? (
