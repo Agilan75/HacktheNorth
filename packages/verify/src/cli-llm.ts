@@ -6,7 +6,7 @@ import { z } from 'zod';
 
 // TODO(contract): relative imports into the api (see docs/contracts/requests/V09.md).
 import { getEnv } from '../../../apps/api/src/env';
-import { createGeminiProvider, extractReplyCall } from '../../../apps/api/src/llm/index';
+import { createAppLlm, extractReplyCall } from '../../../apps/api/src/llm/index';
 import type { LlmProvider } from '../../../apps/api/src/llm/index';
 
 import { configureLayerC, lastLayerCRun, runLayerC } from './layer-c.js';
@@ -84,7 +84,7 @@ export async function main(argv: readonly string[]): Promise<number> {
 
   let llm: LlmProvider;
   try {
-    llm = deps.llm ?? createGeminiProvider({ apiKey: getEnv().GEMINI_API_KEY });
+    llm = deps.llm ?? createAppLlm({ geminiApiKey: getEnv().GEMINI_API_KEY, anthropicApiKey: getEnv().ANTHROPIC_API_KEY, anthropicWorkspaceId: getEnv().ANTHROPIC_WORKSPACE_ID });
   } catch (error) {
     log(`verify:llm: could not read configuration: ${messageOf(error)}`);
     return 2;

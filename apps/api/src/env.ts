@@ -46,6 +46,10 @@ const envSchema = z.object({
 
   /** Unset -> the API still starts, prints a banner and serves the seeded sweep. */
   GEMINI_API_KEY: optionalNonEmpty,
+  /** Claude for every text-only LLM call; Gemini keeps the vision calls (DECISIONS L-1). */
+  ANTHROPIC_API_KEY: optionalNonEmpty,
+  /** Needed only when the Claude key is not scoped to one workspace. */
+  ANTHROPIC_WORKSPACE_ID: optionalNonEmpty,
 
   /** Unset -> `MockFederatoAdapter` over the saved snapshot (PRD §7.4). */
   FEDERATO_BASE_URL: optionalNonEmpty,
@@ -136,7 +140,7 @@ export function describeEnv(env: Env): {
   return {
     nodeEnv: env.NODE_ENV,
     port: env.PORT,
-    llmConfigured: env.GEMINI_API_KEY !== undefined,
+    llmConfigured: env.GEMINI_API_KEY !== undefined || env.ANTHROPIC_API_KEY !== undefined,
     federatoConfigured:
       env.FEDERATO_BASE_URL !== undefined &&
       env.FEDERATO_CLIENT_ID !== undefined &&

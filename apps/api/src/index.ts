@@ -11,7 +11,7 @@ import { describeEnv, federatoEnv, getEnv } from './env';
 import { createDb } from './db/client';
 import type { DbHandle } from './db/client';
 import { migrate } from './db/migrate';
-import { createGeminiProvider } from './llm/index';
+import { createAppLlm } from './llm/index';
 import { createApp, pendingRouteModules } from './app';
 import { observability } from './observability/index';
 import { startupBanner } from './banners';
@@ -26,7 +26,7 @@ export function buildDeps(): Deps {
   const handle = createDb({ url: env.DATABASE_URL });
   currentHandle = handle;
   const adapter = createAdapter({ env: federatoEnv(env) });
-  const llm = createGeminiProvider({ apiKey: env.GEMINI_API_KEY });
+  const llm = createAppLlm({ geminiApiKey: env.GEMINI_API_KEY, anthropicApiKey: env.ANTHROPIC_API_KEY, anthropicWorkspaceId: env.ANTHROPIC_WORKSPACE_ID });
   return { db: handle.db, adapter, llm, clock: systemClock() };
 }
 

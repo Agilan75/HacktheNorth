@@ -17,6 +17,10 @@ export type { FakeLlmOptions, FakeLlmProvider, RecordedCall } from './fake-provi
 export { MODELS, RETRYABLE_STATUSES, createGeminiProvider } from './gemini';
 export type { GeminiProviderOptions } from './gemini';
 export { generateJson, withRetry } from './generate-json';
+export { CLAUDE_MODEL, createClaudeProvider, toJsonSchema } from './claude';
+export type { ClaudeProviderOptions } from './claude';
+export { createAppLlm, createRoutedLlm, isVisionCall, providerFor } from './router';
+export type { RoutedLlmOptions } from './router';
 
 export { observeCall } from './calls/observe';
 export { relateCall } from './calls/relate';

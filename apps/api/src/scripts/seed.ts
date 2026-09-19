@@ -31,7 +31,7 @@ import { FIRE_STATION_SOURCE } from '../enrich/fire-station';
 import { FLOOD_SOURCE } from '../enrich/flood';
 import { runEnrichment } from '../enrich/runner';
 import type { EnrichContext, EnrichLocation, EnrichOutcome, EnrichPlugin } from '../enrich/types';
-import { createGeminiProvider } from '../llm/index';
+import { createAppLlm } from '../llm/index';
 import { planActions } from '../services/actions';
 import { ingestFederato } from '../services/ingest';
 import { rescoreBook } from '../services/rescore';
@@ -395,7 +395,7 @@ export async function main(): Promise<void> {
     const deps: Deps = {
       db: handle.db,
       adapter: createAdapter({ env: federatoEnv(env) }),
-      llm: createGeminiProvider({ apiKey: env.GEMINI_API_KEY }),
+      llm: createAppLlm({ geminiApiKey: env.GEMINI_API_KEY, anthropicApiKey: env.ANTHROPIC_API_KEY, anthropicWorkspaceId: env.ANTHROPIC_WORKSPACE_ID }),
       clock: systemClock(),
     };
     await runSeed(deps, {
