@@ -1,5 +1,7 @@
 # Status
 
+**Live:** console https://retrofit-gamma.vercel.app · API https://api-production-e7f5.up.railway.app (see DEPLOY.md)
+
 Overnight unattended build, 2026-09-19. Branch `build/retrofit` (pushed; **not** merged to `main`).
 
 ## Needs you — in this order

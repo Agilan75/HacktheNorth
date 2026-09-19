@@ -1,0 +1,14 @@
+# Never in the image: secrets, local data, build output, installed modules.
+.env
+.env.*
+!.env.example
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+apps/api/data
+**/*.db
+**/*.db-*
+packages/verify/out/layer-c-cache
+.git
+.expo
+**/.DS_Store

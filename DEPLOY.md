@@ -1,6 +1,18 @@
 # Deploy: API on Railway, console on Vercel
 
-The API is a long-running Node server that writes to a SQLite file, so it needs a host with a persistent disk (Railway). The console is a static site (Vercel). Both configs are in the repo: `railway.json` and `vercel.json`. Both flows were rehearsed from a clean copy of the repo: `npm ci`, the console build, and the API's first boot and restart.
+**Live now:**
+- Console: **https://retrofit-gamma.vercel.app**
+- API: **https://api-production-e7f5.up.railway.app** (`/health` shows `adapter: live`, 158 submissions)
+
+Railway project `retrofit` → service `api`, with volume `api-volume` at `/data`. Vercel project `retrofit`.
+
+**To redeploy after a code change** (neither host is connected to GitHub; both deploy from this folder):
+- API: `npx @railway/cli up --ci`. The volume keeps the data, so the boot seed skips.
+- Console: `npx vercel@latest deploy --prod --yes`
+
+To wipe and reload the data, delete `/data/retrofit.db` on the volume and restart. The next boot re-seeds from live Federato.
+
+The API is a long-running Node server that writes to a SQLite file, so it needs a host with a persistent disk (Railway). The console is a static site (Vercel). The configs are in the repo: `Dockerfile` + `railway.json` for the API, `vercel.json` + `.vercelignore` for the console. Railway builds from the `Dockerfile` because its auto-detecting builder (Railpack) could not plan this npm-workspaces monorepo. Both flows were rehearsed from a clean copy of the repo: `npm ci`, the console build, and the API's first boot and restart.
 
 ## 1. API on Railway
 
