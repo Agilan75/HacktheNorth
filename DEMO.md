@@ -1,6 +1,6 @@
 # Retrofit demo script
 
-Two cuts. The Federato + Rox cut runs on a laptop. Every API call in it has been exercised against the live Federato API and live Gemini, and every console page renders; the full click-path through the console UI has not been rehearsed by a person yet, and live reply extraction needs the Gemini credits topped up. The Intact cut runs on an iPhone and has **not yet been run on a device**.
+Two cuts. The Federato + Rox cut runs on a laptop. Every API call in it has been exercised against the live Federato API and live Claude (text) / Gemini (images), and every console page renders; the full click-path through the console UI has not been rehearsed by a person yet, and live reply extraction needs the Gemini credits topped up. The Intact cut runs on an iPhone and has **not yet been run on a device**.
 
 ---
 
@@ -8,7 +8,7 @@ Two cuts. The Federato + Rox cut runs on a laptop. Every API call in it has been
 
 Do these in order, before judges arrive. Every command runs from the repo root, `/Users/calebchincalebchin/hackthenorth`.
 
-1. **Top up the Gemini credits first.** The key's prepaid credits are depleted (HTTP 402). Top up in Google AI Studio. Without credits, step 4 (live reply extraction) fails. The API banner still says "Gemini: configured" when the credits are gone, so it will not warn you.
+1. **Text AI runs on Claude Sonnet 5; Gemini only does image analysis.** Step 4 (live reply extraction) needs only a working `ANTHROPIC_API_KEY` — verified live. The Gemini key is still out of prepaid credits (HTTP 402); that blocks only the phone cut's vision calls. Top it up in Google AI Studio before the phone cut.
 2. **Keep the already-replied database as a fallback.** With nothing running:
    ```sh
    cp apps/api/data/retrofit.db ~/retrofit-after-reply.db
@@ -19,7 +19,7 @@ Do these in order, before judges arrive. Every command runs from the repo root, 
    rm -f apps/api/data/retrofit.db*
    npm run seed
    ```
-   Seeding ingests all 158 submissions, scores them, runs enrichment, stores the seeded bedroom sweep and **drafts the broker requests**, so the outbox is ready. Drafting takes tens of seconds against live Gemini, so do it now and never live on stage. Expect `158 scored` and a line ending `request drafts ready`.
+   Seeding ingests all 158 submissions, scores them, runs enrichment, stores the seeded bedroom sweep and **drafts the broker requests**, so the outbox is ready. Drafting takes tens of seconds against the live model, so do it now and never live on stage. Expect `158 scored` and a line ending `request drafts ready`.
 4. **Start the API** (terminal 1): `npm run dev:api`. It listens on port 3000.
 5. **Start the console** (terminal 2): `npm run dev:console`.
 6. **Open** http://127.0.0.1:5173. Use `127.0.0.1`, not `localhost`. Confirm the header banner reads **Data source: Live Federato API**.
@@ -80,14 +80,14 @@ Then switch to **SUB-2025-00042, Anchor Transport LLC**, panel (g), the flip pan
    The main building was built in 1998, it's joisted masonry, and total insured value is about $64.5M. Five-year losses total $42,000.
    ```
    Click **Extract fields**.
-5. Point at the table: four typed fields, each with its **Quoted from the reply** text. Say: "Gemini proposes the values, and code checks that each quote actually appears in the reply before a value is accepted." Point at **Before the reply** / **After the reply**.
+5. Point at the table: four typed fields, each with its **Quoted from the reply** text. Say: "Claude proposes the values, and code checks that each quote actually appears in the reply before a value is accepted. Anything under 0.8 confidence — like a TIV the broker called 'about $64.5M' — goes to the underwriter to confirm, never straight into the score." Point at **Before the reply** / **After the reply**.
 6. Back on **Actions**, under **Rank movement from replies**: Lakeside Medical Group LLC, **#8 → #2**.
 
 ### 5. One line each
 
 - **Price adequacy** (panel (d) on Coastal Freight): "Quoted $58,800 against a predicted $62,725, factor by factor."
 - **Peers** (panel (d), **Peer benchmark**): "The five nearest accounts in the book, with distance, rate and losses."
-- **Verification**: "We checked the engine against its own invariants and against a separately written naive implementation. The 100K run found 0 violations and 0 disagreements, and the 10M results are in VERIFICATION.md. Gemini, given only the guideline text, agreed on 1,331 of 1,332 cases, and on all 38 real property accounts. The one disagreement is exactly-50% construction, which the PDF leaves open. These tests found real bugs: the first run had 20,662 invariant violations, and review of real data found 39 defects. All are fixed."
+- **Verification**: "We checked the engine against its own invariants and against a separately written naive implementation. The 100K run found 0 violations and 0 disagreements, and the 10M results are in VERIFICATION.md. A second model, given only the guideline text and the facts, agreed on 1,331 of 1,332 cases, and on all 38 real property accounts. The one disagreement is exactly-50% construction, which the PDF leaves open. These tests found real bugs: the first run had 20,662 invariant violations, and review of real data found 39 defects. All are fixed."
 
 ---
 
@@ -120,9 +120,11 @@ FEDERATO_BASE_URL= npm run dev:api
 ```
 The banner changes to show the snapshot (`FEDERATO: SNAPSHOT (MockFederatoAdapter) - NOT the live API`). Say so out loud. The data already in the database is unchanged, so steps 1–3 and 5 run as written. To re-seed offline, run `FEDERATO_BASE_URL= npm run seed -- --no-enrich`.
 
-**Gemini down or out of credits.**
+**Claude unavailable (key, credit or network).**
 - Still works: all scoring and ranking, the query trace, explanations (built from templates), pricing, peers, flip reasons, the Rules, Glossary and Aggregate pages, and approving drafts. Drafts fall back to a template.
-- Does not work: step 4 extraction (**Extract fields** returns an error) and the whole phone cut.
+- Does not work: step 4 extraction. The reply log will say "Could not read the reply: the extraction call failed" — it never pretends the broker left fields unanswered.
+
+**Gemini out of credits (the current state).** Only the phone cut's vision calls fail; the whole Federato + Rox cut is unaffected.
 - For step 4, stop the API and restore the replied database:
   ```sh
   cp ~/retrofit-after-reply.db apps/api/data/retrofit.db

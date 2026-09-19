@@ -53,7 +53,7 @@
       ]
     ],
     "experiments": {
-      "typedRoutes": true
+      "typedRoutes": false
     },
     "extra": {
       "apiUrlEnvVar": "EXPO_PUBLIC_API_URL"

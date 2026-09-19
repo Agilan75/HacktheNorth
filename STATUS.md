@@ -6,11 +6,8 @@ Overnight unattended build, 2026-09-19. Branch `build/retrofit` (pushed; **not**
 
 ## Needs you — in this order
 
-1. **Top up the Gemini API credits.** *Blocking the live AI features.* The key's prepaid balance ran out during verification; every Gemini call now returns HTTP 402 ("Your prepayment credits are depleted"). Top up at <https://ai.studio/projects>.
-   - **Still works without it:** everything deterministic — ingest, the query planner and its trace, scoring, ranking, verdicts, pricing, peers, template explanations, template request drafts, the whole console.
-   - **Broken until topped up:** broker-reply extraction (the centrepiece of the Rox demo — it returns an error, it has no fallback), Gemini-polished narration, Gemini-worded request drafts (they fall back to templates), and the phone app's vision call (the room sweep cannot be analysed).
-   - The API banner says `Gemini: configured` even at zero balance — it checks that a key exists, not that it has credit. Don't trust it; run one reply through the Actions page to be sure.
-   - After topping up, run `npm run verify:llm` once: it answers the 706 layer-C cases that went unanswered and measures reply-extraction accuracy for the first time (see VERIFICATION.md).
+1. **Gemini now matters only for the phone app's image analysis.** Every text AI call — reply extraction, request drafts, narration, schema-assist, the verification second opinion — runs on **Claude Sonnet 5** (DECISIONS L-1, L-2), live on Railway and verified end to end: a real broker reply became 4 typed fields with verbatim quotes, and the account re-scored. The Gemini key is still out of prepaid credits (HTTP 402), which blocks only the room-sweep vision (`observe`) and the fix-photo check (`verify-fix`). Top up at <https://ai.studio/projects> before demoing the phone app.
+   - After that, run `npm run verify:llm` once to re-run the second opinion on Claude and, for the first time, measure reply-extraction accuracy (VERIFICATION.md). It costs real money on Sonnet 5; decide first.
 2. **Run the phone app on a real iPhone.** No one has. It typechecks, its logic has 139 passing tests and `expo-doctor` passes 21/21, but no agent can drive a camera or compass. Start with the ten checks below.
 3. **Rehearse the demo once, by hand.** Every API call and every console page has been exercised; a person has not yet clicked the full path. Follow `DEMO.md` from its pre-flight.
 4. **Decide on `main`.** The work is on `build/retrofit`, pushed to the shared remote. `main` (your teammate's) is untouched. Merge when you're happy.
@@ -43,7 +40,7 @@ All four prize targets have working code. Phase 1 is complete and verified; phas
 
 | Item | Why |
 | --- | --- |
-| **Reply-extraction accuracy: not measured** | It ran after the credits ran out, so every call failed; the 41% it produced was discarded. Only live evidence: one reply, 4/4 correct. |
+| **Reply-extraction accuracy: not measured** | It ran after the Gemini credits ran out, so every call failed; the 41% it produced was discarded. Extraction now runs on Claude Sonnet 5 and works live (4 fields from one reply: 3 accepted, 1 hedged value sent to confirm), but the 30-reply accuracy check has not been re-run. |
 | **706 layer-C cases unanswered** | Same 402. Resumes from cache after a top-up. |
 | **No real account has a minimal flip** | 23 of 26 declined accounts fail on something the insured can't change (building age, state, renewal); the other 3 fail only on premium but need more than the two-move cap. The engine states the reason, which is what the demo shows. |
 | **Enrichment is display-only** | Flood zone and fire-station distance are fetched and shown but feed no score or price. Overpass was also mostly down (2 of 27). |
@@ -63,7 +60,7 @@ Set `EXPO_PUBLIC_API_URL=https://api-production-e7f5.up.railway.app` (works on a
 6. **Finish:** disabled until ~75% (about 270° of turning), with a spoken reason.
 7. **Turn hint:** "turn left/right about N°" points the physical way (right = clockwise).
 8. **VoiceOver on:** every control is announced with a name and role; the ring reads as text ("62 percent scanned…").
-9. **Analyzing:** stages advance from the real API, not a timer. (Needs Gemini credits — without them this is where it fails.)
+9. **Analyzing:** stages advance from the real API, not a timer. (The vision step still needs Gemini credits — without them this is where it fails.)
 10. **Offline:** capture, enable Airplane Mode, tap Finish → "Queued"; turn it off → it sends.
 
 All 96 checks written by the mobile units: `docs/status/iphone-checklist.md`.
