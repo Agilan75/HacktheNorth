@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react';
 import type { ReactNode } from 'react';
 import { AccessibilityInfo, ActivityIndicator, AppState, Linking, ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -13,10 +13,13 @@ import { getApi } from '@/lib/api';
 import { captureReducer, initialCaptureState, uploadBearings } from '@/lib/capture';
 import type { PendingCapture } from '@/lib/capture';
 import { createHeadingFilter, headingFromReading } from '@/lib/heading';
+import { createLivePricer } from '@/lib/livePrice';
+import type { LivePricer, LiveReport } from '@/lib/livePrice';
 import { getSweepQueue } from '@/lib/queue';
 import { SESSION_PROBLEM_TEXT, buildCreateRequest, sessionStore, useSession } from '@/lib/session';
 import type { SessionFrame } from '@/lib/session';
 import { Button, COLORS, Notice, Screen, SPACE, Text } from '@/ui';
+import { LivePriceStrip, PriceReport } from '@/ui/LivePrices';
 import { ScanOverlay } from '@/ui/ScanOverlay';
 
 /**
@@ -68,6 +71,8 @@ type SendState =
   | { readonly kind: 'preparing' }
   | { readonly kind: 'sending'; readonly count: number }
   | { readonly kind: 'queued'; readonly message: string }
+  /** After Finish: the live price report (null while the last lookups get their <= 5 s). */
+  | { readonly kind: 'report'; readonly report: LiveReport | null }
   | {
       readonly kind: 'error';
       readonly message: string;
@@ -111,6 +116,10 @@ export default function SweepScreen() {
   const cameraRef = useRef<CameraView>(null);
   const filterRef = useRef(createHeadingFilter());
   const frameData = useRef(new Map<number, FrameData>());
+  const pricerRef = useRef<LivePricer | null>(null);
+  pricerRef.current ??= createLivePricer(getApi());
+  const pricer = pricerRef.current;
+  const liveSnap = useSyncExternalStore(pricer.subscribe, pricer.snapshot);
   const pitchRef = useRef<number | undefined>(undefined);
   const capturingRef = useRef(false);
   const alive = useRef(true);
@@ -287,6 +296,7 @@ export default function SweepScreen() {
       const small = await downscale(pic.uri, pic.width, pic.height);
       if (!alive.current) return;
       frameData.current.set(p.index, { imageBase64: small.base64, uri: small.uri, pitchDeg: pitchRef.current });
+      pricer.onFrame(small.base64);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
       dispatch({ type: 'captured', atMs: Date.now(), ref: small.uri });
     } catch {
@@ -294,7 +304,7 @@ export default function SweepScreen() {
     } finally {
       capturingRef.current = false;
     }
-  }, []);
+  }, [pricer]);
 
   useEffect(() => {
     if (capture.pending && capture.phase === 'sweeping') void takeFrame(capture.pending);
@@ -360,10 +370,14 @@ export default function SweepScreen() {
     setCameraReady(false);
     sessionStore.setSweepId(null);
     sessionStore.setFrames(frames, 'sweep');
-    void submitSession();
+    setSend({ kind: 'report', report: null });
+    void pricer.finish().then((report) => {
+      if (alive.current) setSend({ kind: 'report', report });
+    });
   }
 
   function scanAgain(): void {
+    pricer.reset();
     frameData.current.clear();
     sessionStore.clearFrames();
     sessionStore.setSweepId(null);
@@ -450,7 +464,7 @@ export default function SweepScreen() {
   }
 
   if (send.kind !== 'idle') {
-    return <SendView send={send} onRetry={() => void submitSession()} onRetryNow={() => void sweepQueue.retryNow()}
+    return <SendView send={send} onRetry={() => void submitSession()} onContinue={() => void submitSession()} onRetryNow={() => void sweepQueue.retryNow()}
       onScanAgain={scanAgain} onName={() => router.replace('/new')} photoAlternative={photoAlternative(false)} />;
   }
 
@@ -581,6 +595,7 @@ export default function SweepScreen() {
           state={capture}
           onFinish={finishSweep}
           onUsePhotos={() => void usePhotos()}
+          middle={<LivePriceStrip snap={liveSnap} />}
           style={styles.overlay}
         />
       </ScrollView>
@@ -595,6 +610,7 @@ export default function SweepScreen() {
 function SendView({
   send,
   onRetry,
+  onContinue,
   onRetryNow,
   onScanAgain,
   onName,
@@ -602,11 +618,39 @@ function SendView({
 }: {
   readonly send: Exclude<SendState, { kind: 'idle' }>;
   readonly onRetry: () => void;
+  readonly onContinue: () => void;
   readonly onRetryNow: () => void;
   readonly onScanAgain: () => void;
   readonly onName: () => void;
   readonly photoAlternative: ReactNode;
 }) {
+  if (send.kind === 'report') {
+    if (send.report === null) {
+      return (
+        <Screen>
+          <View accessible accessibilityRole="progressbar" accessibilityLabel="Finishing your price report" accessibilityState={{ busy: true }} style={styles.center}>
+            <ActivityIndicator color={COLORS.ink} size="large" />
+            <Text align="center">Finishing your price report…</Text>
+          </View>
+        </Screen>
+      );
+    }
+    return (
+      <Screen
+        title="What's in the room"
+        subtitle="Prices are estimates of what it would cost to buy each item new."
+        footer={
+          <>
+            <Button label="See my insurance quote" accessibilityHint="Sends the scan for your tenant insurance verdict." onPress={onContinue} />
+            <Button label="Scan the room again" variant="secondary" onPress={onScanAgain} />
+          </>
+        }
+      >
+        <PriceReport report={send.report} />
+      </Screen>
+    );
+  }
+
   if (send.kind === 'picking' || send.kind === 'preparing' || send.kind === 'sending') {
     const words =
       send.kind === 'picking'

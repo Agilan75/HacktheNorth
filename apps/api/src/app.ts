@@ -31,6 +31,7 @@ import { registerActionRoutes } from './routes/actions';
 import { registerReplyRoutes } from './routes/reply';
 import { registerSweepRoutes } from './routes/sweeps';
 import { registerVerificationRoutes } from './routes/verification';
+import { registerPriceRoutes } from './routes/price';
 
 /** What every handler finds on the context. */
 export type ApiEnv = {
@@ -63,6 +64,7 @@ export const DEFAULT_REGISTRARS: readonly RouteRegistrar[] = [
   registerReplyRoutes,
   registerSweepRoutes,
   registerVerificationRoutes,
+  registerPriceRoutes,
 ];
 
 const isNotImplemented = (error: unknown): boolean =>
