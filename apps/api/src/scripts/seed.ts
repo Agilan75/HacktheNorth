@@ -32,6 +32,7 @@ import { FLOOD_SOURCE } from '../enrich/flood';
 import { runEnrichment } from '../enrich/runner';
 import type { EnrichContext, EnrichLocation, EnrichOutcome, EnrichPlugin } from '../enrich/types';
 import { createGeminiProvider } from '../llm/index';
+import { planActions } from '../services/actions';
 import { ingestFederato } from '../services/ingest';
 import { rescoreBook } from '../services/rescore';
 import { FRAME_FOV_DEG, advanceSweep } from '../services/sweep';
@@ -75,6 +76,8 @@ export interface SeedOptions {
   readonly plugins?: readonly EnrichPlugin[];
   readonly concurrency?: number;
   readonly log?: (line: string) => void;
+  /** Skip routing and request drafting (`--no-actions`). */
+  readonly skipActions?: boolean;
 }
 
 export interface SeedEnrichmentSummary {
@@ -348,6 +351,16 @@ export async function runSeed(deps: Deps, options: SeedOptions = {}): Promise<Se
     log(`  ${row.id}: stage "${row.stage}"${row.error ? ` (${row.error})` : ''}`);
   }
 
+  // Route every live account and draft its broker request now, so the outbox is
+  // ready before anyone opens the console: drafting against live Gemini takes
+  // tens of seconds, far too long to wait for mid-demo. Re-running is
+  // idempotent (unchanged drafts are kept). DECISIONS S1-1.
+  if (options.skipActions !== true) {
+    log('Planning actions (routing + broker request drafts)...');
+    const plan = await planActions(deps, {});
+    log(`  ${plan.routed} routed, ${plan.needsSeniorReferral} need senior referral, ${plan.drafted} request drafts ready`);
+  }
+
   const rows = createRepos(deps.db).submissions.all();
   const summary: SeedSummary = {
     ingest,
@@ -365,7 +378,7 @@ export async function runSeed(deps: Deps, options: SeedOptions = {}): Promise<Se
   return summary;
 }
 
-/** `npm run seed [--force] [--no-enrich] [--no-sweep]`. */
+/** `npm run seed [--force] [--no-enrich] [--no-sweep] [--no-actions]`. */
 export async function main(): Promise<void> {
   const args = new Set(process.argv.slice(2));
   const env = getEnv();
@@ -382,6 +395,7 @@ export async function main(): Promise<void> {
       force: args.has('--force'),
       skipEnrichment: args.has('--no-enrich'),
       skipSweep: args.has('--no-sweep'),
+      skipActions: args.has('--no-actions'),
     });
   } finally {
     handle.close();

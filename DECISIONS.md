@@ -175,3 +175,11 @@ arithmetic, which the differential had already shown to be exact.
 | R2-11 | **Golden verdicts re-pinned for 6 of 38 accounts, and each pin carries its cause in a comment.** Every change was checked against the raw hydrated JSON first, independently of the engine. | Five deciding rules moved because R2-3 corrected the primary state — which changed which knockout decides the account. Two of them are telling: SUB-2024-00090 holds $55.9M of its TIV in Florida and SUB-2025-00061 holds $53.1M in California, both **target** states, yet the old pins had both declined for being in a not-acceptable state. The sixth, SUB-2026-00081, moved REFER → FIT under R2-4: its two received dates give $0 of five-year loss either way. The rating table was re-fitted with the pinned `--fitted-at` stamp and reproduces byte-for-byte; R² 0.720 and every factor family is still monotonic. | Re-pinning blind to whatever the engine now returns. |
 
 **Run 2 result:** 39 findings confirmed and fixed, 11 refuted by skeptics, 16 minors logged in `docs/reviews/`. `tsc -b` 0 errors · **1,663 / 1,663 tests** · naive isolation clean. The real book now has FIT accounts; before Run 2 it had none.
+
+## S1 — end-to-end smoke (2026-09-19)
+
+| # | Decision | Why | Rejected alternative |
+| --- | --- | --- | --- |
+| S1-1 | **`/actions/plan` drafts 8 requests at a time, reuses an unchanged open draft, and runs inside `npm run seed`.** | Against live Gemini it took **114.7 s** — it awaited each draft serially. That is a demo that dies on stage. Concurrency cut it to 36 s; reuse makes re-planning idempotent and free; seeding it means the outbox is full before anyone opens the console. Ordering and every write are unchanged. | A spinner. |
+| S1-2 | **Vite binds `127.0.0.1` explicitly.** | It listened on `[::1]` only, so any browser resolving `localhost` to IPv4 got a connection error while `curl` worked — the kind of failure that appears only on a judge's laptop. | — |
+| S1-3 | **The absence of a minimal flip on the real book is reported, not engineered around.** | All 37 non-FIT accounts fail on at least one immovable factor, and the engine says which. Loosening immovability to manufacture flips would propose changes the insured cannot make. | Treating state or building age as movable. |

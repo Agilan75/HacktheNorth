@@ -26,6 +26,9 @@ import { LlmError } from '../llm/types';
 import { snapshotOf } from './rescore';
 import type { Deps } from './types';
 
+/** Live Gemini drafts in flight at once during /actions/plan (DECISIONS S1-1). */
+const DRAFT_CONCURRENCY = 8;
+
 /*
  * Decisions: docs/decisions/A17.md. In short:
  * - Scope is every scored commercial-property row (optionally narrowed to
@@ -288,6 +291,47 @@ export async function planActions(
   );
   const nowIso = deps.clock.nowIso();
 
+  // Draft every qualifying request up front, DRAFT_CONCURRENCY at a time, then
+  // let the loop below consume them in order. The loop used to await each
+  // Gemini draft serially: 11 drafts took ~115 s against the live API, far too
+  // long for a live demo. Ordering, writes and the result are unchanged.
+  // DECISIONS S1-1.
+  const draftsAhead = new Map<string, Promise<Awaited<ReturnType<typeof draftFor>>>>();
+  {
+    const pending: { id: string; run: () => Promise<Awaited<ReturnType<typeof draftFor>>> }[] = [];
+    for (const row of rows) {
+      const result = row.result;
+      if (result === null || result === undefined) continue;
+      const ref = directory.submissions.get(row.externalId) ?? null;
+      const broker = ref?.brokerId == null ? null : (directory.brokers.get(ref.brokerId) ?? null);
+      const contact = ref?.contactId == null ? null : (directory.contacts.get(ref.contactId) ?? null);
+      const sel = selectRequest({ submissionId: row.id, result, insuredName: insuredNameOf(row, result), broker, contact });
+      if (!sel.qualifies || sel.fields.length === 0) continue;
+      const fields: RequestedFieldDto[] = sel.fields.map((f) => ({ ...f }));
+      const asked = latest(repos, row.id, 'request').some(
+        (a) => (a.status === 'approved' || a.status === 'sent') && pathKey(a.payload.fields ?? []) === pathKey(fields),
+      );
+      if (asked) continue;
+      if (reusableDraft(repos, row.id, fields) !== undefined) continue;
+      pending.push({ id: row.id, run: () => draftFor(deps, sel, request.draftsOff === true) });
+    }
+    let next = 0;
+    const settle = new Map<string, (v: Awaited<ReturnType<typeof draftFor>>) => void>();
+    const fail = new Map<string, (e: unknown) => void>();
+    for (const p of pending) {
+      const ahead = new Promise<Awaited<ReturnType<typeof draftFor>>>((res, rej) => { settle.set(p.id, res); fail.set(p.id, rej); });
+      ahead.catch(() => undefined); // observed when the loop awaits it; never an unhandled rejection
+      draftsAhead.set(p.id, ahead);
+    }
+    const worker = async (): Promise<void> => {
+      while (next < pending.length) {
+        const job = pending[next++]!;
+        try { settle.get(job.id)!(await job.run()); } catch (e) { fail.get(job.id)!(e); }
+      }
+    };
+    void Promise.all(Array.from({ length: Math.min(DRAFT_CONCURRENCY, pending.length) }, worker));
+  }
+
   let routed = 0;
   let needsSeniorReferral = 0;
   let drafted = 0;
@@ -361,7 +405,15 @@ export async function planActions(
       continue;
     }
 
-    const d = await draftFor(deps, sel, request.draftsOff === true);
+    // An open draft that already asks for exactly these fields is kept as is:
+    // re-planning is idempotent and never re-spends a Gemini call (S1-1).
+    const kept = reusableDraft(repos, row.id, fields);
+    if (kept !== undefined) {
+      drafted += 1;
+      out.push(actionDtoOf(kept, row));
+      continue;
+    }
+    const d = await (draftsAhead.get(row.id) ?? draftFor(deps, sel, request.draftsOff === true));
     const payload: ActionPayload = {
       triggers: [...sel.triggers],
       fields,
@@ -391,6 +443,17 @@ export async function planActions(
   }
 
   return { routed, needsSeniorReferral, drafted, skipped, actions: out };
+}
+
+/** An open draft whose requested fields are unchanged and whose body exists. */
+function reusableDraft(
+  repos: ReturnType<typeof createRepos>,
+  submissionId: string,
+  fields: readonly RequestedFieldDto[],
+) {
+  return latest(repos, submissionId, 'request').find(
+    (a) => a.status === 'draft' && a.payload.draft != null && pathKey(a.payload.fields ?? []) === pathKey(fields),
+  );
 }
 
 /** Approving marks a draft sent. Nothing is ever really emailed (PRD §7.6). */
