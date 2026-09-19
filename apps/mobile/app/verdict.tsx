@@ -10,6 +10,8 @@ import {
   COLORS,
   Card,
   Heading,
+  Hero,
+  Icon,
   Notice,
   SPACE,
   Screen,
@@ -17,6 +19,7 @@ import {
   Text,
   VerdictPill,
 } from '@/ui';
+import type { HeroTone, IconName } from '@/ui';
 
 /**
  * Your quote — PRD §11 `/verdict` (unit M8).
@@ -61,6 +64,49 @@ const VERDICT_SENTENCE: Readonly<Record<Verdict, string>> = {
   REFER: 'This room might be covered, but a person at the insurer needs to look at it first.',
   DOES_NOT_FIT: 'As it is today, this room is outside what the insurer covers.',
 };
+
+/**
+ * Decorative only — `VerdictPill` still prints the word and its own glyph.
+ * FIT keeps red (the pill's own fill colour); REFER moves to blue (PRD §13:
+ * "red never means bad", so a filled red Hero must stay reserved for FIT);
+ * DOES_NOT_FIT matches the pill's ink fill.
+ */
+const HERO_TONE_BY_VERDICT: Readonly<Record<Verdict, HeroTone>> = {
+  FIT: 'red',
+  REFER: 'blue',
+  DOES_NOT_FIT: 'ink',
+};
+
+const HAZARD_ICON: Readonly<Record<string, IconName>> = {
+  portableHeater: 'flame-outline',
+  heaterNearCombustible: 'flame-outline',
+  extensionCord: 'flash-outline',
+  powerBarOverload: 'flash-outline',
+  candle: 'flame-outline',
+  stove: 'restaurant-outline',
+  blockedExit: 'exit-outline',
+  windowAcUnit: 'snow-outline',
+  waterHeater: 'water-outline',
+  highValueContents: 'diamond-outline',
+};
+
+/** Decorative icon per priced factor — falls back to a neutral glyph. */
+function factorIcon(name: string): IconName {
+  const hazard = hazardKeyOfFactor(name);
+  if (hazard !== null) return HAZARD_ICON[hazard] ?? 'warning-outline';
+  switch (name) {
+    case 'contents':
+      return 'cube-outline';
+    case 'buildingAge':
+      return 'business-outline';
+    case 'smokeDetector':
+      return 'radio-button-on-outline';
+    case 'term':
+      return 'calendar-outline';
+    default:
+      return 'ellipse-outline';
+  }
+}
 
 const HAZARD_NAMES: Readonly<Record<string, string>> = {
   portableHeater: 'Portable heater',
@@ -275,18 +321,27 @@ export default function VerdictScreen() {
       }
     >
       {/* Verdict */}
-      <View style={{ gap: SPACE.sm }}>
-        <Text variant="small" tone="muted">
+      <Hero
+        tone={HERO_TONE_BY_VERDICT[verdict]}
+        accessibilityLabel={`${sweep.roomLabel}. Result: ${VERDICT_WORDS[verdict]}. ${VERDICT_SENTENCE[verdict]}`}
+      >
+        <Text tone="inverse" variant="small">
           {sweep.roomLabel}
         </Text>
-        <VerdictPill
-          verdict={verdict}
-          text={VERDICT_WORDS[verdict]}
-          size="large"
-          accessibilityLabel={`Result: ${VERDICT_WORDS[verdict]}`}
-        />
-        <Text>{VERDICT_SENTENCE[verdict]}</Text>
-      </View>
+        {/* REFER's pill is outlined (transparent fill), which only has the
+            contrast its redDeep text needs against Paper — never against a
+            gradient. Every verdict gets the same opaque Paper plate here so
+            none of them can quietly lose legibility on a coloured Hero. */}
+        <View style={{ backgroundColor: COLORS.paper, borderRadius: 999, alignSelf: 'flex-start' }}>
+          <VerdictPill
+            verdict={verdict}
+            text={VERDICT_WORDS[verdict]}
+            size="large"
+            accessibilityLabel={`Result: ${VERDICT_WORDS[verdict]}`}
+          />
+        </View>
+        <Text tone="inverse">{VERDICT_SENTENCE[verdict]}</Text>
+      </Hero>
 
       {questionsLeft ? (
         <Notice
@@ -299,30 +354,37 @@ export default function VerdictScreen() {
       ) : null}
 
       {/* Estimate */}
-      <Card accessibilityRole="summary">
-        <Heading variant="heading">Your price estimate</Heading>
+      <Hero tone="blue" accessibilityRole="summary">
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
+          <Icon name="wallet-outline" size={20} color={COLORS.paper} />
+          <Text tone="inverse" variant="heading" weight="semibold">
+            Your price estimate
+          </Text>
+        </View>
         <View
           accessible
           accessibilityLabel={`Estimate: ${money(price.predictedMonthlyPremium)} a month. ${money(price.predictedPremium)} a year.`}
           style={{ gap: SPACE.xs }}
         >
-          <Text variant="display" weight="semibold">
+          <Text variant="display" weight="semibold" tone="inverse">
             {money(price.predictedMonthlyPremium)}
-            <Text variant="body" tone="muted">
+            <Text variant="body" tone="inverse">
               {' '}a month
             </Text>
           </Text>
-          <Text tone="muted">{`${money(price.predictedPremium)} a year${price.termMonths !== null ? ` · ${String(price.termMonths)}-month policy` : ''}`}</Text>
+          <Text tone="inverse" style={{ opacity: 0.85 }}>
+            {`${money(price.predictedPremium)} a year${price.termMonths !== null ? ` · ${String(price.termMonths)}-month policy` : ''}`}
+          </Text>
         </View>
-        <Text variant="small" tone="muted">
+        <Text variant="small" tone="inverse" style={{ opacity: 0.85 }}>
           {price.estimate
             ? 'This is an estimate from a rating table, not a final price. An insurer confirms the real price.'
             : 'Worked out from the rating table.'}
         </Text>
+      </Hero>
 
-        <Heading variant="body" weight="semibold" style={{ marginTop: SPACE.sm }}>
-          How we got this number
-        </Heading>
+      <Card>
+        <Heading variant="heading">How we got this number</Heading>
         <Text variant="small" tone="muted">
           We start from a base monthly rate and multiply it by each factor below. Change one factor and you can check
           the difference yourself.
@@ -378,7 +440,10 @@ export default function VerdictScreen() {
 
       {/* The fix */}
       <Card tone={flip !== null ? 'accent' : 'plain'}>
-        <Heading variant="heading">What to fix</Heading>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
+          <Icon name="construct-outline" size={20} color={COLORS.ink} />
+          <Heading variant="heading">What to fix</Heading>
+        </View>
         {flip !== null ? (
           <>
             {flip.moves.map((m, i) => (
@@ -447,6 +512,18 @@ function FactorRow({ factor, onPress }: { factor: AppliedFactor; onPress?: (() =
   const label = `${name}: ${factor.input}. Multiplied by ${Number.isFinite(factor.factor) ? String(factor.factor) : 'unknown'}, ${effect}.`;
   const body = (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md }}>
+      <View
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          backgroundColor: COLORS.mutedTint,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Icon name={factorIcon(factor.name)} size={16} color={COLORS.mutedDeep} />
+      </View>
       <View style={{ flex: 1, gap: 2 }}>
         <Text weight="semibold">{name}</Text>
         <Text variant="small" tone="muted">{`${factor.input} · ${effect}`}</Text>

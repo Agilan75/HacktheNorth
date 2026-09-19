@@ -16,7 +16,8 @@ import {
   useSession,
 } from '@/lib/session';
 import type { SessionFrame, TermMonths } from '@/lib/session';
-import { Button, Card, ChoiceGroup, Heading, Notice, Screen, SPACE, Text, TextField } from '@/ui';
+import { Button, COLORS, Card, ChoiceGroup, Heading, Icon, Notice, Screen, SPACE, Text, TextField } from '@/ui';
+import type { IconName } from '@/ui';
 
 /**
  * New sweep — PRD §11 `/new`. Unit M5.
@@ -64,6 +65,27 @@ async function toFrame(asset: ImagePicker.ImagePickerAsset, bearingDeg: number):
   });
   if (!out.base64) throw new Error('no image data');
   return { bearingDeg, capturedAt: new Date().toISOString(), imageBase64: out.base64, uri: out.uri };
+}
+
+/** A card's own heading with a decorative leading icon in a round chip. */
+function PathHeading({ icon, title }: { readonly icon: IconName; readonly title: string }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
+      <View
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 18,
+          backgroundColor: COLORS.mutedTint,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Icon name={icon} size={18} color={COLORS.ink} />
+      </View>
+      <Heading variant="heading">{title}</Heading>
+    </View>
+  );
 }
 
 export default function NewSweepScreen() {
@@ -248,10 +270,11 @@ export default function NewSweepScreen() {
       </View>
 
       <Card>
-        <Heading variant="heading">Scan with the camera</Heading>
+        <PathHeading icon="camera-outline" title="Scan with the camera" />
         <Text>Stand in the middle of the room and turn slowly all the way around. The app takes the photos for you.</Text>
         <Button
           label="Scan the room with the camera"
+          icon="camera-outline"
           accessibilityHint="Opens the camera. Turn slowly in a circle until the ring is full."
           onPress={startScan}
           disabled={busy}
@@ -259,13 +282,14 @@ export default function NewSweepScreen() {
       </Card>
 
       <Card>
-        <Heading variant="heading">Upload photos</Heading>
+        <PathHeading icon="images-outline" title="Upload photos" />
         <Text>
           Pick 3 photos of the room from your library, each facing a different wall. Good if turning around or
           holding the phone up is hard.
         </Text>
         <Button
           label={uploadLabel}
+          icon="images-outline"
           accessibilityLabel="Upload 3 photos instead"
           accessibilityHint="Opens your photo library. Pick 3 photos of the room."
           loading={busy}

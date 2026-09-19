@@ -16,7 +16,7 @@
  *    glyph, selected choices carry a check mark, notices carry a word prefix.
  */
 import { useEffect, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -41,6 +41,8 @@ import type {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Edge } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
   BORDER,
   COLORS,
@@ -136,6 +138,41 @@ export function Heading({ variant = 'title', ...rest }: TextProps) {
 }
 
 /* -------------------------------------------------------------------------- */
+/* Icon                                                                       */
+/* -------------------------------------------------------------------------- */
+
+export type IconName = ComponentProps<typeof Ionicons>['name'];
+
+export interface IconProps {
+  readonly name: IconName;
+  /** Points. Default 20, matching the `body` line height. */
+  readonly size?: number;
+  readonly color?: string;
+  /**
+   * Icons here are always decoration next to real text (PRD §13: colour, and
+   * by extension a glyph, never carries meaning alone) — hidden from screen
+   * readers by default. Set true only for the rare icon-only control that
+   * supplies its own accessibilityLabel on the wrapping Pressable.
+   */
+  readonly accessible?: boolean;
+  readonly style?: StyleProp<TextStyle>;
+}
+
+/** A Ionicons glyph, sized off the type scale so call sites never guess a number. */
+export function Icon({ name, size = 20, color = COLORS.ink, accessible = false, style }: IconProps) {
+  return (
+    <Ionicons
+      name={name}
+      size={size}
+      color={color}
+      style={style}
+      accessibilityElementsHidden={!accessible}
+      importantForAccessibility={accessible ? 'yes' : 'no-hide-descendants'}
+    />
+  );
+}
+
+/* -------------------------------------------------------------------------- */
 /* Button                                                                     */
 /* -------------------------------------------------------------------------- */
 
@@ -149,6 +186,8 @@ export interface ButtonProps extends Omit<PressableProps, 'children' | 'style'> 
   readonly loading?: boolean;
   /** Stretch to the container width (the default for primary actions). */
   readonly fullWidth?: boolean;
+  /** Decorative leading glyph — the label always carries the meaning on its own. */
+  readonly icon?: IconName;
   readonly accessibilityLabel?: string;
   readonly accessibilityHint?: string;
   readonly style?: StyleProp<ViewStyle>;
@@ -168,6 +207,7 @@ export function Button({
   variant = 'primary',
   loading = false,
   fullWidth,
+  icon,
   disabled,
   accessibilityLabel,
   accessibilityHint,
@@ -218,6 +258,8 @@ export function Button({
           accessibilityElementsHidden
           importantForAccessibility="no"
         />
+      ) : icon ? (
+        <Icon name={icon} size={18} color={inactive ? COLORS.mutedDeep : c.text} />
       ) : null}
       <Text
         variant="body"
@@ -300,6 +342,156 @@ export function Card({
       {...rest}
     >
       {children}
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Hero                                                                       */
+/* -------------------------------------------------------------------------- */
+
+export type HeroTone = 'ink' | 'blue' | 'red' | 'green';
+
+/**
+ * Gradient pairs are existing tokens only — never a new colour. Red stays the
+ * verdict-pill colour elsewhere (PRD §13); `red` here is only used behind a
+ * FIT verdict, so it still reads as "this is the verdict colour", not as a
+ * decorative choice unrelated to the pill beside it.
+ */
+const HERO_GRADIENT: Readonly<Record<HeroTone, readonly [string, string]>> = {
+  ink: [COLORS.ink, COLORS.mutedDeep],
+  blue: [COLORS.blue, COLORS.blueDeep],
+  red: [COLORS.red, COLORS.redDeep],
+  green: [COLORS.green, COLORS.greenDeep],
+};
+
+export interface HeroProps {
+  readonly tone?: HeroTone;
+  readonly padding?: SpaceToken;
+  readonly children?: ReactNode;
+  readonly accessibilityLabel?: string;
+  readonly accessibilityRole?: AccessibilityRole;
+  readonly style?: StyleProp<ViewStyle>;
+}
+
+/**
+ * A gradient surface with no shadow (PRD §13: elevation is a border, never a
+ * shadow) for the handful of places that deserve real visual weight — a price,
+ * a verdict, a welcome banner. Text inside should use `tone="inverse"`.
+ */
+export function Hero({ tone = 'ink', padding = 'xl', children, accessibilityLabel, accessibilityRole, style }: HeroProps) {
+  const [from, to] = HERO_GRADIENT[tone];
+  return (
+    <LinearGradient
+      colors={[from, to]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole={accessibilityRole}
+      style={[{ borderRadius: RADIUS.card, padding: SPACE[padding], gap: SPACE.sm }, style]}
+    >
+      {children}
+    </LinearGradient>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Brand                                                                      */
+/* -------------------------------------------------------------------------- */
+
+export interface BrandProps {
+  /** Badge diameter in points. Default 40. */
+  readonly size?: number;
+  readonly showWordmark?: boolean;
+  readonly style?: StyleProp<ViewStyle>;
+}
+
+/**
+ * The Retrofit lockup: a gradient badge and, optionally, the wordmark. Always
+ * decorative — every screen that shows it also has its own real Heading, so
+ * this never has to carry the app's name to a screen reader by itself.
+ */
+export function Brand({ size = 40, showWordmark = true, style }: BrandProps) {
+  return (
+    <View
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+      style={[{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }, style]}
+    >
+      <LinearGradient
+        colors={[COLORS.red, COLORS.redDeep]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Ionicons name="home" size={Math.round(size * 0.5)} color={COLORS.paper} />
+      </LinearGradient>
+      {showWordmark ? (
+        <RNText
+          style={{
+            fontFamily: DISPLAY_FAMILY,
+            fontWeight: '600',
+            fontSize: Math.round(size * 0.5),
+            color: COLORS.ink,
+          }}
+        >
+          Retrofit
+        </RNText>
+      ) : null}
+    </View>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Badge                                                                      */
+/* -------------------------------------------------------------------------- */
+
+export type BadgeTone = 'neutral' | 'info' | 'positive' | 'attention';
+
+const BADGE_COLOR: Readonly<Record<BadgeTone, { bg: string; text: string }>> = {
+  neutral: { bg: COLORS.mutedTint, text: COLORS.mutedDeep },
+  info: { bg: COLORS.blueTint, text: COLORS.blueDeep },
+  positive: { bg: COLORS.greenTint, text: COLORS.greenDeep },
+  attention: { bg: COLORS.redTint, text: COLORS.redDeep },
+};
+
+export interface BadgeProps {
+  readonly label: string;
+  /** Decoration only — the label text always carries the meaning (PRD §13). */
+  readonly tone?: BadgeTone;
+  readonly icon?: IconName;
+  readonly style?: StyleProp<ViewStyle>;
+}
+
+/** A small pill of status text — mirrors the console's Badge tones (info = blue, positive = green). */
+export function Badge({ label, tone = 'neutral', icon, style }: BadgeProps) {
+  const c = BADGE_COLOR[tone];
+  return (
+    <View
+      style={[
+        {
+          flexDirection: 'row',
+          alignItems: 'center',
+          alignSelf: 'flex-start',
+          gap: SPACE.xs,
+          paddingHorizontal: SPACE.md,
+          paddingVertical: SPACE.xs,
+          borderRadius: RADIUS.pill,
+          backgroundColor: c.bg,
+        },
+        style,
+      ]}
+    >
+      {icon ? <Icon name={icon} size={14} color={c.text} /> : null}
+      <Text variant="small" weight="semibold" style={{ color: c.text }}>
+        {label}
+      </Text>
     </View>
   );
 }

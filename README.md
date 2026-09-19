@@ -25,17 +25,19 @@ Gemini sees; the engine decides.
 
 ### User journey and key features
 
-New room → sweep → analyzing → confirm → questions → verdict → verify my fix.
+Your rooms (with an About screen) → new room → sweep → analyzing → confirm → questions → verdict → verify my fix.
 
 - **Sweep:** auto-capture as you turn, a 2D Skia coverage ring, Finish at 75% coverage.
 - **Confirm:** low-confidence objects on a radar ring to confirm or dismiss.
 - **Questions:** one at a time, with a "Questions skipped: N" counter that expands to reasons.
-- **Verdict:** estimate with its factor breakdown, the deciding rule, and the fix. **Verify my fix** re-photographs the hazard and shows the price drop.
+- **Verdict:** a gradient hero for the verdict and the price, estimate with its factor breakdown (each factor iconified), the deciding rule, and the fix. **Verify my fix** re-photographs the hazard and shows the price drop.
 - **Photo upload** for anyone who cannot do a sweep.
+- **About** (`/about`, linked from the header): what Retrofit is, how the three steps work, and a privacy line — reachable without leaving the flow, not a forced first-run gate.
+- **Visual system:** a `@retrofit/design`-token-only accent layer on top of the frozen PRD §13 palette — `Icon` (Ionicons) and `Hero` (a gradient, no-shadow surface; PRD §13 still bars shadows everywhere) added to the phone kit, used for the brand mark, the verdict/price cards, per-hazard icons, and the About screen. Red stays reserved for verdicts (PRD §13: "red never means bad"); blue marks informational/in-progress state, green marks positive/completed — the same meaning as the console's palette.
 
 ### Assumptions, limitations, and future improvements
 
-- **No one has run the phone app on an iPhone yet.** It is typechecked and its logic is tested, but the on-device walk needs a human with a device.
+- **No one has run the phone app on an iPhone yet**, so the camera sweep and its Skia coverage ring are still unverified on real hardware. Every other screen, though, has now been driven end to end in a browser (`expo start --web`) against the live API — real sweeps, real questions, real verdicts — which caught and fixed two real bugs a code read alone hadn't: a screen-reader-only nested-heading conflict on `/confirm`, and a colour-contrast failure where an outlined verdict pill's red text landed on a dark gradient it wasn't designed for (now backed by an opaque plate). `expo-doctor` stays 21/21 and all 139 logic tests still pass.
 - **The Gemini key's prepaid credits are depleted (HTTP 402).** Until topped up in Google AI Studio, the phone app's vision call, broker-reply extraction, request drafting, and narration fall back or fail. Scoring, ranking, template explanations, and the whole engine are unaffected.
 - **Broker-reply extraction accuracy is unmeasured.** The 30-fixture check ran after the credits ran out.
 - **The 3D coverage dome was cut.** The app uses the 2D Skia ring, the PRD's named fallback.

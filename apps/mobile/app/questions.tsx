@@ -15,6 +15,7 @@ import {
   Card,
   ChoiceGroup,
   Heading,
+  Icon,
   MIN_TOUCH_TARGET,
   Notice,
   RADIUS,
@@ -398,6 +399,7 @@ export default function QuestionsScreen() {
           ) : null}
           <Button
             label="Next"
+            icon="arrow-forward-outline"
             loading={sending === 'answer'}
             disabled={busy || !hasDraft(q)}
             accessibilityHint={hasDraft(q) ? 'Saves your answer and shows the next question.' : 'Answer the question first, or skip it.'}
@@ -408,6 +410,7 @@ export default function QuestionsScreen() {
           />
           <Button
             label="Skip — I'm not sure"
+            icon="play-skip-forward-outline"
             variant="secondary"
             fullWidth
             loading={sending === 'skip'}
@@ -420,9 +423,16 @@ export default function QuestionsScreen() {
       }
     >
       <View style={{ gap: SPACE.xs }}>
-        <Text variant="small" tone="muted" accessibilityElementsHidden importantForAccessibility="no">
-          {`Question ${number}`}
-        </Text>
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.xs }}
+        >
+          <Icon name="help-circle-outline" size={16} color={COLORS.mutedDeep} />
+          <Text variant="small" tone="muted">
+            {`Question ${number}`}
+          </Text>
+        </View>
         <Heading
           variant="title"
           accessibilityLabel={`Question ${number}. ${q.prompt}`}
