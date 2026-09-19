@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "files": [],
+  "references": [
+    { "path": "./packages/design" },
+    { "path": "./packages/engine" },
+    { "path": "./packages/contracts" },
+    { "path": "./packages/federato" },
+    { "path": "./packages/verify" },
+    { "path": "./apps/api" },
+    { "path": "./apps/console" }
+  ]
+}

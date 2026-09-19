@@ -2,6 +2,19 @@
 
 ## Context
 
+> **Pre-flight corrections applied 2026-09-19 (read these first; they override the text below).**
+>
+> 1. **The monorepo lives at the repository root** (`/Users/calebchincalebchin/hackthenorth`), not in a `retrofit/` subfolder. `packages/` and `apps/` sit beside the existing `docs/` and `prototype/`. Every path in this document that reads `retrofit/x` means `x`.
+> 2. **The git repository already exists** on branch `build/retrofit`, remote `Agilan75/HacktheNorth` (shared with a teammate). Drop `git init` from CP0. Commit at every checkpoint; push the branch only at the very end; never merge to `main`; never force-push.
+> 3. **`.env` exists at the repo root** with working Federato OAuth credentials and a working `GEMINI_API_KEY`. Never print it, copy it into a source file, or commit it.
+> 4. **The Gemini model chain is verified live**: `gemini-3.6-flash`, `gemini-3.8-flash`, `gemini-3.5-flash` all answer `generateContent` with an enforced `responseSchema`. `gemini-3.7-flash` is held in reserve. Thinking is on by default (89-263 thought tokens on a trivial prompt), so `maxOutputTokens` must be generous and `finishReason: MAX_TOKENS` treated as a retryable diagnostic.
+> 5. **A02 ports the Gemini provider from `prototype/gemini.js`** in this repo, not from the stale absolute path named in the A02 row below. `prototype/claude.js` is the Anthropic parity path and the fallback provider.
+> 6. **`prototype/` is frozen.** No unit owns it, no unit edits it. It is read-only source material.
+> 7. **`pdftoppm` is now installed**, so the "read PDFs whole, never with a `pages` argument" constraint below is lifted.
+> 8. **Temporary files go in the agent's own scratchpad directory, never `/tmp`.** Under this sandbox `curl -o /tmp/...` silently writes a zero-byte file.
+> 9. **The deep Federato pass queries `Policy`, not `Submission`** (F09). `Submission` has no premium, TIV, state, construction, or building fields and no reverse reference to `Policy`.
+> 10. **This build runs unattended.** Nothing blocks on a human. Decide, log to `DECISIONS.md`, continue.
+
 `retrofit/docs/PRD.md` (v1.2) is final and nothing is built: the folder holds only `docs/`, `.env` (working Gemini and Federato credentials), `.env.example`, `.gitignore`. The user asked for the build to be planned for many parallel agents, then chose **~100 agents with light review** and **phone app written last**. Prizes: Federato, Rox, Intact, MLH Gemini; Sentry and a GoDaddy domain last and non-integral.
 
 **Machine facts (checked):** 8 cores, 8 GB RAM, Node 24.16, npm 11.13, 38 GB free, Xcode CLT present, no git repo yet, no `pdftoppm` (so PDFs must be read whole, never with a `pages` argument; all six Federato PDFs are ≤ 8 pages). The Workflow tool caps concurrency at `min(16, cores − 2)` = **6 agents at once**. About 110 units × ~15 min ÷ 6 slots ≈ 4.5 hours of agent time plus checkpoints: **estimate ~6 hours wall-clock**.
@@ -44,7 +57,7 @@ W0-1 ∥ W0-2, then W0-3 ∥ W0-4, then W0-5.
 
 **Dependencies (one install):** typescript ~5.9, vitest ^3, tsx ^4, fast-check ^4 · zod ^4 · hono ^4 + @hono/node-server · drizzle-orm + better-sqlite3 ^12 · sharp ^0.34 · @google/genai ^1 · react/react-dom pinned to Expo's version, react-router ^7, vite ^7, testing-library, jsdom, `@fontsource-variable/{fraunces,inter}` (fonts without wifi) · @sentry/node, @sentry/react (unused until the end) · Expo set from `expo-template-blank-typescript`. No eslint, prettier, Tailwind, dotenv, drizzle-kit (migration is hand-written `CREATE TABLE IF NOT EXISTS`).
 
-**Checkpoint CP0 (me):** `git init` in `retrofit/`, `npm install`, smoke `better-sqlite3` and `sharp` on Node 24, `tsc -b`, `vitest`, commit, tag `cp0-green`. Fallbacks: better-sqlite3 → node-gyp compile → `drizzle-orm/sqlite-proxy` over `node:sqlite` (confined to `API/src/db/client.ts`); Expo peer conflict → remove `apps/mobile` from workspaces and give it its own install in Run 3.
+**Checkpoint CP0 (me):** `npm install`, smoke `better-sqlite3` and `sharp` on Node 24, `tsc -b`, `vitest`, commit, tag `cp0-green`. Fallbacks: better-sqlite3 → node-gyp compile → `drizzle-orm/sqlite-proxy` over `node:sqlite` (confined to `API/src/db/client.ts`); Expo peer conflict → remove `apps/mobile` from workspaces and give it its own install in Run 3.
 
 ---
 
@@ -97,7 +110,7 @@ Each unit = module(s) + colocated test(s). "K" = Run 0 contracts.
 | ID | Scope | Deps |
 | --- | --- | --- |
 | A01 | DB client + migrate (node:sqlite fallback lives here) + repos | K |
-| A02 | Gemini provider ported from `/Users/calebchin/hackthenorth/gemini.js` (MODELS chain, MAX_ROUNDS, RETRYABLE, VisionError, `clamp01`/`sanitize`, MAX_TOKENS diagnostics) + `generateJson` (zod, one retry, degrade) | K |
+| A02 | Gemini provider ported from `prototype/gemini.js` (MODELS chain, MAX_ROUNDS, RETRYABLE, VisionError, `clamp01`/`sanitize`, MAX_TOKENS diagnostics) + `generateJson` (zod, one retry, degrade) | K |
 | A03–A06 | Gemini calls, two per unit, each with prompt, schema, fake-provider test, one tiny live smoke: observe+relate · verify-fix+narrate · schema-assist+second-opinion · draft-request+extract-reply | K |
 | A07 | Enrichment HTTP helper (6 s timeout, cache) + Nominatim fallback + OpenFEMA flood | K |
 | A08 | Overpass fire-station distance + enrichment runner + unavailable cards | A07 |

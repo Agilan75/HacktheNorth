@@ -1,0 +1,639 @@
+/**
+ * Wire DTOs — the exact JSON every route in PRD §8 accepts and returns.
+ * FROZEN after Run 0 (W0-3).
+ *
+ * `packages/contracts` depends only on `@retrofit/engine` and `zod`, because
+ * `packages/federato` depends on *it*. So the federato-shaped objects (query
+ * trace, explanation, routing) are declared here at the wire boundary, with
+ * unions loosened where a stricter domain union lives in `@retrofit/federato`.
+ * The domain types there are structurally assignable to these.
+ *
+ * Every response either has the shape named below or is an `ErrorDto`.
+ */
+
+import type {
+  AppliedInterpretation,
+  Citation,
+  Contradiction,
+  CoverageResult,
+  EngineResult,
+  FeatureVector,
+  FieldMap,
+  FlipResult,
+  LineOfBusiness,
+  Observation,
+  PeerResult,
+  PriceBreakdown,
+  Question,
+  QualityComponents,
+  Rollup,
+  Rule,
+  Severity,
+  Verdict,
+  VoiResult,
+} from '@retrofit/engine';
+
+/* -------------------------------------------------------------------------- */
+/* Envelope                                                                   */
+/* -------------------------------------------------------------------------- */
+
+export interface ErrorDto {
+  readonly error: {
+    readonly code: string;
+    readonly message: string;
+    /** Present on a 422: the zod issues, flattened to path + message. */
+    readonly issues?: readonly { readonly path: string; readonly message: string }[];
+  };
+}
+
+export interface PageDto {
+  readonly total: number;
+  readonly limit: number;
+  readonly offset: number;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shared leaf shapes                                                         */
+/* -------------------------------------------------------------------------- */
+
+export type AdapterKindDto = 'live' | 'mock';
+export type RecommendationDto = 'accept' | 'review' | 'decline' | 'investigate';
+export type RequestTriggerDto = 'missing_data' | 'high_contradiction' | 'one_flip_from_fit';
+export type ActionTypeDto = 'route' | 'request' | 'reply' | 'rescore' | 'log';
+export type ActionStatusDto = 'draft' | 'approved' | 'sent' | 'replied' | 'applied' | 'failed';
+export type SweepStageDto =
+  | 'received'
+  | 'quality_gate'
+  | 'observing'
+  | 'relating'
+  | 'scoring'
+  | 'questions'
+  | 'done'
+  | 'failed';
+
+/** The query trace (PRD §7.5 step 6). `TPayload` is `QueryPayload` in the API. */
+export interface QueryTraceEntryDto<TPayload = unknown> {
+  readonly id: string;
+  readonly seq: number;
+  readonly pass: string;
+  readonly goal: string;
+  readonly requiredBy: readonly {
+    readonly ruleId: string;
+    readonly factor: string | null;
+    readonly canonicalPath: string;
+    readonly why: string;
+  }[];
+  readonly pathChosen: {
+    readonly rootResource: string;
+    readonly path: readonly string[];
+    readonly why: string;
+    readonly alternativesRejected: readonly {
+      readonly rootResource: string;
+      readonly path: readonly string[];
+      readonly why: string;
+    }[];
+  };
+  readonly payload: TPayload;
+  readonly rowCount: number;
+  readonly totalAvailable: number | null;
+  readonly durationMs: number;
+  readonly adapterKind: AdapterKindDto;
+  readonly startedAt: string;
+  readonly outcome: string;
+  readonly error: {
+    readonly code: string | null;
+    readonly message: string;
+    readonly httpStatus: number | null;
+  } | null;
+  readonly adaptedFrom: string | null;
+  readonly adaptation: string;
+  readonly notes: readonly string[];
+}
+
+/** The deterministic explanation (PRD §7.7). */
+export interface ExplanationDto {
+  readonly submissionId: string;
+  readonly text: string;
+  readonly sentences: readonly string[];
+  readonly recommendation: RecommendationDto;
+  readonly mixed: boolean;
+  readonly inAppetite: readonly {
+    readonly factor: string;
+    readonly label: string;
+    readonly inAppetite: boolean;
+    readonly tier: string | null;
+    readonly valueText: string;
+  }[];
+  readonly outOfAppetite: readonly {
+    readonly factor: string;
+    readonly label: string;
+    readonly inAppetite: boolean;
+    readonly tier: string | null;
+    readonly valueText: string;
+  }[];
+  readonly numbers: Readonly<Record<string, number>>;
+  readonly citations: readonly Citation[];
+  readonly template: string;
+  readonly narrated: boolean;
+}
+
+export interface UnderwriterDto {
+  readonly id: number;
+  readonly name: string;
+  readonly email: string;
+  readonly team: string;
+  readonly region: string;
+  readonly authorityLimit: number;
+}
+
+export interface RoutingDecisionDto {
+  readonly submissionId: string;
+  readonly primaryState: string | null;
+  readonly requestedLimit: number | null;
+  readonly assigned: UnderwriterDto | null;
+  readonly needsSeniorReferral: boolean;
+  readonly reason: string;
+  readonly candidates: readonly {
+    readonly underwriter: UnderwriterDto;
+    readonly regionMatches: boolean;
+    readonly authorityCovers: boolean;
+    readonly reason: string;
+  }[];
+}
+
+export interface RequestedFieldDto {
+  readonly canonicalPath: string;
+  readonly componentKey: string | null;
+  readonly label: string;
+  readonly why: string;
+  readonly factor: string | null;
+  readonly ruleId: string | null;
+  readonly currentValue: string | null;
+  readonly severity: Severity;
+}
+
+export interface ExtractedValueDto {
+  readonly canonicalPath: string;
+  readonly value: unknown;
+  readonly confidence: number;
+  readonly quote: string;
+  readonly accepted: boolean;
+  readonly quoteFound: boolean;
+  readonly typeOk: boolean;
+  readonly rangeOk: boolean;
+  readonly rejection: string | null;
+  readonly needsConfirmation: boolean;
+}
+
+/** The before/after pair every action log row carries. */
+export interface ScoreSnapshotDto {
+  readonly appetiteScore: number;
+  readonly verdict: Verdict;
+  readonly completeness: number;
+  readonly confidence: number;
+  readonly predictedPremium: number | null;
+  readonly qualityIndex: number;
+  readonly rank: number | null;
+}
+
+/** An enrichment plugin's card, including the "unavailable" case (PRD §8). */
+export interface EnrichmentCardDto {
+  readonly source: string;
+  readonly title: string;
+  readonly available: boolean;
+  readonly unavailableReason: string | null;
+  readonly fetchedAt: string | null;
+  readonly fields: readonly {
+    readonly canonicalPath: string;
+    readonly label: string;
+    readonly valueText: string;
+    readonly value: unknown;
+  }[];
+  readonly attribution: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* GET /health                                                                */
+/* -------------------------------------------------------------------------- */
+
+export interface HealthDto {
+  readonly ok: true;
+  readonly version: string;
+  readonly adapter: AdapterKindDto;
+  /** False when `GEMINI_API_KEY` is unset: the API still starts (PRD §9.1). */
+  readonly llmConfigured: boolean;
+  readonly submissionCount: number;
+  readonly startedAt: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* GET /submissions — the ranked queue                                        */
+/* -------------------------------------------------------------------------- */
+
+export interface QueueRowDto {
+  readonly id: string;
+  readonly externalId: string;
+  readonly rank: number;
+  readonly qualityIndex: number;
+  readonly qualityComponents: QualityComponents;
+  readonly verdict: Verdict;
+  readonly insuredName: string | null;
+  readonly lineOfBusiness: string;
+  /** True for the 120 rows collapsed under "Out of appetite: line of business". */
+  readonly outOfAppetiteLine: boolean;
+  readonly appetiteScore: number;
+  readonly primaryState: string | null;
+  readonly totalTiv: number | null;
+  readonly quotedPremium: number | null;
+  readonly predictedPremium: number | null;
+  readonly adequacy: number | null;
+  readonly completeness: number;
+  readonly confidence: number;
+  readonly contradictionCount: number;
+  readonly openHighContradictionCount: number;
+  readonly distanceToAppetite: 0 | 1 | 2 | null;
+  /** The "1 flip from FIT" badge. */
+  readonly oneFlipFromFit: boolean;
+  readonly assignedUnderwriter: UnderwriterDto | null;
+  readonly pendingAction: {
+    readonly id: string;
+    readonly type: ActionTypeDto;
+    readonly status: ActionStatusDto;
+  } | null;
+  readonly explanation: string | null;
+  readonly updatedAt: string;
+}
+
+export interface QueueQueryDto {
+  readonly line?: string;
+  readonly verdict?: Verdict;
+  readonly state?: string;
+  readonly underwriterId?: number;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface QueueResponseDto {
+  readonly rows: readonly QueueRowDto[];
+  readonly page: PageDto;
+  readonly adapter: AdapterKindDto;
+  readonly filters: QueueQueryDto;
+}
+
+/* -------------------------------------------------------------------------- */
+/* GET /submissions/:id                                                       */
+/* -------------------------------------------------------------------------- */
+
+export interface BuildingRowDto {
+  readonly externalId: string;
+  readonly name: string | null;
+  readonly tiv: number | null;
+  readonly yearBuilt: number | null;
+  readonly constructionType: string | null;
+  readonly sprinklered: boolean | null;
+  readonly stories: number | null;
+  readonly protectionClass: number | null;
+  readonly state: string | null;
+  readonly city: string | null;
+  readonly pre1990: boolean;
+  readonly post2010: boolean;
+  readonly acceptableConstruction: boolean;
+  readonly assumedAcceptableConstruction: boolean;
+}
+
+export interface SubmissionDetailDto {
+  readonly id: string;
+  readonly externalId: string;
+  readonly source: string;
+  readonly lineOfBusiness: LineOfBusiness;
+  readonly insuredName: string | null;
+  readonly rank: number | null;
+  readonly result: EngineResult;
+  readonly rollup: Rollup;
+  readonly vector: FeatureVector;
+  readonly price: PriceBreakdown;
+  readonly flip: FlipResult;
+  readonly voi: VoiResult;
+  readonly peers: PeerResult | null;
+  readonly contradictions: readonly Contradiction[];
+  readonly interpretations: readonly AppliedInterpretation[];
+  readonly buildings: readonly BuildingRowDto[];
+  readonly explanation: ExplanationDto | null;
+  readonly queryTrace: readonly QueryTraceEntryDto[];
+  readonly fieldMap: FieldMap | null;
+  readonly enrichment: readonly EnrichmentCardDto[];
+  readonly routing: RoutingDecisionDto | null;
+  readonly actions: readonly ActionDto[];
+  readonly attachedSweep: SweepDto | null;
+  readonly shareSlug: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* POST /ingest/federato · POST /submissions/:id/run · POST /enrich/:id       */
+/* -------------------------------------------------------------------------- */
+
+export interface IngestRequestDto {
+  /** Absent means every line the planner supports. */
+  readonly lineOfBusiness?: LineOfBusiness;
+  /** Ingest only these external ids. Absent means the whole book. */
+  readonly externalIds?: readonly string[];
+  /** Re-run even when the external id is already stored. Idempotent otherwise. */
+  readonly force?: boolean;
+}
+
+export interface IngestResponseDto {
+  readonly adapter: AdapterKindDto;
+  readonly ingested: number;
+  readonly updated: number;
+  readonly skipped: number;
+  readonly knockedOutAtTriage: number;
+  readonly noPolicy: number;
+  readonly queryCount: number;
+  readonly durationMs: number;
+  readonly warnings: readonly string[];
+  readonly externalIds: readonly string[];
+}
+
+export interface RunResponseDto {
+  readonly id: string;
+  readonly before: ScoreSnapshotDto | null;
+  readonly after: ScoreSnapshotDto;
+  readonly rankChanged: boolean;
+  readonly result: EngineResult;
+}
+
+export interface EnrichResponseDto {
+  readonly id: string;
+  readonly cards: readonly EnrichmentCardDto[];
+  readonly before: ScoreSnapshotDto | null;
+  readonly after: ScoreSnapshotDto;
+  readonly result: EngineResult;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Actions (PRD §7.6)                                                         */
+/* -------------------------------------------------------------------------- */
+
+export interface ActionDto {
+  readonly id: string;
+  readonly submissionId: string;
+  readonly externalId: string | null;
+  readonly insuredName: string | null;
+  readonly type: ActionTypeDto;
+  readonly status: ActionStatusDto;
+  /** Who or what acted: `code`, `gemini:<call>` or `underwriter`. */
+  readonly actor: string;
+  readonly triggers: readonly RequestTriggerDto[];
+  readonly fields: readonly RequestedFieldDto[];
+  /** The drafted message. Nothing is ever really emailed (PRD §7.6). */
+  readonly draft: string | null;
+  readonly recipient: {
+    readonly name: string | null;
+    readonly email: string | null;
+    readonly brokerName: string | null;
+  } | null;
+  readonly routing: RoutingDecisionDto | null;
+  readonly sourceText: string | null;
+  readonly extracted: readonly ExtractedValueDto[];
+  readonly before: ScoreSnapshotDto | null;
+  readonly after: ScoreSnapshotDto | null;
+  readonly rankBefore: number | null;
+  readonly rankAfter: number | null;
+  readonly note: string | null;
+  readonly createdAt: string;
+}
+
+export interface ActionsPlanRequestDto {
+  readonly externalIds?: readonly string[];
+  /** Skip the Gemini draft and store the deterministic field list only. */
+  readonly draftsOff?: boolean;
+}
+
+export interface ActionsPlanResponseDto {
+  readonly routed: number;
+  readonly needsSeniorReferral: number;
+  readonly drafted: number;
+  readonly skipped: number;
+  readonly actions: readonly ActionDto[];
+}
+
+export interface ActionsQueryDto {
+  readonly status?: ActionStatusDto;
+  readonly type?: ActionTypeDto;
+  readonly submissionId?: string;
+  readonly limit?: number;
+  readonly offset?: number;
+}
+
+export interface ActionsResponseDto {
+  readonly actions: readonly ActionDto[];
+  readonly page: PageDto;
+  /** Stated on screen: the dataset's contacts are synthetic (PRD §16). */
+  readonly sendingIsSimulated: true;
+}
+
+export interface ApproveActionResponseDto {
+  readonly action: ActionDto;
+}
+
+export interface ReplyRequestDto {
+  /** Free text. Exactly one of `text` or `pdfBase64` is required. */
+  readonly text?: string;
+  /** A loss run or similar, base64-encoded. */
+  readonly pdfBase64?: string;
+  readonly filename?: string;
+  /** The action this reply answers, when it answers one. */
+  readonly actionId?: string;
+}
+
+export interface ReplyResponseDto {
+  readonly id: string;
+  readonly action: ActionDto;
+  readonly extracted: readonly ExtractedValueDto[];
+  readonly accepted: readonly ExtractedValueDto[];
+  readonly rejected: readonly ExtractedValueDto[];
+  readonly needsConfirmation: readonly ExtractedValueDto[];
+  readonly newContradictions: readonly Contradiction[];
+  readonly before: ScoreSnapshotDto;
+  readonly after: ScoreSnapshotDto;
+  readonly rankBefore: number | null;
+  readonly rankAfter: number | null;
+  readonly result: EngineResult;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Sweeps (PRD §8, §11)                                                       */
+/* -------------------------------------------------------------------------- */
+
+export interface SweepFrameDto {
+  readonly index: number;
+  /** Degrees clockwise, 0 = sweep start. */
+  readonly bearingDeg: number;
+  readonly pitchDeg: number | null;
+  readonly capturedAt: string;
+  /** 0..1 from the code-side quality gate. */
+  readonly quality: number | null;
+  readonly dropped: boolean;
+  readonly dropReason: string | null;
+  /** Server-side path or data URL for the crop view. Never a secret. */
+  readonly imageRef: string | null;
+}
+
+export interface SweepCreateRequestDto {
+  readonly roomLabel: string;
+  readonly termMonths: 4 | 8 | 12;
+  readonly submissionId?: string;
+  readonly frames: readonly {
+    readonly bearingDeg: number;
+    readonly pitchDeg?: number;
+    readonly capturedAt: string;
+    /** base64 JPEG/PNG, one per captured frame, at most 15. */
+    readonly imageBase64: string;
+  }[];
+}
+
+export interface SweepDto {
+  readonly id: string;
+  readonly submissionId: string | null;
+  readonly roomLabel: string;
+  readonly termMonths: number;
+  readonly stage: SweepStageDto;
+  readonly frames: readonly SweepFrameDto[];
+  readonly coverage: CoverageResult | null;
+  readonly observations: readonly Observation[];
+  /** Observations under 0.6 waiting for the user to confirm or dismiss. */
+  readonly needsConfirmation: readonly Observation[];
+  readonly result: EngineResult | null;
+  readonly askedQuestionIds: readonly string[];
+  readonly skippedCount: number;
+  readonly error: string | null;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+}
+
+export interface SweepAnswersRequestDto {
+  readonly answers: readonly {
+    readonly questionId: string;
+    readonly field: string;
+    readonly value: string | number | boolean | null;
+    /** True when the user skipped rather than answered. */
+    readonly skipped?: boolean;
+  }[];
+  /** Observations the user confirmed or dismissed on `/confirm`. */
+  readonly confirmations?: readonly {
+    readonly observationId: string;
+    readonly confirmed: boolean;
+  }[];
+}
+
+export interface NextQuestionResponseDto {
+  readonly question: Question | null;
+  readonly askedCount: number;
+  readonly skipped: readonly { readonly field: string; readonly reason: string }[];
+  readonly done: boolean;
+}
+
+export interface VerifyFixRequestDto {
+  readonly hazardKey: string;
+  readonly imageBase64: string;
+  readonly capturedAt: string;
+}
+
+export interface VerifyFixResponseDto {
+  readonly sweepId: string;
+  readonly hazardKey: string;
+  readonly stillPresent: boolean;
+  readonly confidence: number;
+  readonly reason: string;
+  readonly before: ScoreSnapshotDto;
+  readonly after: ScoreSnapshotDto;
+  readonly result: EngineResult;
+}
+
+/* -------------------------------------------------------------------------- */
+/* GET /aggregate · GET /rules · GET /glossary · GET /s/:slug                 */
+/* -------------------------------------------------------------------------- */
+
+export interface AggregateDto {
+  readonly counts: {
+    readonly total: number;
+    readonly byVerdict: Readonly<Record<Verdict, number>>;
+    readonly byLine: Readonly<Record<string, number>>;
+    readonly scored: number;
+    readonly knockedOut: number;
+  };
+  /** Ten buckets of ten score points, `scoreHistogram[0]` = 0–9. */
+  readonly scoreHistogram: readonly number[];
+  readonly topKnockoutFactors: readonly {
+    readonly factor: string;
+    readonly label: string;
+    readonly count: number;
+  }[];
+  readonly oneFlipAway: readonly {
+    readonly id: string;
+    readonly externalId: string;
+    readonly insuredName: string | null;
+    readonly appetiteScore: number;
+    readonly moveLabel: string;
+    readonly scoreAfter: number;
+    readonly premiumAfter: number | null;
+  }[];
+  readonly bookAdequacy: {
+    readonly median: number | null;
+    readonly underpricedCount: number;
+    readonly n: number;
+  };
+  /** Read from `packages/verify/out/summary.json`; null before a run exists. */
+  readonly verification: {
+    readonly propertyCasesRun: number;
+    readonly differentialCasesRun: number;
+    readonly disagreements: number;
+    readonly llmCasesRun: number;
+    readonly llmAgreementRate: number | null;
+    readonly llmAgreementCi95: readonly [number, number] | null;
+    readonly extractionFieldAccuracy: number | null;
+    readonly generatedAt: string;
+  } | null;
+}
+
+export interface RulesResponseDto {
+  readonly rulebooks: readonly {
+    /** `commercial`, `extensions` or `tenant`. Extensions are labelled as ours. */
+    readonly id: string;
+    readonly label: string;
+    readonly version: string;
+    readonly isExtension: boolean;
+    readonly rules: readonly Rule[];
+  }[];
+  readonly interpretations: readonly AppliedInterpretation[];
+  readonly weights: Readonly<Record<string, number>>;
+}
+
+export interface GlossaryResponseDto {
+  readonly entries: readonly {
+    readonly term: string;
+    readonly definition: string;
+    readonly page: number;
+    readonly aliases: readonly string[];
+  }[];
+  readonly doc: string;
+}
+
+/** The public share payload. Carries no broker contact and no secret. */
+export interface ShareDto {
+  readonly slug: string;
+  readonly lineOfBusiness: LineOfBusiness;
+  readonly verdict: Verdict;
+  readonly appetiteScore: number;
+  readonly explanation: string | null;
+  readonly price: PriceBreakdown;
+  readonly flip: FlipResult;
+  readonly decidingRule: {
+    readonly ruleId: string;
+    readonly factor: string;
+    readonly citation: Citation;
+  } | null;
+  readonly createdAt: string;
+}

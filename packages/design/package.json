@@ -1,0 +1,15 @@
+{
+  "name": "@retrofit/design",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Retrofit design tokens shared by console and mobile (PRD §13).",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {}
+}

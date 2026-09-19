@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "Retrofit",
+    "slug": "retrofit",
+    "scheme": "retrofit",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "backgroundColor": "#FAF8F2",
+    "primaryColor": "#E4002B",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#FAF8F2"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "fit.retro.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Retrofit uses the camera to scan your room, so you can get a tenant quote without filling in a form.",
+        "NSMotionUsageDescription": "Retrofit reads device motion to tell how far you have turned, so it knows which parts of the room you have already scanned.",
+        "NSLocationWhenInUseUsageDescription": "Retrofit reads your compass heading while you scan, to map each photo to a direction in the room. Your location is never stored or shared.",
+        "NSPhotoLibraryUsageDescription": "Retrofit can use three photos from your library instead of a camera sweep, so a quote is still possible if scanning does not work for you.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "fit.retro.app",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.HIGH_SAMPLING_RATE_SENSORS"
+      ]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Retrofit uses the camera to scan your room, so you can get a tenant quote without filling in a form."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Retrofit reads your compass heading while you scan, to map each photo to a direction in the room. Your location is never stored or shared."
+        }
+      ],
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Retrofit reads device motion to tell how far you have turned, so it knows which parts of the room you have already scanned."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "apiUrlEnvVar": "EXPO_PUBLIC_API_URL"
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "name": "@retrofit/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo-router/entry",
+  "description": "Expo Router tenant quoting app (PRD §11, phase 2). Excluded from the root tsc -b graph.",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "typecheck": "tsc -p . --noEmit",
+    "doctor": "npx expo-doctor"
+  },
+  "dependencies": {
+    "@retrofit/design": "*",
+    "@shopify/react-native-skia": "2.12.0",
+    "expo": "57.0.24",
+    "expo-camera": "57.0.5",
+    "expo-file-system": "57.0.7",
+    "expo-haptics": "57.0.3",
+    "expo-image-manipulator": "57.0.19",
+    "expo-linking": "57.0.10",
+    "expo-router": "57.0.22",
+    "expo-sensors": "57.0.3",
+    "expo-status-bar": "57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-gesture-handler": "3.3.0",
+    "react-native-reanimated": "4.7.0",
+    "react-native-safe-area-context": "5.10.0",
+    "react-native-screens": "4.28.0",
+    "react-native-worklets": "0.13.0"
+  },
+  "devDependencies": {
+    "@babel/core": "7.29.7",
+    "@types/react": "19.2.18"
+  }
+}
