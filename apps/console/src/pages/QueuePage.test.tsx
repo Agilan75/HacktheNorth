@@ -186,13 +186,14 @@ describe('QueuePage', () => {
     expect(cell('S1', 'adequacy')).toBe('92%');
     expect(cell('S1', 'completeness')).toBe('89%');
     expect(cell('S1', 'contradictions')).toBe('2');
-    expect(cell('S1', 'flip')).toBe('');
+    // A FIT row says so; a blank cell read as broken (queue diagnostics).
+    expect(cell('S1', 'flip')).toBe('Not needed');
     expect(cell('S1', 'underwriter')).toBe('Unassigned');
     expect(cell('S1', 'pending')).toBe('Request Info');
     expect(cell('S1', 'explanation')).toBe('All eight factors in appetite.');
     // Missing numbers print an em dash, not 0.
     expect(cell('S2', 'premium')).toBe('— vs $10,000');
-    expect(cell('S2', 'adequacy')).toBe('—');
+    expect(cell('S2', 'adequacy')).toBe('n/a');
     expect(cell('S2', 'flip')).toBe('1 flip from FIT');
     expect(cell('S2', 'pending')).toBe('None');
   });
