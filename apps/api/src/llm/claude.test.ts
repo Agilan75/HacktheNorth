@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { createClaudeProvider, CLAUDE_MODEL, toJsonSchema } from './claude';
-import { createRoutedLlm, providerFor } from './router';
+import { createAppLlm, createRoutedLlm, providerFor } from './router';
 import type { LlmProvider, ResponseSchemaNode } from './types';
 
 const response: ResponseSchemaNode = {
@@ -94,5 +94,10 @@ describe('LLM routing: Gemini for images, Claude for text (DECISIONS L-1)', () =
     const opts = { vision: named('gemini'), text: named('claude', false) };
     expect(providerFor('extract-reply', opts).name).toBe('gemini');
     expect(createRoutedLlm(opts).name).toBe('gemini (text) + gemini (vision)');
+  });
+
+  it('sends vision to Claude too when a Claude key is set (DECISIONS L-5)', () => {
+    expect(createAppLlm({ geminiApiKey: 'g', anthropicApiKey: 'a' }).name).toBe('claude (text) + claude (vision)');
+    expect(createAppLlm({ geminiApiKey: 'g', anthropicApiKey: undefined }).name).toBe('gemini (text) + gemini (vision)');
   });
 });

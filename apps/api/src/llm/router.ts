@@ -1,8 +1,9 @@
 /**
  * Routes each LLM call to its provider (DECISIONS L-1): the calls that look at
- * images (`VISION_CALLS` -- observe, verify-fix) go to Gemini; every text-only
- * call goes to Claude. If Claude is not configured, text calls fall back to
- * Gemini, which is exactly the behaviour before the split.
+ * images (`VISION_CALLS` -- observe, verify-fix) go to the vision provider; every
+ * text-only call goes to Claude. If Claude is not configured, text calls fall back
+ * to Gemini, which is exactly the behaviour before the split. `createAppLlm` makes
+ * Claude the vision provider too whenever it is configured (DECISIONS L-5).
  */
 import { VISION_CALLS } from '@retrofit/contracts';
 import type { LlmCallName } from '@retrofit/contracts';
@@ -41,8 +42,8 @@ export function createAppLlm(keys: {
   readonly anthropicApiKey: string | undefined;
   readonly anthropicWorkspaceId?: string | undefined;
 }): LlmProvider {
-  return createRoutedLlm({
-    vision: createGeminiProvider({ apiKey: keys.geminiApiKey }),
-    text: createClaudeProvider({ apiKey: keys.anthropicApiKey, workspaceId: keys.anthropicWorkspaceId }),
-  });
+  const claude = createClaudeProvider({ apiKey: keys.anthropicApiKey, workspaceId: keys.anthropicWorkspaceId });
+  const gemini = createGeminiProvider({ apiKey: keys.geminiApiKey });
+  // DECISIONS L-5: vision also goes to Claude while the Gemini key has no credit.
+  return createRoutedLlm({ vision: claude.configured ? claude : gemini, text: claude });
 }
