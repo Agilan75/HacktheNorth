@@ -10,6 +10,9 @@
     "paths": {
       "@/*": [
         "./src/*"
+      ],
+      "@retrofit/contracts": [
+        "../../packages/contracts/src/index.ts"
       ]
     }
   },

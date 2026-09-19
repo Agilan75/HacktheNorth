@@ -35,7 +35,10 @@ const DEFAULTS = {
 const DEFAULT_OUT = fileURLToPath(new URL('../out', import.meta.url));
 
 /** Keys of summary.json owned by layer C / the extraction check (V09), kept across A+B runs. */
-const PRESERVED_KEYS = ['llmCasesRun', 'llmAgreementRate', 'llmAgreementCi95', 'extractionFieldAccuracy', 'layerC'] as const;
+// extractionFieldAccuracy is deliberately NOT carried forward: a stale value from
+// a run whose model calls failed would outlive the run that invalidated it
+// (DECISIONS CP2-3). Only a fresh verify:llm run may write it.
+const PRESERVED_KEYS = ['llmCasesRun', 'llmAgreementRate', 'llmAgreementCi95', 'layerC'] as const;
 
 function defaultWorkers(): number {
   return Math.max(1, Math.min(6, availableParallelism() - 1));

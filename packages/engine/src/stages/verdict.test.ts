@@ -340,3 +340,44 @@ describe('verdict — reasons', () => {
     expect(a).toEqual(b);
   });
 });
+
+describe('verdict — tenant deciding rule (PRD 15 invariant, CP3-1)', () => {
+  const allMissing = Object.fromEntries(APPETITE_FACTORS.map((f) => [f, outcome(f, null)])) as Record<
+    AppetiteFactorId,
+    FactorOutcome
+  >;
+  const fired = (ruleId: string, tier: Tier, extension = false): EvaluateResult['firedRules'][number] => ({
+    ruleId,
+    factor: 'hazards' as AppetiteFactorId,
+    tier,
+    tierValue: tier === 'not_acceptable' ? 0 : 0.6,
+    weight: 0,
+    points: 0,
+    citation: { doc: 'Retrofit tenant rulebook', section: ruleId, quote: ruleId },
+    conditions: [],
+    extension,
+  });
+
+  it('a tenant REFER names the worst fired tenant rule, not null', () => {
+    const v = verdict(
+      evaluated(allMissing, {
+        completeness: 63.6,
+        firedRules: [fired('T-HZ-HEATER', 'acceptable'), fired('T-HZ-POWER-BAR', 'refer'), fired('T-HZ-HEATER-COMBUSTIBLE', 'not_acceptable')],
+      }),
+      [],
+    );
+    expect(v.verdict).toBe('REFER');
+    expect(v.decidingRule?.ruleId).toBe('T-HZ-HEATER-COMBUSTIBLE');
+    expect(v.decidingRule?.citation.doc).toBe('Retrofit tenant rulebook');
+  });
+
+  it('never falls back to an extension rule, so a commercial result is unchanged', () => {
+    const v = verdict(evaluated(allMissing, { completeness: 0, firedRules: [fired('X-SPRINKLER', 'refer', true)] }), []);
+    expect(v.decidingRule).toBeNull();
+  });
+
+  it('never overrides a deciding rule that V-8 already found', () => {
+    const v = verdict(evaluated({}, { firedRules: [fired('T-HZ-POWER-BAR', 'refer')] }), []);
+    expect(v.decidingRule?.ruleId).not.toBe('T-HZ-POWER-BAR');
+  });
+});

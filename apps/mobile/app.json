@@ -6,14 +6,11 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "backgroundColor": "#FAF8F2",
     "primaryColor": "#E4002B",
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#FAF8F2"
-    },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "fit.retro.app",

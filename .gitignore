@@ -8,3 +8,4 @@ apps/api/data/*.db*
 packages/federato/probe-output.json
 .DS_Store
 *.tsbuildinfo
+packages/verify/out/layer-c-cache/

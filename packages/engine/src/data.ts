@@ -51,7 +51,9 @@ export function parseQuestions(json: unknown): Question[] {
  * vectors/ without opening src/.
  */
 export function dataFilePath(kind: DataKind, name: string): string {
-  return fileURLToPath(new URL(`../${kind}/${name}.json`, import.meta.url));
+  // `.href` (a string) typechecks under both the Node and the DOM `URL` lib, since
+  // the phone app reaches this file transitively through type imports.
+  return fileURLToPath(new URL(`../${kind}/${name}.json`, import.meta.url).href);
 }
 
 async function readJson(kind: DataKind, name: string): Promise<unknown> {

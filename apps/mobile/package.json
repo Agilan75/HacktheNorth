@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "main": "expo-router/entry",
-  "description": "Expo Router tenant quoting app (PRD §11, phase 2). Excluded from the root tsc -b graph.",
+  "description": "Expo Router tenant quoting app (PRD \u00a711, phase 2). Excluded from the root tsc -b graph.",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -12,24 +12,28 @@
     "doctor": "npx expo-doctor"
   },
   "dependencies": {
+    "@retrofit/contracts": "*",
     "@retrofit/design": "*",
-    "@shopify/react-native-skia": "2.12.0",
+    "@shopify/react-native-skia": "2.6.2",
     "expo": "57.0.24",
     "expo-camera": "57.0.5",
+    "expo-constants": "57.0.19",
     "expo-file-system": "57.0.7",
     "expo-haptics": "57.0.3",
     "expo-image-manipulator": "57.0.19",
+    "expo-image-picker": "57.0.19",
     "expo-linking": "57.0.10",
+    "expo-location": "57.0.19",
     "expo-router": "57.0.22",
     "expo-sensors": "57.0.3",
     "expo-status-bar": "57.0.1",
     "react": "19.2.3",
     "react-native": "0.86.3",
-    "react-native-gesture-handler": "3.3.0",
-    "react-native-reanimated": "4.7.0",
-    "react-native-safe-area-context": "5.10.0",
-    "react-native-screens": "4.28.0",
-    "react-native-worklets": "0.13.0"
+    "react-native-gesture-handler": "2.32.0",
+    "react-native-reanimated": "4.5.1",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-screens": "4.26.0",
+    "react-native-worklets": "0.10.1"
   },
   "devDependencies": {
     "@babel/core": "7.29.7",

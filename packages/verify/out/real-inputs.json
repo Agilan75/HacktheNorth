@@ -1,0 +1,610 @@
+[
+  {
+    "caseId": "SUB-2024-00065",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "TX",
+      "totalTiv": 41745000,
+      "quotedPremium": 172000,
+      "pctTivPre1990": 0.6186609174751467,
+      "pctTivPost2010": 0.08769912564378968,
+      "pctTivAcceptableConstruction": 0.38133908252485327,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2024-00076",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "TN",
+      "totalTiv": 10628000,
+      "quotedPremium": 45900,
+      "pctTivPre1990": 0,
+      "pctTivPost2010": 1,
+      "pctTivAcceptableConstruction": 1,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": false,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2024-00090",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "FL",
+      "totalTiv": 82322000,
+      "quotedPremium": 188400,
+      "pctTivPre1990": 0.6565802580112242,
+      "pctTivPost2010": 0.21419547630038144,
+      "pctTivAcceptableConstruction": 1,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00001",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "FL",
+      "totalTiv": 112568000,
+      "quotedPremium": 619900,
+      "pctTivPre1990": 0.5947693838391017,
+      "pctTivPost2010": 0.2808435789922536,
+      "pctTivAcceptableConstruction": 0.4550405088479852,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00004",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "MA",
+      "totalTiv": 104141000,
+      "quotedPremium": 377300,
+      "pctTivPre1990": 0.7630328112847006,
+      "pctTivPost2010": 0,
+      "pctTivAcceptableConstruction": 0.7162404816546797,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00033",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "TX",
+      "totalTiv": 48121000,
+      "quotedPremium": 314000,
+      "pctTivPre1990": 0.19480060680368239,
+      "pctTivPost2010": 0,
+      "pctTivAcceptableConstruction": 0.8051993931963176,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00042",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "CA",
+      "totalTiv": 31868000,
+      "quotedPremium": 127500,
+      "pctTivPre1990": 0.6460085352077319,
+      "pctTivPost2010": 0,
+      "pctTivAcceptableConstruction": 1,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00052",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "CA",
+      "totalTiv": 111284000,
+      "quotedPremium": 471700,
+      "pctTivPre1990": 0.8378922396750657,
+      "pctTivPost2010": 0.06199453650120413,
+      "pctTivAcceptableConstruction": 1,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00054",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "MA",
+      "totalTiv": 79108000,
+      "quotedPremium": 378100,
+      "pctTivPre1990": 0.5444455680841381,
+      "pctTivPost2010": 0.049817970369621274,
+      "pctTivAcceptableConstruction": 0.6612352732972645,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00061",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "CA",
+      "totalTiv": 108923000,
+      "quotedPremium": 411000,
+      "pctTivPre1990": 0.7000633475023641,
+      "pctTivPost2010": 0.24477842145368747,
+      "pctTivAcceptableConstruction": 0.7102907558550535,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00066",
+    "input": {
+      "submissionType": "renewal",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "TX",
+      "totalTiv": 41745000,
+      "quotedPremium": 274500,
+      "pctTivPre1990": 0.6186609174751467,
+      "pctTivPost2010": 0.08769912564378968,
+      "pctTivAcceptableConstruction": 0.38133908252485327,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00070",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "CA",
+      "totalTiv": 52665000,
+      "quotedPremium": 321300,
+      "pctTivPre1990": 0.27891388968005315,
+      "pctTivPost2010": 0.478078420203171,
+      "pctTivAcceptableConstruction": 0.7569923098832242,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00074",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "NJ",
+      "totalTiv": 12843000,
+      "quotedPremium": 61500,
+      "pctTivPre1990": 0,
+      "pctTivPost2010": 0,
+      "pctTivAcceptableConstruction": 1,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": false,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00077",
+    "input": {
+      "submissionType": "renewal",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "TN",
+      "totalTiv": 10628000,
+      "quotedPremium": 46700,
+      "pctTivPre1990": 0,
+      "pctTivPost2010": 1,
+      "pctTivAcceptableConstruction": 1,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": false,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00083",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "CA",
+      "totalTiv": 108243000,
+      "quotedPremium": 266700,
+      "pctTivPre1990": 0.505797141616548,
+      "pctTivPost2010": 0.25439982262132427,
+      "pctTivAcceptableConstruction": 0.6000018476945391,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00091",
+    "input": {
+      "submissionType": "renewal",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "FL",
+      "totalTiv": 82322000,
+      "quotedPremium": 269200,
+      "pctTivPre1990": 0.6565802580112242,
+      "pctTivPost2010": 0.21419547630038144,
+      "pctTivAcceptableConstruction": 1,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00092",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "NJ",
+      "totalTiv": 67265000,
+      "quotedPremium": 266400,
+      "pctTivPre1990": 0.9870066156247677,
+      "pctTivPost2010": 0,
+      "pctTivAcceptableConstruction": 1,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00007",
+    "input": {
+      "submissionType": "renewal",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "FL",
+      "totalTiv": 34793000,
+      "quotedPremium": 79200,
+      "pctTivPre1990": 0,
+      "pctTivPost2010": 0,
+      "pctTivAcceptableConstruction": 0,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": false,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00014",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "CA",
+      "totalTiv": 124074000,
+      "quotedPremium": 703500,
+      "pctTivPre1990": 0.3243306413914277,
+      "pctTivPost2010": 0.09913438754291794,
+      "pctTivAcceptableConstruction": 0.6843980205361316,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00025",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "IL",
+      "totalTiv": 75065000,
+      "quotedPremium": 339700,
+      "pctTivPre1990": 0,
+      "pctTivPost2010": 0.07815892892826218,
+      "pctTivAcceptableConstruction": 0.9218410710717378,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": false,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00028",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "CA",
+      "totalTiv": 64817000,
+      "quotedPremium": 177500,
+      "pctTivPre1990": 0.44894086427943286,
+      "pctTivPost2010": 0.21173457580573,
+      "pctTivAcceptableConstruction": 0.44708949812549176,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00031",
+    "input": {
+      "submissionType": "renewal",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "WA",
+      "totalTiv": 26254000,
+      "quotedPremium": 88600,
+      "pctTivPre1990": 0,
+      "pctTivPost2010": 1,
+      "pctTivAcceptableConstruction": 1,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": false,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00038",
+    "input": {
+      "submissionType": "renewal",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "CA",
+      "totalTiv": 13436000,
+      "quotedPremium": 82300,
+      "pctTivPre1990": 0.2582613873176541,
+      "pctTivPost2010": 0.741738612682346,
+      "pctTivAcceptableConstruction": 1,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00043",
+    "input": {
+      "submissionType": "renewal",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "CA",
+      "totalTiv": 31868000,
+      "quotedPremium": 112100,
+      "pctTivPre1990": 0.6460085352077319,
+      "pctTivPost2010": 0,
+      "pctTivAcceptableConstruction": 1,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00047",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "TN",
+      "totalTiv": 109076000,
+      "quotedPremium": 262000,
+      "pctTivPre1990": 0.38446587700319046,
+      "pctTivPost2010": 0.3631687997359639,
+      "pctTivAcceptableConstruction": 0.4322307382008875,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00081",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "CA",
+      "totalTiv": 18492000,
+      "quotedPremium": 58800,
+      "pctTivPre1990": 0,
+      "pctTivPost2010": 0.745511572571923,
+      "pctTivAcceptableConstruction": 0.745511572571923,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": false,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00098",
+    "input": {
+      "submissionType": "new_business",
+      "lineOfBusiness": "commercial_property",
+      "primaryState": "TN",
+      "totalTiv": 57136000,
+      "quotedPremium": 175100,
+      "pctTivPre1990": 1,
+      "pctTivPost2010": 0,
+      "pctTivAcceptableConstruction": 0.9688987678521422,
+      "fiveYearLoss": 0,
+      "anyBuildingPre1990": true,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00115",
+    "input": {
+      "submissionType": null,
+      "lineOfBusiness": "commercial_property",
+      "primaryState": null,
+      "totalTiv": null,
+      "quotedPremium": null,
+      "pctTivPre1990": null,
+      "pctTivPost2010": null,
+      "pctTivAcceptableConstruction": null,
+      "fiveYearLoss": null,
+      "anyBuildingPre1990": null,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00126",
+    "input": {
+      "submissionType": null,
+      "lineOfBusiness": "commercial_property",
+      "primaryState": null,
+      "totalTiv": null,
+      "quotedPremium": null,
+      "pctTivPre1990": null,
+      "pctTivPost2010": null,
+      "pctTivAcceptableConstruction": null,
+      "fiveYearLoss": null,
+      "anyBuildingPre1990": null,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00132",
+    "input": {
+      "submissionType": null,
+      "lineOfBusiness": "commercial_property",
+      "primaryState": null,
+      "totalTiv": null,
+      "quotedPremium": null,
+      "pctTivPre1990": null,
+      "pctTivPost2010": null,
+      "pctTivAcceptableConstruction": null,
+      "fiveYearLoss": null,
+      "anyBuildingPre1990": null,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00134",
+    "input": {
+      "submissionType": null,
+      "lineOfBusiness": "commercial_property",
+      "primaryState": null,
+      "totalTiv": null,
+      "quotedPremium": null,
+      "pctTivPre1990": null,
+      "pctTivPost2010": null,
+      "pctTivAcceptableConstruction": null,
+      "fiveYearLoss": null,
+      "anyBuildingPre1990": null,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00138",
+    "input": {
+      "submissionType": null,
+      "lineOfBusiness": "commercial_property",
+      "primaryState": null,
+      "totalTiv": null,
+      "quotedPremium": null,
+      "pctTivPre1990": null,
+      "pctTivPost2010": null,
+      "pctTivAcceptableConstruction": null,
+      "fiveYearLoss": null,
+      "anyBuildingPre1990": null,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2025-00143",
+    "input": {
+      "submissionType": null,
+      "lineOfBusiness": "commercial_property",
+      "primaryState": null,
+      "totalTiv": null,
+      "quotedPremium": null,
+      "pctTivPre1990": null,
+      "pctTivPost2010": null,
+      "pctTivAcceptableConstruction": null,
+      "fiveYearLoss": null,
+      "anyBuildingPre1990": null,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00118",
+    "input": {
+      "submissionType": null,
+      "lineOfBusiness": "commercial_property",
+      "primaryState": null,
+      "totalTiv": null,
+      "quotedPremium": null,
+      "pctTivPre1990": null,
+      "pctTivPost2010": null,
+      "pctTivAcceptableConstruction": null,
+      "fiveYearLoss": null,
+      "anyBuildingPre1990": null,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00131",
+    "input": {
+      "submissionType": null,
+      "lineOfBusiness": "commercial_property",
+      "primaryState": null,
+      "totalTiv": null,
+      "quotedPremium": null,
+      "pctTivPre1990": null,
+      "pctTivPost2010": null,
+      "pctTivAcceptableConstruction": null,
+      "fiveYearLoss": null,
+      "anyBuildingPre1990": null,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00133",
+    "input": {
+      "submissionType": null,
+      "lineOfBusiness": "commercial_property",
+      "primaryState": null,
+      "totalTiv": null,
+      "quotedPremium": null,
+      "pctTivPre1990": null,
+      "pctTivPost2010": null,
+      "pctTivAcceptableConstruction": null,
+      "fiveYearLoss": null,
+      "anyBuildingPre1990": null,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00141",
+    "input": {
+      "submissionType": null,
+      "lineOfBusiness": "commercial_property",
+      "primaryState": null,
+      "totalTiv": null,
+      "quotedPremium": null,
+      "pctTivPre1990": null,
+      "pctTivPost2010": null,
+      "pctTivAcceptableConstruction": null,
+      "fiveYearLoss": null,
+      "anyBuildingPre1990": null,
+      "hasOpenHighContradiction": false
+    }
+  },
+  {
+    "caseId": "SUB-2026-00147",
+    "input": {
+      "submissionType": null,
+      "lineOfBusiness": "commercial_property",
+      "primaryState": null,
+      "totalTiv": null,
+      "quotedPremium": null,
+      "pctTivPre1990": null,
+      "pctTivPost2010": null,
+      "pctTivAcceptableConstruction": null,
+      "fiveYearLoss": null,
+      "anyBuildingPre1990": null,
+      "hasOpenHighContradiction": false
+    }
+  }
+]

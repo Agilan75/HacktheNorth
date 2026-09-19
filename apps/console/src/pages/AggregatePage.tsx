@@ -134,7 +134,12 @@ function verificationTiles(v: AggregateResponse['verification']): readonly Verif
     {
       key: 'extractionFieldAccuracy',
       label: 'Extraction field accuracy',
-      value: formatPercent(asNumber(v.extractionFieldAccuracy), { decimals: 1 }),
+      // Absent means the check has not produced a valid measurement; say so
+      // rather than dropping the tile or showing a dash (DECISIONS CP2-3).
+      value:
+        asNumber(v.extractionFieldAccuracy) === null
+          ? 'Not measured'
+          : formatPercent(asNumber(v.extractionFieldAccuracy), { decimals: 1 }),
     },
   ];
   return tiles;

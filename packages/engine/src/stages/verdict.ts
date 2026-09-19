@@ -137,6 +137,23 @@ export function verdict(
     };
   }
 
+  // Tenant fallback (PRD 15 invariant: every verdict names its deciding rule).
+  // Tenant rules are not one of the eight appetite factors, so V-8 finds no
+  // deciding factor for them and a tenant REFER / DOES_NOT_FIT carried no rule.
+  // Scoped to fired rules outside the appetite factors and not extensions --
+  // exactly the tenant rulebook -- so the commercial decidingRule, which layer B
+  // compares, can never change. Worst tier first. DECISIONS CP3-1.
+  if (decidingRule === null && decided !== 'FIT') {
+    const appetiteIds = new Set<string>(evaluated.factors.map((f) => String(f.factor)));
+    const rank = (t: string): number => (t === 'not_acceptable' ? 0 : t === 'refer' ? 1 : 2);
+    const tenantRule = evaluated.firedRules
+      .filter((r) => !r.extension && !appetiteIds.has(String(r.factor)) && r.tier !== 'target' && r.tier !== 'acceptable')
+      .sort((a, b) => rank(a.tier) - rank(b.tier))[0];
+    if (tenantRule !== undefined) {
+      decidingRule = { ruleId: tenantRule.ruleId, factor: tenantRule.factor, tier: tenantRule.tier, citation: tenantRule.citation };
+    }
+  }
+
   /* ---- reasons, most-deciding first -------------------------------------- */
 
   const reasons: string[] = [];
