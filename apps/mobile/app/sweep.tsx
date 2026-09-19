@@ -432,6 +432,7 @@ export default function SweepScreen() {
   const photoAlternative = (primary: boolean) => (
     <Button
       label="Use 3 photos instead"
+      icon="images-outline"
       variant={primary ? 'primary' : 'secondary'}
       fullWidth
       accessibilityHint="Pick three photos of the room from your library. You get the same kind of quote."
@@ -473,6 +474,7 @@ export default function SweepScreen() {
           <>
             <Button
               label="Allow camera and compass"
+              icon="camera-outline"
               accessibilityHint="Asks your permission for the camera and the compass, then starts the scan."
               onPress={() => void allowAndStart()}
             />
@@ -503,6 +505,7 @@ export default function SweepScreen() {
             {photoAlternative(true)}
             <Button
               label={settings ? 'Open Settings to turn on the camera' : 'Allow the camera'}
+              icon={settings ? 'settings-outline' : 'camera-outline'}
               variant="secondary"
               accessibilityHint={settings ? 'Opens the Settings app. Turn on Camera, then come back.' : 'Asks your permission for the camera.'}
               onPress={() => void askCameraAgain()}
@@ -532,12 +535,18 @@ export default function SweepScreen() {
             {locationOff && locationPermission && !locationPermission.canAskAgain ? (
               <Button
                 label="Open Settings to turn on location"
+                icon="settings-outline"
                 variant="secondary"
                 accessibilityHint="Opens the Settings app. Turn on Location, then come back."
                 onPress={() => void Linking.openSettings().catch(() => undefined)}
               />
             ) : null}
-            <Button label="Try the compass again" variant="secondary" onPress={() => void retryCompass()} />
+            <Button
+              label="Try the compass again"
+              icon="refresh-outline"
+              variant="secondary"
+              onPress={() => void retryCompass()}
+            />
           </>
         }
       >

@@ -190,14 +190,14 @@ function buildColumns(): readonly DataTableColumn<QueueRowView>[] {
       header: 'Underwriter',
       render: (r) =>
         r.assignedUnderwriter === null ? (
-          'Unassigned'
+          <Badge label="Unassigned" tone="quiet" />
         ) : r.underwriterSource === 'federato' ? (
           <span title="Federato's own assignment; Retrofit did not route this account">
-            {r.assignedUnderwriter}{' '}
+            <Badge label={r.assignedUnderwriter} tone="info" />{' '}
             <span style={{ color: cssVar('muted') }}>· Federato</span>
           </span>
         ) : (
-          r.assignedUnderwriter
+          <Badge label={r.assignedUnderwriter} tone="info" />
         ),
       sortValue: (r) => r.assignedUnderwriter,
     },

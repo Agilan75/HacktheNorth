@@ -5,7 +5,8 @@ import type { SweepDto, SweepStageDto } from '@retrofit/contracts';
 
 import { describeApiError, getApi, isApiError, pollSweep } from '@/lib/api';
 import { sessionStore, useSession } from '@/lib/session';
-import { Button, Card, COLORS, Notice, RADIUS, Screen, SPACE, Text } from '@/ui';
+import { Button, Card, COLORS, Icon, Notice, RADIUS, Screen, SPACE, Text } from '@/ui';
+import type { IconName } from '@/ui';
 
 /**
  * Working it out — PRD §11 `/analyzing`. Unit M6.
@@ -39,15 +40,17 @@ interface Step {
   readonly doing: string;
   /** Plain words once it is done. */
   readonly done: string;
+  /** Decorative only — the words above always carry the meaning. */
+  readonly icon: IconName;
 }
 
 /** Step i is finished when the server's stage has reached ORDER[i]. */
 const STEPS: readonly Step[] = [
-  { doing: 'Receiving your photos', done: 'Photos received' },
-  { doing: 'Checking each photo is clear enough', done: 'Photos checked' },
-  { doing: 'Looking at what is in the room', done: 'Items in the room found' },
-  { doing: 'Checking for risks, like a heater near curtains', done: 'Risks checked' },
-  { doing: 'Working out your quote', done: 'Quote worked out' },
+  { doing: 'Receiving your photos', done: 'Photos received', icon: 'cloud-upload-outline' },
+  { doing: 'Checking each photo is clear enough', done: 'Photos checked', icon: 'checkmark-done-outline' },
+  { doing: 'Looking at what is in the room', done: 'Items in the room found', icon: 'eye-outline' },
+  { doing: 'Checking for risks, like a heater near curtains', done: 'Risks checked', icon: 'shield-checkmark-outline' },
+  { doing: 'Working out your quote', done: 'Quote worked out', icon: 'calculator-outline' },
 ];
 
 type StepStatus = 'done' | 'now' | 'waiting';
@@ -252,13 +255,22 @@ function StepRow({ step, index, status }: { readonly step: Step; readonly index:
       }}
     >
       {/* A shape for each state, so the state never rests on colour alone. */}
-      <View style={{ width: 28, alignItems: 'center' }}>
+      <View
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: status === 'done' ? COLORS.ink : status === 'now' ? COLORS.blueTint : 'transparent',
+        }}
+      >
         {status === 'now' ? (
-          <ActivityIndicator color={COLORS.ink} />
+          <ActivityIndicator color={COLORS.blueDeep} />
+        ) : status === 'done' ? (
+          <Icon name="checkmark" size={18} color={COLORS.paper} />
         ) : (
-          <Text weight="semibold" tone={status === 'done' ? 'ink' : 'muted'}>
-            {status === 'done' ? '✓' : '○'}
-          </Text>
+          <Icon name={step.icon} size={16} color={COLORS.mutedDeep} />
         )}
       </View>
       <View style={{ flexShrink: 1 }}>

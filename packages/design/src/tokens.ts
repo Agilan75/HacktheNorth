@@ -20,6 +20,19 @@ export const COLORS = {
   muted: '#7C8073',
   mutedDeep: '#5E6357',
   mutedTint: '#EDEFE8',
+  /**
+   * Accent family, added on top of the frozen Paper/Ink/Red/Muted system.
+   * Red stays reserved for the verdict pills (PRD §13: "red never means bad");
+   * blue is the informational/primary-action accent (charts, primary buttons,
+   * chips) and green marks a positive completion (sent, available, moved up).
+   * Neither ever stands alone: every use still carries a word or a mark.
+   */
+  blue: '#2C6E9E',
+  blueDeep: '#1D3557',
+  blueTint: '#E4EAF1',
+  green: '#2E7050',
+  greenDeep: '#265C42',
+  greenTint: '#E3EFE7',
 } as const;
 
 export type ColorToken = keyof typeof COLORS;

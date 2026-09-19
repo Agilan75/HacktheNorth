@@ -76,6 +76,13 @@ th {
   font-weight: var(--rf-weight-semibold);
   color: var(--rf-muted-deep);
 }
+tr[data-clickable='true'] {
+  transition: background-color 0.12s ease;
+}
+tr[data-clickable='true']:hover,
+tr[data-clickable='true']:focus-visible {
+  background: var(--rf-muted-tint);
+}
 
 button,
 input,
@@ -102,11 +109,31 @@ a.rf-button {
   border-radius: var(--rf-radius-pill);
   background: var(--rf-paper);
   cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
 }
 button:disabled {
   cursor: not-allowed;
   color: var(--rf-muted-deep);
   border-color: var(--rf-muted-tint);
+}
+button:not(:disabled):hover,
+a.rf-button:hover {
+  background: var(--rf-muted-tint);
+}
+
+/* Primary CTA (Approve, Extract fields): the one accent-filled button on a
+   page, reserved for the action the underwriter is most likely to take next.
+   Blue, not Red, so it never reads as a verdict (PRD 13). */
+.rf-button--primary {
+  border-color: var(--rf-blue-deep);
+  background: var(--rf-blue);
+  color: var(--rf-paper);
+}
+.rf-button--primary:not(:disabled):hover {
+  background: var(--rf-blue-deep);
+}
+.rf-button--primary:disabled {
+  background: var(--rf-paper);
 }
 
 input,
@@ -143,6 +170,15 @@ textarea {
   clip-path: inset(50%) !important;
   white-space: nowrap !important;
   border: 0 !important;
+}
+
+/* --------------------------------------------------------------- Nav */
+
+.rf-nav-link {
+  transition: background-color 0.12s ease;
+}
+.rf-nav-link:hover {
+  background: var(--rf-muted-tint);
 }
 
 /* ------------------------------------------------------------ Card */
@@ -232,6 +268,16 @@ textarea {
   color: var(--rf-red-deep);
 }
 .rf-badge--quiet { background: transparent; color: var(--rf-muted-deep); }
+.rf-badge--positive {
+  background: var(--rf-green-tint);
+  border-color: var(--rf-green-tint);
+  color: var(--rf-green-deep);
+}
+.rf-badge--info {
+  background: var(--rf-blue-tint);
+  border-color: var(--rf-blue-tint);
+  color: var(--rf-blue-deep);
+}
 
 /* -------------------------------------------------- CitationQuote */
 

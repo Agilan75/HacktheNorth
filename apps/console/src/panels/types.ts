@@ -361,6 +361,15 @@ export interface QueueRowView {
   readonly pendingAction: string | null;
   readonly explanationLine: string;
   readonly outOfAppetiteLine: boolean;
+  /**
+   * R5-12: set when this row was not found in the live queue and had to be
+   * synthesised from a narrower DTO (the aggregate's one-flip-away list,
+   * which does not carry a rank, quality index or verdict). `rank`,
+   * `qualityIndex` and `verdict` are then placeholders required by the type,
+   * never the account's real value — a consumer must check this flag before
+   * rendering them, rather than trust the numbers at face value.
+   */
+  readonly incomplete?: boolean;
 }
 
 /**

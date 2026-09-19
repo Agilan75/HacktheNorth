@@ -555,7 +555,18 @@ describe('createApiClient', () => {
       z: { moveLabel: 'Premium to $50,000', scoreAfter: 79, premiumAfter: null },
     });
     expect(agg.oneFlipAway[0]).toMatchObject({ submissionId: 'c', rank: 4, verdict: 'DOES_NOT_FIT' });
-    expect(agg.oneFlipAway[1]).toMatchObject({ submissionId: 'z', insuredName: 'POL-z', appetiteScore: 70, oneFlipFromFit: true, explanationLine: 'Premium to $50,000' });
+    expect(agg.oneFlipAway[0]!.incomplete).toBeUndefined();
+    // 'z' has no matching queue row: R5-12 — the synthesised row must not
+    // claim a real verdict or predicted premium it does not have.
+    expect(agg.oneFlipAway[1]).toMatchObject({
+      submissionId: 'z',
+      insuredName: 'POL-z',
+      appetiteScore: 70,
+      oneFlipFromFit: true,
+      explanationLine: 'Premium to $50,000',
+      predictedPremium: null,
+      incomplete: true,
+    });
     expect(agg.bookAdequacy).toBe(0.97);
     expect(agg.verification).toMatchObject({ disagreements: 0, llmAgreementCi95: '0.87–0.99', extractionFieldAccuracy: null });
   });

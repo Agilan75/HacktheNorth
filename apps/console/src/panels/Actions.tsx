@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ReactElement } from 'react';
+import type { CSSProperties, ReactElement } from 'react';
 
 import { formatDate, formatMoney, formatScore, formatVerdict, titleCase } from '@retrofit/contracts';
 
@@ -14,6 +14,16 @@ import type {
 
 /** PRD 7.6: a request is saved as a draft; only a draft can be approved. */
 const APPROVABLE_STATUS = 'draft';
+
+/** Positive completion states, so "sent" reads as done, not as a leftover "quiet" grey next to "failed". */
+const POSITIVE_STATUSES: ReadonlySet<string> = new Set(['approved', 'sent', 'replied', 'applied']);
+
+/** Decoration only — the label text (`titleCase(status)`) always carries the meaning. */
+function statusTone(status: string): 'attention' | 'positive' | 'quiet' {
+  if (status === APPROVABLE_STATUS || status === 'failed') return 'attention';
+  if (POSITIVE_STATUSES.has(status)) return 'positive';
+  return 'quiet';
+}
 
 function authorityLabel(withinAuthority: boolean | null, underwriter: string | null): string {
   if (withinAuthority === true) return 'Within authority';
@@ -78,7 +88,7 @@ function DraftCard(props: {
     <article className="rf-draft" data-testid="actions-draft" data-action-id={draft.actionId}>
       <header className="rf-draft__header">
         <h4 className="rf-draft__subject">{draft.subject}</h4>
-        <Badge label={titleCase(draft.status)} tone={approvable ? 'attention' : 'quiet'} />
+        <Badge label={titleCase(draft.status)} tone={statusTone(draft.status)} />
       </header>
       <p className="rf-draft__body" style={{ whiteSpace: 'pre-wrap' }}>
         {draft.body}
@@ -110,7 +120,7 @@ function DraftCard(props: {
       {approvable ? (
         <button
           type="button"
-          className="rf-button"
+          className="rf-button rf-button--primary"
           onClick={() => void approve()}
           disabled={pending}
           aria-label={`Approve request: ${draft.subject}`}
@@ -135,6 +145,12 @@ function rankMovement(before: number | null, after: number | null): string {
   if (delta > 0) return ` (up ${delta})`;
   if (delta < 0) return ` (down ${-delta})`;
   return ' (no change)';
+}
+
+/** The words always carry the meaning; green only highlights a genuine improvement. */
+function rankMovementStyle(before: number | null, after: number | null): CSSProperties | undefined {
+  if (before === null || after === null || before <= after) return undefined;
+  return { color: 'var(--rf-green-deep)', fontWeight: 600 };
 }
 
 function beforeAfter(before: string, after: string, hasAfter: boolean): string {
@@ -170,8 +186,10 @@ function LogTable(props: { readonly log: readonly ActionLogEntryView[] }): React
                 {beforeAfter(formatScore(e.beforeScore), formatScore(e.afterScore), hasAfter)}
               </td>
               <td data-testid="log-rank">
-                {beforeAfter(formatScore(e.beforeRank), formatScore(e.afterRank), hasAfter) +
-                  rankMovement(e.beforeRank, e.afterRank)}
+                {beforeAfter(formatScore(e.beforeRank), formatScore(e.afterRank), hasAfter)}
+                <span style={rankMovementStyle(e.beforeRank, e.afterRank)}>
+                  {rankMovement(e.beforeRank, e.afterRank)}
+                </span>
               </td>
               <td data-testid="log-verdict">
                 {beforeAfter(formatVerdict(e.beforeVerdict), formatVerdict(e.afterVerdict), hasAfter)}

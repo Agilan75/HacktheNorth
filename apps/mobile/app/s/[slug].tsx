@@ -5,7 +5,8 @@ import * as Linking from 'expo-linking';
 import type { ShareDto } from '@retrofit/contracts';
 
 import { describeApiError, getApi, isApiError } from '@/lib/api';
-import { COLORS, Button, Card, Heading, Notice, SPACE, Screen, SkeletonCard, Text, VerdictPill } from '@/ui';
+import { Brand, COLORS, Button, Card, Heading, Hero, Notice, SPACE, Screen, SkeletonCard, Text, VerdictPill } from '@/ui';
+import type { HeroTone } from '@/ui';
 
 /**
  * Shared result — PRD §11 `/s/[slug]` (unit M9).
@@ -14,9 +15,22 @@ import { COLORS, Button, Card, Heading, Notice, SPACE, Screen, SkeletonCard, Tex
  * words and a glyph, the price, the plain explanation, the deciding rule with
  * its quote, and the smallest change that would reach FIT. Every number is the
  * API's; this screen formats, it never computes.
+ *
+ * This is the one screen a stranger might open cold from a text message, with
+ * no other Retrofit context on screen — it gets the same Hero/Brand treatment
+ * as `/verdict` so it reads as a real result from a real product, not a bare
+ * data dump.
  */
 
 type Verdict = ShareDto['verdict'];
+
+/** Same mapping as `/verdict`: FIT keeps red (the pill's own fill), REFER
+ * moves to blue so a filled red Hero stays reserved for FIT (PRD §13). */
+const HERO_TONE_BY_VERDICT: Readonly<Record<Verdict, HeroTone>> = {
+  FIT: 'red',
+  REFER: 'blue',
+  DOES_NOT_FIT: 'ink',
+};
 
 /** Tenant-facing words; commercial results keep the kit's underwriting labels. */
 const TENANT_VERDICT_WORDS: Readonly<Record<Verdict, string>> = {
@@ -139,44 +153,54 @@ function SharedResult({ share }: { readonly share: ShareDto }) {
         <>
           <Button
             label="Share this result"
+            icon="share-outline"
             accessibilityHint="Opens the share sheet with a link to this result."
             onPress={() => {
               void onShare();
             }}
           />
-          <Button label="Get your own quote" variant="secondary" onPress={() => router.push('/new')} />
+          <Button label="Get your own quote" icon="camera-outline" variant="secondary" onPress={() => router.push('/new')} />
         </>
       }
     >
-      <View style={{ gap: SPACE.sm }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
+        <Brand size={28} showWordmark={false} />
         <Heading>{tenant ? 'Tenant insurance result' : 'Property insurance result'}</Heading>
-        {when ? (
-          <Text variant="small" tone="muted">
-            {`Checked on ${when}. This is a read-only copy.`}
-          </Text>
-        ) : null}
       </View>
+      {when ? (
+        <Text variant="small" tone="muted">
+          {`Checked on ${when}. This is a read-only copy.`}
+        </Text>
+      ) : null}
 
       {shareError ? <Notice tone="error">{shareError}</Notice> : null}
 
-      <Card>
-        <VerdictPill verdict={share.verdict} {...(verdictText ? { text: verdictText } : {})} size="large" />
+      <Hero
+        tone={HERO_TONE_BY_VERDICT[share.verdict]}
+        accessibilityLabel={`Result: ${verdictText ?? share.verdict}.${priceLine ? ` ${priceLine}` : ''}`}
+      >
+        {/* REFER's pill is outlined (transparent fill); it only has the
+            contrast its text needs against Paper, never a gradient — same
+            fix as `/verdict`. */}
+        <View style={{ backgroundColor: COLORS.paper, borderRadius: 999, alignSelf: 'flex-start' }}>
+          <VerdictPill verdict={share.verdict} {...(verdictText ? { text: verdictText } : {})} size="large" />
+        </View>
         {priceLine ? (
-          <Text variant="heading" weight="semibold">
+          <Text variant="heading" weight="semibold" tone="inverse">
             {priceLine}
           </Text>
         ) : (
-          <Text tone="muted">No price yet: some details were missing.</Text>
+          <Text tone="inverse">No price yet: some details were missing.</Text>
         )}
         {price.estimate ? (
-          <Text variant="small" tone="muted">
+          <Text variant="small" tone="inverse" style={{ opacity: 0.85 }}>
             This price is an estimate.
           </Text>
         ) : null}
-        <Text variant="small" tone="muted">
+        <Text variant="small" tone="inverse" style={{ opacity: 0.85 }}>
           {`Match with the insurer's guidelines: ${Math.round(share.appetiteScore)} out of 100.`}
         </Text>
-      </Card>
+      </Hero>
 
       {share.explanation ? (
         <Card>

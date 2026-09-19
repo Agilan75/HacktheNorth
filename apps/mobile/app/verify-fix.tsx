@@ -364,6 +364,7 @@ export default function VerifyFixScreen() {
       <View style={{ gap: SPACE.sm }}>
         <Button
           label={photo === null ? 'Take a photo' : 'Take a different photo'}
+          icon="camera-outline"
           variant={photo === null ? 'primary' : 'secondary'}
           fullWidth
           loading={picking}
@@ -375,6 +376,7 @@ export default function VerifyFixScreen() {
         />
         <Button
           label="Choose a photo from my library"
+          icon="images-outline"
           variant="secondary"
           fullWidth
           disabled={sending || picking}

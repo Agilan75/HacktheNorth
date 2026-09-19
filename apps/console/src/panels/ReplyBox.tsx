@@ -130,21 +130,44 @@ export function ReplyBox(props: ReplyBoxProps): ReactElement {
   return (
     <div className="rf-reply" data-testid="reply-box" data-submission-id={submissionId}>
       <h3 className="rf-card__subtitle">Broker reply</h3>
-      <form onSubmit={submit} aria-busy={pending}>
-        <label htmlFor={textId}>Paste the broker&apos;s reply</label>
-        <textarea
-          id={textId}
-          rows={6}
-          value={text}
-          onChange={(e) => setText(e.currentTarget.value)}
-          disabled={pending}
-          placeholder="e.g. Building B-1 was built in 1991 per the county assessor."
-        />
-        <button type="submit" className="rf-button" disabled={pending || trimmed === ''}>
+      <form
+        onSubmit={submit}
+        aria-busy={pending}
+        style={{ display: 'flex', flexDirection: 'column', gap: 'var(--rf-space-md)', maxWidth: 640 }}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--rf-space-xs)' }}>
+          <label htmlFor={textId}>Paste the broker&apos;s reply</label>
+          <textarea
+            id={textId}
+            rows={6}
+            value={text}
+            onChange={(e) => setText(e.currentTarget.value)}
+            disabled={pending}
+            placeholder="e.g. Building B-1 was built in 1991 per the county assessor."
+            style={{ width: '100%' }}
+          />
+        </div>
+        <button
+          type="submit"
+          className="rf-button rf-button--primary"
+          disabled={pending || trimmed === ''}
+          style={{ alignSelf: 'flex-start' }}
+        >
           {pending ? 'Extracting…' : 'Extract fields'}
         </button>
-        <label htmlFor={fileId}>Or upload a reply (PDF or text, e.g. loss runs)</label>
-        <input id={fileId} type="file" accept={ACCEPT_FILES} onChange={pick} disabled={pending} />
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            gap: 'var(--rf-space-sm)',
+            paddingTop: 'var(--rf-space-sm)',
+            borderTop: '1px solid var(--rf-muted-tint)',
+          }}
+        >
+          <label htmlFor={fileId}>Or upload a reply (PDF or text, e.g. loss runs)</label>
+          <input id={fileId} type="file" accept={ACCEPT_FILES} onChange={pick} disabled={pending} />
+        </div>
       </form>
       <p aria-live="polite" className="rf-footnote">
         {pending ? 'Reading the reply…' : ''}

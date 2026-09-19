@@ -12,6 +12,7 @@ import {
   COLORS,
   Card,
   Heading,
+  Icon,
   MIN_TOUCH_TARGET,
   Notice,
   RADIUS,
@@ -22,6 +23,7 @@ import {
   Text,
   bearingWords,
 } from '@/ui';
+import type { IconName } from '@/ui';
 
 /**
  * Check what we found — PRD §11 `/confirm`, PRD 9.3 step 7 (unit M7).
@@ -69,6 +71,34 @@ const PLAIN_NAMES: Readonly<Record<string, string>> = {
 
 function plainName(label: string): string {
   return PLAIN_NAMES[label] ?? label.replace(/[_-]+/g, ' ').trim();
+}
+
+/** Decorative only — the plain-language name and status text always carry the meaning. */
+const ITEM_ICON: Readonly<Record<string, IconName>> = {
+  portable_heater: 'flame-outline',
+  extension_cord: 'flash-outline',
+  power_bar: 'flash-outline',
+  outlet: 'flash-outline',
+  curtain: 'albums-outline',
+  fabric: 'albums-outline',
+  bedding: 'bed-outline',
+  smoke_detector: 'radio-button-on-outline',
+  sprinkler_head: 'water-outline',
+  window_ac_unit: 'snow-outline',
+  stove: 'restaurant-outline',
+  candle: 'flame-outline',
+  bike: 'bicycle-outline',
+  jewelry: 'diamond-outline',
+  camera: 'camera-outline',
+  laptop: 'laptop-outline',
+  tv: 'tv-outline',
+  instrument: 'musical-notes-outline',
+  blocked_exit: 'exit-outline',
+  water_heater: 'water-outline',
+};
+
+function itemIcon(label: string): IconName {
+  return ITEM_ICON[label] ?? 'help-circle-outline';
 }
 
 /**
@@ -277,8 +307,15 @@ export default function ConfirmScreen() {
             choice === 'confirmed' ? 'You said: it is there.' : choice === 'dismissed' ? 'You said: it is not there.' : 'Not checked yet.';
           return (
             <Card key={o.id} tone={firstOpen?.id === o.id ? 'accent' : 'plain'}>
-              <View accessible accessibilityRole="header" accessibilityLabel={`Item ${i + 1} of ${items.length}: ${name}. ${where} ${status}`}>
-                <Heading variant="heading">{capitalise(name)}</Heading>
+              {/* One accessible group (not also `role="header"`, which would
+                  nest a heading trait inside the real <Heading> below it —
+                  confirmed live: react-native-web renders that as a nested
+                  <h1>, an invalid and conflicting accessibility tree). */}
+              <View accessible accessibilityLabel={`Item ${i + 1} of ${items.length}: ${name}. ${where} ${status}`}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
+                  <Icon name={itemIcon(o.label)} size={20} color={COLORS.mutedDeep} />
+                  <Heading variant="heading">{capitalise(name)}</Heading>
+                </View>
                 <Text tone="muted">{where}</Text>
                 <Text weight="semibold">{status}</Text>
                 {firstOpen?.id === o.id ? (

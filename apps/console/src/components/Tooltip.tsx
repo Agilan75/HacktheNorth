@@ -175,6 +175,7 @@ export function Tooltip(props: TooltipProps): ReactElement {
       <span
         className="rf-tooltip__trigger"
         style={triggerStyle}
+        role="button"
         tabIndex={0}
         aria-describedby={tipId}
         data-term={term}

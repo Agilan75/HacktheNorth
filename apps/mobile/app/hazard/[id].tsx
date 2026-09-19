@@ -22,6 +22,7 @@ import {
   COLORS,
   Card,
   Heading,
+  Icon,
   Notice,
   RADIUS,
   SPACE,
@@ -30,6 +31,7 @@ import {
   Text,
   VerdictPill,
 } from '@/ui';
+import type { IconName } from '@/ui';
 
 /**
  * What we found — PRD §11 `/hazard/[id]` (unit M9).
@@ -179,6 +181,7 @@ function HazardDetail({
           {status === 'present' && hazardKey !== 'highValueContents' ? (
             <Button
               label="I fixed it: check with a new photo"
+              icon="camera-outline"
               accessibilityHint="Opens the camera so you can take one photo showing the fix. We then update your quote."
               onPress={() => router.push({ pathname: '/verify-fix', params: { hazard: hazardKey, sweep: sweep.id } })}
             />
@@ -243,6 +246,13 @@ function HazardDetail({
 
 /* -------------------------------------------------------------------------- */
 
+const STATUS_ICON: Readonly<Record<ReturnType<typeof hazardStatus>, IconName>> = {
+  fixed: 'checkmark-circle',
+  present: 'alert-circle',
+  absent: 'checkmark-circle-outline',
+  unknown: 'help-circle-outline',
+};
+
 function StatusLine({ status, hazardKey }: { readonly status: ReturnType<typeof hazardStatus>; readonly hazardKey: string }) {
   const text =
     status === 'fixed'
@@ -261,6 +271,9 @@ function StatusLine({ status, hazardKey }: { readonly status: ReturnType<typeof 
     <View accessible accessibilityRole="text" accessibilityLabel={`${word}. ${text}`} style={{ flexDirection: 'row', gap: SPACE.sm, alignItems: 'flex-start' }}>
       <View
         style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: SPACE.xs,
           borderWidth: 2,
           borderColor: COLORS.ink,
           backgroundColor: status === 'present' ? COLORS.ink : COLORS.paper,
@@ -269,6 +282,7 @@ function StatusLine({ status, hazardKey }: { readonly status: ReturnType<typeof 
           paddingVertical: SPACE.xs,
         }}
       >
+        <Icon name={STATUS_ICON[status]} size={14} color={status === 'present' ? COLORS.paper : COLORS.ink} />
         <Text variant="small" weight="semibold" style={{ color: status === 'present' ? COLORS.paper : COLORS.ink }}>
           {word}
         </Text>

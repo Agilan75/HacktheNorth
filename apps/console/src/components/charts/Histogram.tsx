@@ -95,7 +95,7 @@ export function Histogram(props: HistogramProps): ReactElement {
                   width={colWidth}
                   height={h}
                   rx={4}
-                  fill="var(--rf-ink)"
+                  fill="var(--rf-blue)"
                 />
               ) : null}
               <text

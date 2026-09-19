@@ -111,7 +111,7 @@ export function AdequacyScale(props: AdequacyScaleProps): ReactElement {
               cx={markerX}
               cy={g.trackY + g.trackHeight / 2}
               r={9}
-              fill="var(--rf-red)"
+              fill="var(--rf-blue)"
               stroke="var(--rf-paper)"
               strokeWidth={2}
             />
