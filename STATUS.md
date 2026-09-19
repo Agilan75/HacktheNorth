@@ -53,7 +53,7 @@ All four prize targets have working code. Phase 1 is complete and verified; phas
 
 ## iPhone — first ten checks
 
-Set `EXPO_PUBLIC_API_URL` to your Mac's LAN IP (not `localhost`), `npm run dev:api`, then `npm run dev:mobile` and open in Expo Go.
+Set `EXPO_PUBLIC_API_URL=https://api-production-e7f5.up.railway.app` (works on any network, so there's no need to run the API locally), then `npm run dev:mobile` and open in Expo Go.
 
 1. **It launches.** The rooms list shows, with a "New sweep" button. (The native modules were realigned to Expo Go's SDK 57 versions overnight; if anything crashes on launch, that is the first suspect.)
 2. **New room:** label, term (4/8/12 months), and two equal choices — scan with the camera, or upload 3 photos.
