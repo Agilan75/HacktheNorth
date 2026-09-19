@@ -599,9 +599,17 @@ export interface SweepFrameDto {
 }
 
 export interface SweepCreateRequestDto {
-  readonly roomLabel: string;
-  readonly termMonths: 4 | 8 | 12;
+  /** Defaults to `Room` server-side: the phone reaches the camera before it can ask for a name. */
+  readonly roomLabel?: string;
+  /** Defaults to 12 server-side (PRD §11 term; the phone no longer asks). */
+  readonly termMonths?: 4 | 8 | 12;
   readonly submissionId?: string;
+  /**
+   * Replacement value of the contents the sweep priced, in whole USD. The
+   * server rounds it into `exposure.contentsLimit`; the renter is never asked
+   * to value their own belongings.
+   */
+  readonly contentsEstimateUsd?: number;
   readonly frames: readonly {
     readonly bearingDeg: number;
     readonly pitchDeg?: number;
@@ -638,7 +646,17 @@ export interface SweepAnswersRequestDto {
     /** True when the user skipped rather than answered. */
     readonly skipped?: boolean;
   }[];
-  /** Observations the user confirmed or dismissed on `/confirm`. */
+  /**
+   * Corrections to a field the sweep derived or defaulted, made inline on the
+   * verdict screen. An edit names the canonical field directly, because a
+   * derived field has no question to answer. Latest edit per field wins, and an
+   * edit outranks the sweep's own value exactly as an answer does.
+   */
+  readonly edits?: readonly {
+    readonly field: string;
+    readonly value: string | number | boolean | null;
+  }[];
+  /** Observations the user confirmed or dismissed. */
   readonly confirmations?: readonly {
     readonly observationId: string;
     readonly confirmed: boolean;

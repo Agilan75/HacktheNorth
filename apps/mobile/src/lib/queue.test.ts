@@ -55,12 +55,16 @@ function request(label: string): SweepCreateRequestDto {
   };
 }
 
+/** The server's defaults for the two fields the phone no longer collects. */
+const labelOf = (req: SweepCreateRequestDto): string => req.roomLabel ?? 'Room';
+const termOf = (req: SweepCreateRequestDto): number => req.termMonths ?? 12;
+
 function sweepFor(req: SweepCreateRequestDto): SweepDto {
   return {
-    id: `sw_${req.roomLabel}`,
+    id: `sw_${labelOf(req)}`,
     submissionId: null,
-    roomLabel: req.roomLabel,
-    termMonths: req.termMonths,
+    roomLabel: labelOf(req),
+    termMonths: termOf(req),
     stage: 'received',
     frames: [],
     coverage: null,
@@ -80,7 +84,7 @@ function network() {
   const state = { online: true, failWith: null as (() => unknown) | null };
   const sent: string[] = [];
   const send = async (req: SweepCreateRequestDto): Promise<SweepDto> => {
-    sent.push(req.roomLabel);
+    sent.push(labelOf(req));
     if (state.failWith !== null) throw state.failWith();
     if (!state.online) throw offline();
     return sweepFor(req);

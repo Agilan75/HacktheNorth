@@ -12,8 +12,11 @@
     "doctor": "npx expo-doctor"
   },
   "dependencies": {
+    "@expo-google-fonts/fraunces": "0.4.1",
+    "@expo-google-fonts/inter": "0.4.2",
     "@expo/metro-runtime": "~57.0.16",
     "@expo/vector-icons": "^15.0.2",
+    "@reactvision/react-viro": "2.58.1",
     "@retrofit/contracts": "*",
     "@retrofit/design": "*",
     "@shopify/react-native-skia": "2.6.2",
@@ -21,6 +24,7 @@
     "expo-camera": "57.0.5",
     "expo-constants": "57.0.19",
     "expo-file-system": "57.0.7",
+    "expo-font": "57.0.4",
     "expo-haptics": "57.0.3",
     "expo-image-manipulator": "57.0.19",
     "expo-image-picker": "57.0.19",
@@ -29,6 +33,7 @@
     "expo-location": "57.0.19",
     "expo-router": "57.0.22",
     "expo-sensors": "57.0.3",
+    "expo-splash-screen": "57.0.9",
     "expo-status-bar": "57.0.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
