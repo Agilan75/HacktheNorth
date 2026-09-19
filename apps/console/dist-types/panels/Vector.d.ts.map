@@ -1,1 +1,1 @@
-{"version":3,"file":"Vector.d.ts","sourceRoot":"","sources":["../../src/panels/Vector.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,OAAO,CAAC;AAK1C,OAAO,KAAK,EAAuB,gBAAgB,EAAE,MAAM,YAAY,CAAC;AA8DxE;;;;;;GAMG;AACH,wBAAgB,MAAM,CAAC,KAAK,EAAE,gBAAgB,GAAG,YAAY,CA2G5D"}
+{"version":3,"file":"Vector.d.ts","sourceRoot":"","sources":["../../src/panels/Vector.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,OAAO,CAAC;AAK1C,OAAO,KAAK,EAAuB,gBAAgB,EAAE,MAAM,YAAY,CAAC;AA+DxE;;;;;;GAMG;AACH,wBAAgB,MAAM,CAAC,KAAK,EAAE,gBAAgB,GAAG,YAAY,CAiH5D"}

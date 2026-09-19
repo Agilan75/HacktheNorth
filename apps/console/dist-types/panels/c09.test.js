@@ -43,15 +43,15 @@ describe('Buildings (PRD 10 e)', () => {
         expect(screen.getByText('2 buildings')).toBeInTheDocument();
         expect(screen.queryByText(/Showing/)).toBeNull();
     });
-    it('renders each building row with em dashes for unknowns and flags as labelled badges', () => {
+    it('renders each building row with words for unknowns and flags as labelled badges', () => {
         render(_jsx(Buildings, { buildings: buildings, rollup: rollup }));
         const table = screen.getByRole('table', { name: 'Schedule of buildings' });
         const rows = within(table).getAllByRole('row').slice(1);
         expect(rows).toHaveLength(2);
         const first = within(rows[0]).getAllByRole('cell').map((c) => c.textContent);
-        expect(first).toEqual(['B-2', '2 Main St', 'OH', '1995', 'Joisted Masonry', '$75.0M', 'Yes', '3', '—']);
+        expect(first).toEqual(['B-2', '2 Main St', 'OH', '1995', 'Joisted Masonry', '$75.0M', 'Yes', '3', 'None']);
         const second = within(rows[1]).getAllByRole('cell').map((c) => c.textContent);
-        expect(second).toEqual(['B-1', '—', 'OH', '1989', '—', '$75.0M', '—', '—', 'pre-1990']);
+        expect(second).toEqual(['B-1', 'Not reported', 'OH', '1989', 'Not reported', '$75.0M', 'Not reported', 'Not reported', 'pre-1990']);
     });
     it('sorts by year built', () => {
         render(_jsx(Buildings, { buildings: buildings, rollup: rollup }));

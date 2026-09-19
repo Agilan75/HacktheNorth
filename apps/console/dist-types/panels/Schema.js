@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { EM_DASH, formatScore, pluralize } from '@retrofit/contracts';
+import { formatScore, pluralize } from '@retrofit/contracts';
 import { cssVar, SPACE } from '@retrofit/design';
 import { Badge } from '../components/atoms/Badge';
 import { Card } from '../components/atoms/Card';
@@ -33,7 +33,7 @@ const unmappedColumns = [
     {
         key: 'sampleValue',
         header: 'Sample value',
-        render: (r) => (r.sampleValue === null || r.sampleValue === '' ? EM_DASH : _jsx(Code, { children: r.sampleValue })),
+        render: (r) => (r.sampleValue === null || r.sampleValue === '' ? 'Empty in Federato' : _jsx(Code, { children: r.sampleValue })),
     },
     { key: 'reason', header: 'Why it stayed unmapped', render: (r) => r.reason },
 ];

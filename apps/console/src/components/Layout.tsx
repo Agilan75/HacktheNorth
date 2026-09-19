@@ -46,6 +46,7 @@ const headerStyle: CSSProperties = {
   alignItems: 'center',
   gap: SPACE.lg,
   padding: `${SPACE.md}px ${SPACE.xl}px`,
+  minWidth: 0,
   borderBottom: `1px solid ${cssVar('muted-tint')}`,
   background: cssVar('paper'),
 };
@@ -85,8 +86,8 @@ const mainStyle: CSSProperties = {
   flex: 1,
   width: '100%',
   maxWidth: 1440,
+  minWidth: 0,
   margin: '0 auto',
-  padding: `${SPACE.xl}px`,
   boxSizing: 'border-box',
 };
 
@@ -126,7 +127,8 @@ export function Layout(props: LayoutProps): ReactElement {
         </nav>
         <div data-testid="adapter-banner-slot">{banner}</div>
       </header>
-      <main id={MAIN_ID} tabIndex={-1} style={mainStyle}>
+      {/* Padding lives in base.css (.rf-main) so it can tighten at phone width. */}
+      <main id={MAIN_ID} className="rf-main" tabIndex={-1} style={mainStyle}>
         {children}
       </main>
     </div>

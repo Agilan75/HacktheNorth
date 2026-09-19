@@ -16,7 +16,7 @@ function flipRow(id, over = {}) {
         submissionId: id, rank: 4, qualityIndex: 70, verdict: 'DOES_NOT_FIT', insuredName: `Insured ${id}`,
         lineOfBusiness: 'commercial_property', primaryState: 'OH', appetiteScore: 75, quotedPremium: 150000,
         predictedPremium: 160000, adequacy: 0.9375, completeness: 100, contradictionCount: 0, oneFlipFromFit: true,
-        assignedUnderwriter: null, pendingAction: null, explanationLine: 'Queue explanation sentence.', outOfAppetiteLine: false,
+        assignedUnderwriter: null, underwriterSource: null, synthetic: false, totalTiv: null, pendingAction: null, explanationLine: 'Queue explanation sentence.', outOfAppetiteLine: false,
         ...over,
     };
 }

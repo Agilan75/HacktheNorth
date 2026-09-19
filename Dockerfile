@@ -16,4 +16,4 @@ RUN npm ci
 
 ENV NODE_ENV=production
 EXPOSE 3000
-CMD ["sh", "-c", "node --import tsx apps/api/src/scripts/seed.ts --if-empty --no-enrich ; node --import tsx apps/api/src/index.ts"]
+CMD ["sh", "-c", "node --import tsx apps/api/src/scripts/seed.ts --if-empty --no-enrich ; node --import tsx apps/api/src/scripts/backfill.ts ; node --import tsx apps/api/src/index.ts"]

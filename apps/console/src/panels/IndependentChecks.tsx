@@ -151,6 +151,7 @@ export function IndependentChecks(props: IndependentChecksProps): ReactElement {
         A second, deliberately naive implementation written straight from the guideline table,
         sharing no code with the engine, given the same facts.
       </p>
+      <div className="rf-scroll-x">
       <table aria-label="Engine compared with the independent implementation" style={{ marginTop: SPACE.sm }}>
         <thead>
           <tr>
@@ -173,6 +174,7 @@ export function IndependentChecks(props: IndependentChecksProps): ReactElement {
           ))}
         </tbody>
       </table>
+      </div>
 
       <h3 style={sectionHeadStyle}>Second-opinion model</h3>
       <p style={mutedStyle}>

@@ -146,6 +146,16 @@ function SubmissionHeader(props: HeaderProps): ReactElement {
             <Badge label={KIND_BADGE[detail.accountKind]} tone="attention" />
           </>
         ) : null}
+        {detail.synthetic ? (
+          <>
+            {' '}
+            <Badge
+              label="Synthetic data"
+              tone="attention"
+              title="Federato holds no policy for this account. Its location, building, premium and loss values were hand-authored for the demo; the engine scored them."
+            />
+          </>
+        ) : null}
       </div>
       <dl className="submission-headline">
         <div>

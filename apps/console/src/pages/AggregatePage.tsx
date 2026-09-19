@@ -168,7 +168,7 @@ function OneFlipTable(props: { readonly rows: readonly QueueRowView[]; readonly 
     return <p style={{ margin: 0, color: 'var(--rf-muted-deep)' }}>No submission is one change away from FIT.</p>;
   }
   return (
-    <div style={{ overflowX: 'auto' }}>
+    <div className="rf-scroll-x">
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <caption className="rf-sr-only">Submissions one change away from FIT</caption>
         <thead>

@@ -734,7 +734,8 @@ describe('GET /submissions/:id — who and what the account is (FILL-backend)', 
   it('tells a scored account from a no-policy account', async () => {
     setup();
     insert('SUB-P', makeResult({ id: 'SUB-P', verdict: 'FIT' }), 1, policyRaw('SUB-P'));
-    insert('SUB-N', makeResult({ id: 'SUB-N', verdict: 'REFER' }), 2, noPolicyRaw('SUB-N'));
+    const bare = makeResult({ id: 'SUB-N', verdict: 'REFER' });
+    insert('SUB-N', { ...bare, canonical: { ...bare.canonical, buildings: [] } }, 2, noPolicyRaw('SUB-N'));
     const p = await detail('SUB-P');
     const n = await detail('SUB-N');
     expect(p.accountKind).toBe('scored');
@@ -743,6 +744,35 @@ describe('GET /submissions/:id — who and what the account is (FILL-backend)', 
     const kinds = new Map((await queue()).rows.map((r) => [r.externalId, r.accountKind]));
     expect(kinds.get('SUB-P')).toBe('scored');
     expect(kinds.get('SUB-N')).toBe('no_policy');
+  });
+
+  it('scores a no-policy account once buildings are supplied, and flags synthetic values', async () => {
+    setup();
+    const base = makeResult({ id: 'SUB-S', verdict: 'FIT' });
+    const tagged = {
+      ...base,
+      canonical: {
+        ...base.canonical,
+        submissionType: [{ value: 'new_business', provenance: { source: 'answer', sourceDetail: 'synthetic:backfill-v1' } }],
+      },
+    } as EngineResult;
+    insert('SUB-S', tagged, 1, noPolicyRaw('SUB-S'));
+    insert('SUB-P', makeResult({ id: 'SUB-P', verdict: 'FIT' }), 2, policyRaw('SUB-P'));
+    const s = await detail('SUB-S');
+    expect(s.accountKind).toBe('scored');
+    expect(s.synthetic).toBe(true);
+    expect((await detail('SUB-P')).synthetic).toBe(false);
+    const row = (await queue()).rows.find((r) => r.externalId === 'SUB-S')!;
+    expect(row).toMatchObject({ accountKind: 'scored', synthetic: true });
+  });
+
+  it('falls back to Federato\'s own underwriter when Retrofit has not routed the account', async () => {
+    setup();
+    const row = insert('SUB-F', makeResult({ id: 'SUB-F', verdict: 'DOES_NOT_FIT' }), 1, policyRaw('SUB-F'));
+    repos.submissions.update(row.id, { facts: { ...FACTS, underwriterName: 'O. Tanaka' } });
+    const q = (await queue()).rows.find((r) => r.externalId === 'SUB-F')!;
+    expect(q.assignedUnderwriter).toBeNull();
+    expect(q.federatoUnderwriter).toBe('O. Tanaka');
   });
 
   it('says so when a row was stored before facts were read: every fact absent, none guessed', async () => {

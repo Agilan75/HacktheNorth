@@ -287,6 +287,7 @@ function queueRow(id: string, rank: number, extra: Record<string, unknown> = {})
     adequacy: 1.09375, completeness: 100, confidence: 0.7, contradictionCount: 0, openHighContradictionCount: 0,
     distanceToAppetite: 0, oneFlipFromFit: false,
     assignedUnderwriter: { id: 3, name: 'Dana Whitfield', email: 'x', team: 'P', region: 'Midwest', authorityLimit: 1 },
+    federatoUnderwriter: null,
     pendingAction: { id: 'a', type: 'request', status: 'draft' }, explanation: 'Fits.', updatedAt: '2026-09-19T12:00:00.000Z',
     ...extra,
   };

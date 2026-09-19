@@ -60,6 +60,7 @@ export function AttachedSweep(props: AttachedSweepPanelProps): ReactElement {
       {sweep.observations.length === 0 ? (
         <p className="rf-empty">Nothing was observed in this sweep.</p>
       ) : (
+        <div className="rf-scroll-x">
         <table className="rf-table" aria-label="Observations">
           <thead>
             <tr>
@@ -88,6 +89,7 @@ export function AttachedSweep(props: AttachedSweepPanelProps): ReactElement {
             ))}
           </tbody>
         </table>
+        </div>
       )}
       <p className="rf-footnote">{`Sweep ${sweep.sweepId}`}</p>
     </Card>

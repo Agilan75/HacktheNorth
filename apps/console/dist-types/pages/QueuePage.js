@@ -1,7 +1,8 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
+import { jsx as _jsx, Fragment as _Fragment, jsxs as _jsxs } from "react/jsx-runtime";
 import { useId, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { formatMoney, formatPercent, formatScore, pluralize, titleCase, } from '@retrofit/contracts';
+import { cssVar } from '@retrofit/design';
 import { submissionPath } from '../App.js';
 import { useApi } from '../api/useApi.js';
 import { Badge } from '../components/atoms/Badge.js';
@@ -103,7 +104,7 @@ function buildColumns() {
             key: 'insured',
             header: 'Insured',
             minWidth: 170,
-            render: (r) => (_jsx(Link, { to: submissionPath(r.submissionId), "aria-label": `Open ${r.insuredName}`, children: r.insuredName })),
+            render: (r) => (_jsxs(_Fragment, { children: [_jsx(Link, { to: submissionPath(r.submissionId), "aria-label": `Open ${r.insuredName}`, children: r.insuredName }), r.synthetic ? (_jsxs(_Fragment, { children: [' ', _jsx(Badge, { label: "Synthetic", tone: "quiet", title: "Federato holds no policy; values hand-authored for the demo" })] })) : null] })),
             sortValue: (r) => r.insuredName,
         },
         {
@@ -154,7 +155,7 @@ function buildColumns() {
         {
             key: 'underwriter',
             header: 'Underwriter',
-            render: (r) => r.assignedUnderwriter ?? 'Unassigned',
+            render: (r) => r.assignedUnderwriter === null ? ('Unassigned') : r.underwriterSource === 'federato' ? (_jsxs("span", { title: "Federato's own assignment; Retrofit did not route this account", children: [r.assignedUnderwriter, ' ', _jsx("span", { style: { color: cssVar('muted') }, children: "\u00B7 Federato" })] })) : (r.assignedUnderwriter),
             sortValue: (r) => r.assignedUnderwriter,
         },
         {

@@ -63,7 +63,7 @@ describe('Actions', () => {
     expect(screen.getByText('Needs referral to senior authority')).toBeInTheDocument();
   });
 
-  it('shows unassigned routing with dashes', () => {
+  it('shows unassigned routing in words', () => {
     render(
       <Actions
         submissionId="sub-1"
@@ -74,8 +74,9 @@ describe('Actions', () => {
       />,
     );
     expect(screen.getByTestId('routing-underwriter')).toHaveTextContent('Unassigned');
-    expect(screen.getByTestId('routing-authority')).toHaveTextContent('—');
-    expect(screen.getByText('Not routed')).toBeInTheDocument();
+    expect(screen.getByTestId('routing-authority')).toHaveTextContent('Not routed');
+    expect(screen.getByTestId('routing-region')).toHaveTextContent('Not routed');
+    expect(screen.getByTestId('actions-routing').querySelector('.rf-badge')).toHaveTextContent('Not routed');
   });
 
   it('renders the draft with requested fields and approves by actionId', async () => {

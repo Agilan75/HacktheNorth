@@ -167,7 +167,7 @@ const ruleListStyle: CSSProperties = {
   margin: 0,
   padding: 0,
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))',
   gap: SPACE.md,
 };
 
@@ -183,7 +183,7 @@ const ruleStyle: CSSProperties = {
 const metaStyle: CSSProperties = {
   margin: 0,
   display: 'grid',
-  gridTemplateColumns: 'max-content 1fr',
+  gridTemplateColumns: 'max-content minmax(0, 1fr)',
   columnGap: SPACE.md,
   rowGap: SPACE.xs,
   fontSize: cssVar('size-small'),
@@ -191,7 +191,7 @@ const metaStyle: CSSProperties = {
 };
 
 const dtStyle: CSSProperties = { color: cssVar('muted-deep') };
-const ddStyle: CSSProperties = { margin: 0 };
+const ddStyle: CSSProperties = { margin: 0, minWidth: 0, overflowWrap: 'anywhere' };
 const codeStyle: CSSProperties = { fontSize: cssVar('size-small') };
 
 function RuleCard(props: { readonly rule: RuleDto; readonly showWeight: boolean }): ReactElement {

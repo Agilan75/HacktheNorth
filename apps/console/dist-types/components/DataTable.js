@@ -148,7 +148,7 @@ export function DataTable(props) {
                         }, children: column.render(row) })) : (column.render(row)) }, column.key))) }, rowKey(row)));
         });
     }
-    return (_jsx("div", { style: { width: '100%', overflowX: 'auto' }, children: _jsxs("table", { style: tableStyle, "aria-busy": loading ? 'true' : undefined, children: [_jsxs("caption", { style: captionStyle, children: [caption, loading ? _jsx("span", { style: srOnly, children: " (loading)" }) : null] }), _jsx("thead", { children: _jsx("tr", { children: columns.map((column) => {
+    return (_jsx("div", { style: { position: 'relative', width: '100%', maxWidth: '100%', overflowX: 'auto' }, children: _jsxs("table", { style: tableStyle, "aria-busy": loading ? 'true' : undefined, children: [_jsxs("caption", { style: captionStyle, children: [caption, loading ? _jsx("span", { style: srOnly, children: " (loading)" }) : null] }), _jsx("thead", { children: _jsx("tr", { children: columns.map((column) => {
                             const align = column.align ?? 'left';
                             const active = sort !== null && sort.key === column.key;
                             const ariaSort = !column.sortValue

@@ -5,7 +5,9 @@ import { AdapterBanner } from './components/AdapterBanner.js';
 import { Layout } from './components/Layout.js';
 import { ActionsPage } from './pages/ActionsPage.js';
 import { AggregatePage } from './pages/AggregatePage.js';
+import { ExplorePage } from './pages/ExplorePage.js';
 import { GlossaryPage } from './pages/GlossaryPage.js';
+import { NotFoundPage } from './pages/NotFoundPage.js';
 import { QueuePage } from './pages/QueuePage.js';
 import { RulesPage } from './pages/RulesPage.js';
 import { SubmissionPage } from './pages/SubmissionPage.js';
@@ -26,6 +28,8 @@ export const ROUTES = {
   aggregate: '/aggregate',
   /** The testing in full, from GET /verification (FILL-console). */
   verification: '/verification',
+  /** The book in 3D: scatter and network views. */
+  explore: '/explore',
 } as const;
 
 export type RouteKey = keyof typeof ROUTES;
@@ -42,6 +46,7 @@ export const NAV_ITEMS: readonly { readonly to: string; readonly label: string }
   { to: ROUTES.rules, label: 'Rules' },
   { to: ROUTES.glossary, label: 'Glossary' },
   { to: ROUTES.aggregate, label: 'Aggregate' },
+  { to: ROUTES.explore, label: 'Explore' },
   { to: ROUTES.verification, label: 'Verification' },
 ];
 
@@ -60,7 +65,8 @@ export function App(): ReactElement {
         <Route path={ROUTES.glossary} element={<GlossaryPage />} />
         <Route path={ROUTES.aggregate} element={<AggregatePage />} />
         <Route path={ROUTES.verification} element={<VerificationPage />} />
-        <Route path="*" element={<Navigate to={ROUTES.queue} replace />} />
+        <Route path={ROUTES.explore} element={<ExplorePage />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Layout>
   );

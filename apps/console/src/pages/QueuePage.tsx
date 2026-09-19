@@ -10,6 +10,7 @@ import {
   titleCase,
 } from '@retrofit/contracts';
 
+import { cssVar } from '@retrofit/design';
 import { submissionPath } from '../App.js';
 import { useApi } from '../api/useApi.js';
 import { Badge } from '../components/atoms/Badge.js';
@@ -118,9 +119,17 @@ function buildColumns(): readonly DataTableColumn<QueueRowView>[] {
       header: 'Insured',
       minWidth: 170,
       render: (r) => (
-        <Link to={submissionPath(r.submissionId)} aria-label={`Open ${r.insuredName}`}>
-          {r.insuredName}
-        </Link>
+        <>
+          <Link to={submissionPath(r.submissionId)} aria-label={`Open ${r.insuredName}`}>
+            {r.insuredName}
+          </Link>
+          {r.synthetic ? (
+            <>
+              {' '}
+              <Badge label="Synthetic" tone="quiet" title="Federato holds no policy; values hand-authored for the demo" />
+            </>
+          ) : null}
+        </>
       ),
       sortValue: (r) => r.insuredName,
     },
@@ -179,7 +188,17 @@ function buildColumns(): readonly DataTableColumn<QueueRowView>[] {
     {
       key: 'underwriter',
       header: 'Underwriter',
-      render: (r) => r.assignedUnderwriter ?? 'Unassigned',
+      render: (r) =>
+        r.assignedUnderwriter === null ? (
+          'Unassigned'
+        ) : r.underwriterSource === 'federato' ? (
+          <span title="Federato's own assignment; Retrofit did not route this account">
+            {r.assignedUnderwriter}{' '}
+            <span style={{ color: cssVar('muted') }}>· Federato</span>
+          </span>
+        ) : (
+          r.assignedUnderwriter
+        ),
       sortValue: (r) => r.assignedUnderwriter,
     },
     {

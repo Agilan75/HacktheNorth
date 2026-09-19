@@ -22,6 +22,7 @@ function FieldsTable(props: { readonly fields: readonly ExtractedFieldView[] }):
     return <p className="rf-empty">No field values were found in the reply.</p>;
   }
   return (
+    <div className="rf-scroll-x">
     <table className="rf-table" aria-label="Extracted fields">
       <thead>
         <tr>
@@ -52,6 +53,7 @@ function FieldsTable(props: { readonly fields: readonly ExtractedFieldView[] }):
         ))}
       </tbody>
     </table>
+    </div>
   );
 }
 

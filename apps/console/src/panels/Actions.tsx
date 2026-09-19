@@ -21,6 +21,11 @@ function authorityLabel(withinAuthority: boolean | null, underwriter: string | n
   return underwriter === null ? 'Not routed' : 'Authority unknown';
 }
 
+/** What a blank routing field means: nothing routed yet, or a routed account missing that field. */
+function unroutedText(routing: RoutingView): string {
+  return routing.underwriter === null ? 'Not routed' : 'Not recorded';
+}
+
 function RoutingBlock(props: { readonly routing: RoutingView }): ReactElement {
   const { routing } = props;
   const label = authorityLabel(routing.withinAuthority, routing.underwriter);
@@ -36,11 +41,11 @@ function RoutingBlock(props: { readonly routing: RoutingView }): ReactElement {
         </div>
         <div className="rf-stat" data-testid="routing-region">
           <dt>Region</dt>
-          <dd>{routing.region ?? '—'}</dd>
+          <dd>{routing.region ?? unroutedText(routing)}</dd>
         </div>
         <div className="rf-stat" data-testid="routing-authority">
           <dt>Authority limit</dt>
-          <dd>{formatMoney(routing.authorityLimit)}</dd>
+          <dd>{routing.authorityLimit === null ? unroutedText(routing) : formatMoney(routing.authorityLimit)}</dd>
         </div>
       </dl>
       <p className="rf-actions__rationale">{routing.rationale}</p>
@@ -79,6 +84,7 @@ function DraftCard(props: {
         {draft.body}
       </p>
       {draft.requestedFields.length > 0 ? (
+        <div className="rf-scroll-x">
         <table className="rf-table" aria-label="Requested fields">
           <thead>
             <tr>
@@ -94,11 +100,12 @@ function DraftCard(props: {
                 <td>
                   <code>{f.path}</code>
                 </td>
-                <td>{f.voi === null ? '—' : `${formatScore(f.voi, { decimals: 1 })} pts`}</td>
+                <td>{f.voi === null ? 'Not ranked' : `${formatScore(f.voi, { decimals: 1 })} pts`}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       ) : null}
       {approvable ? (
         <button
@@ -139,6 +146,7 @@ function LogTable(props: { readonly log: readonly ActionLogEntryView[] }): React
     return <p className="rf-empty">No actions have been logged for this submission.</p>;
   }
   return (
+    <div className="rf-scroll-x">
     <table className="rf-table" aria-label="Action log">
       <thead>
         <tr>
@@ -173,6 +181,7 @@ function LogTable(props: { readonly log: readonly ActionLogEntryView[] }): React
         })}
       </tbody>
     </table>
+    </div>
   );
 }
 

@@ -132,7 +132,9 @@ export function Histogram(props: HistogramProps): ReactElement {
           </text>
         ) : null}
       </svg>
-      <table className="rf-sr-only">
+      {/* The class sits on a wrapper: a table cannot shrink to 1px, a div can. */}
+      <div className="rf-sr-only">
+      <table>
         <caption>{title}</caption>
         <thead>
           <tr>
@@ -149,6 +151,7 @@ export function Histogram(props: HistogramProps): ReactElement {
           ))}
         </tbody>
       </table>
+      </div>
     </figure>
   );
 }

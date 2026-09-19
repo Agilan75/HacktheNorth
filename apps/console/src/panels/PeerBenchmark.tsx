@@ -65,6 +65,7 @@ export function PeerBenchmark(props: PeerBenchmarkPanelProps): ReactElement {
       {peers.length === 0 ? (
         <p className="rf-empty">No comparable accounts share enough known components.</p>
       ) : (
+        <div className="rf-scroll-x">
         <table className="rf-table" aria-label="Nearest accounts">
           <thead>
             <tr>
@@ -92,6 +93,7 @@ export function PeerBenchmark(props: PeerBenchmarkPanelProps): ReactElement {
             ))}
           </tbody>
         </table>
+        </div>
       )}
       <p className="rf-footnote">
         A benchmark on rate and loss only. Every account with a full vector in this book was bound,

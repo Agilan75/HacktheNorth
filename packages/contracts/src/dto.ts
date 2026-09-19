@@ -244,6 +244,8 @@ export interface QueueRowDto {
   /** True for the 120 rows collapsed under "Out of appetite: line of business". */
   readonly outOfAppetiteLine: boolean;
   readonly accountKind: AccountKindDto;
+  /** True when some of the account's values were hand-authored (`synthetic:` provenance), not read from Federato. */
+  readonly synthetic: boolean;
   readonly appetiteScore: number;
   readonly primaryState: string | null;
   readonly totalTiv: number | null;
@@ -258,6 +260,11 @@ export interface QueueRowDto {
   /** The "1 flip from FIT" badge. */
   readonly oneFlipFromFit: boolean;
   readonly assignedUnderwriter: UnderwriterDto | null;
+  /**
+   * Federato's own `Submission.underwriter`, shown when Retrofit has not routed
+   * the account (knocked out, or no state to route on). Display only.
+   */
+  readonly federatoUnderwriter: string | null;
   readonly pendingAction: {
     readonly id: string;
     readonly type: ActionTypeDto;
@@ -402,6 +409,8 @@ export interface SubmissionDetailDto {
   /** The line to show: Federato's own line (`cyber`, ...) for a triage knockout, otherwise `lineOfBusiness`. */
   readonly displayLineOfBusiness: string;
   readonly accountKind: AccountKindDto;
+  /** True when some of the account's values were hand-authored (`synthetic:` provenance), not read from Federato. */
+  readonly synthetic: boolean;
   /** Present for every submission. */
   readonly facts: SubmissionFactsDto;
   /** Present for the 38 real property accounts the verification covered; null otherwise or when no verification file exists. */

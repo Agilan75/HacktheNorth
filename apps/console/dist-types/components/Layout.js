@@ -26,6 +26,7 @@ const headerStyle = {
     alignItems: 'center',
     gap: SPACE.lg,
     padding: `${SPACE.md}px ${SPACE.xl}px`,
+    minWidth: 0,
     borderBottom: `1px solid ${cssVar('muted-tint')}`,
     background: cssVar('paper'),
 };
@@ -61,8 +62,8 @@ const mainStyle = {
     flex: 1,
     width: '100%',
     maxWidth: 1440,
+    minWidth: 0,
     margin: '0 auto',
-    padding: `${SPACE.xl}px`,
     boxSizing: 'border-box',
 };
 /**
@@ -76,6 +77,6 @@ export function Layout(props) {
                     event.currentTarget.style.top = `${SPACE.sm}px`;
                 }, onBlur: (event) => {
                     event.currentTarget.style.top = '-100px';
-                }, children: "Skip to content" }), _jsxs("header", { style: headerStyle, children: [_jsx("p", { style: brandStyle, children: "Retrofit" }), _jsx("nav", { "aria-label": "Primary", style: { flex: '1 1 auto' }, children: _jsx("ul", { style: navListStyle, children: nav.map((item) => (_jsx("li", { children: _jsx(NavLink, { to: item.to, style: navLinkStyle, children: item.label }) }, item.to))) }) }), _jsx("div", { "data-testid": "adapter-banner-slot", children: banner })] }), _jsx("main", { id: MAIN_ID, tabIndex: -1, style: mainStyle, children: children })] }));
+                }, children: "Skip to content" }), _jsxs("header", { style: headerStyle, children: [_jsx("p", { style: brandStyle, children: "Retrofit" }), _jsx("nav", { "aria-label": "Primary", style: { flex: '1 1 auto' }, children: _jsx("ul", { style: navListStyle, children: nav.map((item) => (_jsx("li", { children: _jsx(NavLink, { to: item.to, style: navLinkStyle, children: item.label }) }, item.to))) }) }), _jsx("div", { "data-testid": "adapter-banner-slot", children: banner })] }), _jsx("main", { id: MAIN_ID, className: "rf-main", tabIndex: -1, style: mainStyle, children: children })] }));
 }
 //# sourceMappingURL=Layout.js.map

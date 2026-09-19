@@ -13,7 +13,8 @@
   "scripts": {
     "typecheck": "tsc -b",
     "dev": "node --env-file-if-exists=../../.env --import tsx --watch src/index.ts",
-    "start": "node --env-file-if-exists=../../.env --import tsx src/index.ts"
+    "start": "node --env-file-if-exists=../../.env --import tsx src/index.ts",
+    "backfill": "node --env-file-if-exists=../../.env --import tsx src/scripts/backfill.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.127.0",

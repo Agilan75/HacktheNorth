@@ -47,11 +47,12 @@ describe('Actions', () => {
         render(_jsx(Actions, { submissionId: "sub-1", routing: { ...routing, withinAuthority: false }, drafts: [], log: [], onApprove: () => { } }));
         expect(screen.getByText('Needs referral to senior authority')).toBeInTheDocument();
     });
-    it('shows unassigned routing with dashes', () => {
+    it('shows unassigned routing in words', () => {
         render(_jsx(Actions, { submissionId: "sub-1", routing: { region: null, underwriter: null, authorityLimit: null, withinAuthority: null, rationale: 'No state.' }, drafts: [], log: [], onApprove: () => { } }));
         expect(screen.getByTestId('routing-underwriter')).toHaveTextContent('Unassigned');
-        expect(screen.getByTestId('routing-authority')).toHaveTextContent('—');
-        expect(screen.getByText('Not routed')).toBeInTheDocument();
+        expect(screen.getByTestId('routing-authority')).toHaveTextContent('Not routed');
+        expect(screen.getByTestId('routing-region')).toHaveTextContent('Not routed');
+        expect(screen.getByTestId('actions-routing').querySelector('.rf-badge')).toHaveTextContent('Not routed');
     });
     it('renders the draft with requested fields and approves by actionId', async () => {
         const onApprove = vi.fn(() => Promise.resolve());

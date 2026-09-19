@@ -28,7 +28,7 @@ function detail(over = {}) {
     const pricing = { quotedPremium: 41250, predictedPremium: 50000, adequacy: 0.825, expectedLoss: 12000, ratePer100Tiv: 0.31, currency: 'USD', factors: [], notes: [] };
     return {
         submissionId: 'SUB-7', insuredName: 'Harbor Freight Storage', lineOfBusiness: 'commercial_property',
-        displayLineOfBusiness: 'commercial_property', accountKind: 'scored', facts: null, verification: null, verdict: 'REFER',
+        displayLineOfBusiness: 'commercial_property', accountKind: 'scored', synthetic: false, facts: null, verification: null, verdict: 'REFER',
         appetiteScore: 81, completeness: 88.88888888888889, confidence: 0.7,
         explanation: { verdict: 'REFER', headline: 'h', paragraphs: [], recommendation: 'r', decidingFactorId: null, decidingRuleId: null, confidence: 0.7 },
         factors: [{ factorId: 'tiv', label: 'TIV', tier: 'target', tierValue: 1, weight: 0.2, points: 20, known: true, knockout: false, ruleId: 'R1', citation: null }],

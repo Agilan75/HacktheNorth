@@ -105,11 +105,17 @@ describe('Vector', () => {
         expect(screen.getByTestId('vector-raw-isNewBusiness')).toHaveTextContent('Missing');
         expect(screen.getByTestId('vector-mask-isNewBusiness')).toHaveTextContent('0 · missing');
         expect(screen.getByTestId('vector-row-isNewBusiness')).toHaveAttribute('data-mask', '0');
-        expect(screen.getByTestId('vector-tier-totalTiv')).toHaveTextContent('—');
-        expect(screen.getByTestId('vector-scaled-totalTiv')).toHaveTextContent('—');
+        expect(screen.getByTestId('vector-tier-totalTiv')).toHaveTextContent('Missing');
+        expect(screen.getByTestId('vector-scaled-totalTiv')).toHaveTextContent('Missing');
         expect(screen.getByTestId('vector-completeness')).toHaveTextContent('11.1%');
         expect(screen.getByTestId('vector-known')).toHaveTextContent('1 of 11');
         expect(screen.queryByText('Knockout')).toBeNull();
+    });
+    it('drops the Scaled column when the API sent no scaled values, never inventing one', () => {
+        const base = vector([[1, 1]], 100 / 9);
+        render(_jsx(Vector, { vector: { ...base, components: base.components.map((c) => ({ ...c, scaled: null })) } }));
+        expect(screen.queryByRole('columnheader', { name: 'Scaled' })).toBeNull();
+        expect(screen.queryByTestId('vector-scaled-isNewBusiness')).toBeNull();
     });
 });
 //# sourceMappingURL=Vector.test.js.map

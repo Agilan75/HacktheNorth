@@ -4,7 +4,8 @@ import { cssVar, SPACE } from '@retrofit/design';
 import { Badge } from '../components/atoms/Badge.js';
 import { Card } from '../components/atoms/Card.js';
 import { DataTable } from '../components/DataTable.js';
-const EM_DASH = '—';
+/** A building field Federato left blank: say so in words, never a bare dash. */
+const NOT_REPORTED = 'Not reported';
 /** Every figure here is read straight off the rollup the engine returned; nothing is recomputed. */
 function rollupItems(rollup) {
     return [
@@ -16,30 +17,30 @@ function rollupItems(rollup) {
             term: 'TIV in acceptable construction',
             value: formatPercent(rollup.pctTivAcceptableConstruction, { decimals: 1 }),
         },
-        { term: 'Primary state', value: rollup.primaryState ?? EM_DASH },
+        { term: 'Primary state', value: rollup.primaryState ?? NOT_REPORTED },
         { term: 'Five-year loss', value: formatMoney(rollup.fiveYearLoss) },
     ];
 }
 function sprinklerText(value) {
     if (value === null)
-        return EM_DASH;
+        return NOT_REPORTED;
     return value ? 'Yes' : 'No';
 }
 const COLUMNS = [
     { key: 'id', header: 'Building', render: (b) => b.id, sortValue: (b) => b.id },
-    { key: 'address', header: 'Address', render: (b) => b.address ?? EM_DASH, sortValue: (b) => b.address },
-    { key: 'state', header: 'State', render: (b) => b.state ?? EM_DASH, sortValue: (b) => b.state },
+    { key: 'address', header: 'Address', render: (b) => b.address ?? NOT_REPORTED, sortValue: (b) => b.address },
+    { key: 'state', header: 'State', render: (b) => b.state ?? NOT_REPORTED, sortValue: (b) => b.state },
     {
         key: 'yearBuilt',
         header: 'Year built',
         align: 'right',
-        render: (b) => (b.yearBuilt === null ? EM_DASH : String(b.yearBuilt)),
+        render: (b) => (b.yearBuilt === null ? NOT_REPORTED : String(b.yearBuilt)),
         sortValue: (b) => b.yearBuilt,
     },
     {
         key: 'construction',
         header: 'Construction',
-        render: (b) => (b.constructionType === null ? EM_DASH : titleCase(b.constructionType)),
+        render: (b) => (b.constructionType === null ? NOT_REPORTED : titleCase(b.constructionType)),
         sortValue: (b) => b.constructionType,
     },
     { key: 'tiv', header: 'TIV', align: 'right', render: (b) => formatTiv(b.tiv), sortValue: (b) => b.tiv },
@@ -54,13 +55,13 @@ const COLUMNS = [
         header: 'Protection class',
         headerTitle: 'Public protection class (1 best, 10 worst)',
         align: 'right',
-        render: (b) => (b.protectionClass === null ? EM_DASH : String(b.protectionClass)),
+        render: (b) => (b.protectionClass === null ? NOT_REPORTED : String(b.protectionClass)),
         sortValue: (b) => b.protectionClass,
     },
     {
         key: 'flags',
         header: 'Flags',
-        render: (b) => b.flags.length === 0 ? (EM_DASH) : (_jsx("span", { style: { display: 'inline-flex', flexWrap: 'wrap', gap: SPACE.xs }, children: b.flags.map((flag) => (_jsx(Badge, { label: flag, tone: "attention" }, flag))) })),
+        render: (b) => b.flags.length === 0 ? ('None') : (_jsx("span", { style: { display: 'inline-flex', flexWrap: 'wrap', gap: SPACE.xs }, children: b.flags.map((flag) => (_jsx(Badge, { label: flag, tone: "attention" }, flag))) })),
         sortValue: (b) => b.flags.length,
     },
 ];

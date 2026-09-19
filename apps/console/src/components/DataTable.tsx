@@ -230,7 +230,7 @@ export function DataTable<Row>(props: DataTableProps<Row>): ReactElement {
   }
 
   return (
-    <div style={{ width: '100%', overflowX: 'auto' }}>
+    <div style={{ position: 'relative', width: '100%', maxWidth: '100%', overflowX: 'auto' }}>
       <table style={tableStyle} aria-busy={loading ? 'true' : undefined}>
         <caption style={captionStyle}>
           {caption}

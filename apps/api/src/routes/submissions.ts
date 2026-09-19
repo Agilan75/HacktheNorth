@@ -106,8 +106,20 @@ function displayLine(row: SubmissionRow, result: EngineResult): string {
  */
 function accountKindOf(row: SubmissionRow, result: EngineResult): AccountKindDto {
   if (isOutOfAppetiteLine(result)) return 'triage_knockout';
-  if (row.source === 'federato' && (row.raw?.records['Policy']?.length ?? 0) === 0) return 'no_policy';
+  // No Policy and nothing supplied since (a broker reply or the backfill adds buildings).
+  if (
+    row.source === 'federato' &&
+    (row.raw?.records['Policy']?.length ?? 0) === 0 &&
+    result.canonical.buildings.length === 0
+  ) {
+    return 'no_policy';
+  }
   return 'scored';
+}
+
+/** Some values were hand-authored by the backfill (apps/api/src/scripts/backfill.ts), not read from Federato. */
+function isSynthetic(result: EngineResult): boolean {
+  return JSON.stringify(result.canonical).includes('"sourceDetail":"synthetic:');
 }
 
 /** The stored triage facts, or an explicit "never read" record: every value absent, none guessed. */
@@ -215,6 +227,7 @@ function toQueueRow(
     lineOfBusiness: displayLine(row, result),
     outOfAppetiteLine: isOutOfAppetiteLine(result),
     accountKind: accountKindOf(row, result),
+    synthetic: isSynthetic(result),
     appetiteScore: result.evaluate.appetiteScore,
     primaryState: result.rollup.primaryState,
     totalTiv: result.rollup.totalTiv,
@@ -230,6 +243,7 @@ function toQueueRow(
     distanceToAppetite: result.verdict.distanceToAppetite,
     oneFlipFromFit: oneFlipFromFit(result),
     assignedUnderwriter: assigned,
+    federatoUnderwriter: row.facts?.underwriterName ?? null,
     pendingAction: pendingOf(actions),
     explanation: result.explanation,
     updatedAt: row.updatedAt,
@@ -564,6 +578,7 @@ export function registerSubmissionRoutes(app: Hono<ApiEnv>, deps: Deps): void {
       lineOfBusiness: row.lineOfBusiness,
       displayLineOfBusiness: displayLine(row, result),
       accountKind: accountKindOf(row, result),
+      synthetic: isSynthetic(result),
       facts: factsOf(row),
       verification: accountVerification(perAccountOrNull(), row.externalId, result),
       insuredName: row.insuredName,

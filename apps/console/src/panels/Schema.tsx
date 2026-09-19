@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactElement } from 'react';
 
-import { EM_DASH, formatScore, pluralize } from '@retrofit/contracts';
+import { formatScore, pluralize } from '@retrofit/contracts';
 import { cssVar, SPACE } from '@retrofit/design';
 
 import { Badge } from '../components/atoms/Badge';
@@ -46,7 +46,7 @@ const unmappedColumns: readonly DataTableColumn<UnmappedRow>[] = [
   {
     key: 'sampleValue',
     header: 'Sample value',
-    render: (r) => (r.sampleValue === null || r.sampleValue === '' ? EM_DASH : <Code>{r.sampleValue}</Code>),
+    render: (r) => (r.sampleValue === null || r.sampleValue === '' ? 'Empty in Federato' : <Code>{r.sampleValue}</Code>),
   },
   { key: 'reason', header: 'Why it stayed unmapped', render: (r) => r.reason },
 ];

@@ -123,16 +123,26 @@ textarea {
   outline-offset: 2px;
 }
 
+/*
+ * Visually hidden, read by screen readers. The standard 1px clip pattern; the
+ * max-width/max-height pin the box so it never widens the page. Put it on a
+ * block or inline element, never on a <table> (a table cannot shrink below its
+ * content), and give every horizontal scroll box position: relative so an
+ * absolutely placed sr-only span inside it is clipped with the rest.
+ */
 .rf-sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  max-width: 1px !important;
+  max-height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
 /* ------------------------------------------------------------ Card */
@@ -268,4 +278,84 @@ textarea {
 }
 @media (prefers-reduced-motion: reduce) {
   .rf-skeleton__line { animation: none; }
+}
+
+/* ------------------------------------- Layout hardening (phone width) */
+
+/* Page padding: 24px, tightening to 16px on phones. */
+.rf-main { padding: var(--rf-space-xl); }
+
+/* A horizontal scroll box for a wide table: the table scrolls inside it, the page never does. */
+.rf-scroll-x {
+  position: relative;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Flex and grid children default to min-width:auto and would grow to fit a wide table. */
+.rf-card,
+.rf-card__body,
+.rf-card__header,
+.rf-card__title {
+  min-width: 0;
+}
+.rf-card__header { flex-wrap: wrap; }
+.rf-card__aside {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Long unbroken words (paths, ids) break only when they would overflow; never changes desktop layout. */
+body { overflow-wrap: break-word; }
+/* Long unbroken identifiers (rollup.pctTivAcceptableConstruction) wrap instead of widening the page. */
+code { overflow-wrap: anywhere; }
+table code { overflow-wrap: normal; }
+
+input,
+select,
+textarea { max-width: 100%; }
+
+/*
+ * Inline links get 4px of vertical padding so the hit area is at least 24px tall
+ * (WCAG 2.5.8) without changing line height. Buttons and nav links set their own 44px.
+ */
+a { padding-block: 4px; }
+
+/* Submission page: breadcrumb and in-page panel index. */
+.submission-index ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-xs) var(--rf-space-sm);
+  margin: 0 0 var(--rf-space-lg);
+  padding: 0;
+  list-style: none;
+}
+.submission-index a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--rf-min-touch-target);
+  padding: 0 var(--rf-space-md);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-pill);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+  color: var(--rf-ink);
+  text-decoration: none;
+}
+.submission-index a:hover { border-color: var(--rf-muted); text-decoration: underline; }
+
+@media (max-width: 600px) {
+  .rf-main { padding: var(--rf-space-lg); }
+  .rf-card { padding: var(--rf-space-lg); }
+  .rf-pill { white-space: normal; flex-wrap: wrap; }
+  /* 14 stacked 44px chips would push the page body a full screen down; 36px keeps it compact and still well above 24px. */
+  .submission-index a { min-height: 36px; }
+}
+
+a.rf-button {
+  display: inline-flex;
+  align-items: center;
+  color: var(--rf-ink);
+  text-decoration: none;
 }

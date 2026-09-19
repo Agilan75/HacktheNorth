@@ -218,7 +218,7 @@ function Strata(props: { readonly data: VerificationDto }): ReactElement | null 
         Cases are chosen to sit on every threshold and every ambiguity in the guidelines, where a
         disagreement is most likely. {`${count(c.unanswered)} cases were never answered and are left out of every count. Of the ${count(c.agreed)} agreeing cases, ${count(c.decidingFactorAgreed)} also named the same deciding factor.`}
       </p>
-      <div style={{ overflowX: 'auto', marginTop: SPACE.md }}>
+      <div className="rf-scroll-x" style={{ marginTop: SPACE.md }}>
         <table aria-label="Second-opinion agreement by stratum">
           <thead>
             <tr>

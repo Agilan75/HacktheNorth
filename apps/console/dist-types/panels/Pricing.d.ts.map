@@ -1,1 +1,1 @@
-{"version":3,"file":"Pricing.d.ts","sourceRoot":"","sources":["../../src/panels/Pricing.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,OAAO,CAAC;AAM1C,OAAO,KAAK,EAA0C,iBAAiB,EAAE,MAAM,YAAY,CAAC;AAoJ5F;;;;GAIG;AACH,wBAAgB,OAAO,CAAC,KAAK,EAAE,iBAAiB,GAAG,YAAY,CAwE9D"}
+{"version":3,"file":"Pricing.d.ts","sourceRoot":"","sources":["../../src/panels/Pricing.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,OAAO,CAAC;AAM1C,OAAO,KAAK,EAA0C,iBAAiB,EAAE,MAAM,YAAY,CAAC;AAsJ5F;;;;GAIG;AACH,wBAAgB,OAAO,CAAC,KAAK,EAAE,iBAAiB,GAAG,YAAY,CAwE9D"}

@@ -54,7 +54,8 @@ function tierName(key: string, tier: number): string | null {
 
 function formatTier(c: VectorComponentView): string {
   if (!c.appetiteFactor) return 'Not scored';
-  if (c.tier === null || c.mask === 0) return '—';
+  if (c.mask === 0) return 'Missing';
+  if (c.tier === null) return 'No tier';
   const name = tierName(c.key, c.tier);
   const value = formatScore(c.tier, { decimals: c.tier === 0 || c.tier === 1 ? 0 : 1 });
   return name !== null ? `${value} · ${name}` : value;
@@ -78,6 +79,8 @@ export function Vector(props: VectorPanelProps): ReactElement {
   const known = components.filter((c) => c.mask === 1).length;
   const keys = new Set(components.map((c) => c.key));
   const spansBuildingAge = BUILDING_AGE_KEYS.every((k) => keys.has(k));
+  // The scaled column is shown only when the API sent scaled values; it is never filled in here.
+  const showScaled = components.some((c) => c.scaled !== null);
 
   return (
     <div className="rf-panel rf-vector" data-testid="vector-panel">
@@ -103,7 +106,7 @@ export function Vector(props: VectorPanelProps): ReactElement {
       {components.length === 0 ? (
         <p className="rf-empty">No feature vector was built for this submission.</p>
       ) : (
-        <div className="rf-table-wrap" style={{ overflowX: 'auto' }}>
+        <div className="rf-table-wrap rf-scroll-x">
           <table className="rf-table" aria-label="Feature vector">
             <thead>
               <tr>
@@ -112,7 +115,7 @@ export function Vector(props: VectorPanelProps): ReactElement {
                 <th scope="col">Raw (x)</th>
                 <th scope="col">Tier (t)</th>
                 <th scope="col">Mask (m)</th>
-                <th scope="col">Scaled</th>
+                {showScaled ? <th scope="col">Scaled</th> : null}
                 <th scope="col">Movable</th>
               </tr>
             </thead>
@@ -153,7 +156,11 @@ export function Vector(props: VectorPanelProps): ReactElement {
                       ) : null}
                     </td>
                     <td data-testid={`vector-mask-${c.key}`}>{c.mask === 1 ? '1 · known' : '0 · missing'}</td>
-                    <td data-testid={`vector-scaled-${c.key}`}>{formatScore(c.scaled, { decimals: 3 })}</td>
+                    {showScaled ? (
+                      <td data-testid={`vector-scaled-${c.key}`}>
+                        {c.scaled !== null ? formatScore(c.scaled, { decimals: 3 }) : c.mask === 0 ? 'Missing' : 'Not scaled'}
+                      </td>
+                    ) : null}
                     <td data-testid={`vector-movable-${c.key}`}>{c.immovable ? 'Immovable' : 'Movable'}</td>
                   </tr>
                 );

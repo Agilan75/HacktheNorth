@@ -143,7 +143,7 @@ const ruleListStyle = {
     margin: 0,
     padding: 0,
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))',
     gap: SPACE.md,
 };
 const ruleStyle = {
@@ -157,14 +157,14 @@ const ruleStyle = {
 const metaStyle = {
     margin: 0,
     display: 'grid',
-    gridTemplateColumns: 'max-content 1fr',
+    gridTemplateColumns: 'max-content minmax(0, 1fr)',
     columnGap: SPACE.md,
     rowGap: SPACE.xs,
     fontSize: cssVar('size-small'),
     lineHeight: cssVar('leading-small'),
 };
 const dtStyle = { color: cssVar('muted-deep') };
-const ddStyle = { margin: 0 };
+const ddStyle = { margin: 0, minWidth: 0, overflowWrap: 'anywhere' };
 const codeStyle = { fontSize: cssVar('size-small') };
 function RuleCard(props) {
     const { rule, showWeight } = props;

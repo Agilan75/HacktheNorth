@@ -76,6 +76,7 @@ function FactorTable(props: { readonly factors: readonly PricingFactorView[] }):
     return <p className="rf-empty">No rating factors were applied to this account.</p>;
   }
   return (
+    <div className="rf-scroll-x">
     <table className="rf-table" aria-label="Account-level factors">
       <thead>
         <tr>
@@ -96,6 +97,7 @@ function FactorTable(props: { readonly factors: readonly PricingFactorView[] }):
         ))}
       </tbody>
     </table>
+    </div>
   );
 }
 
@@ -110,7 +112,7 @@ function BuildingTable(props: { readonly buildings: readonly PricingBuildingView
     for (const f of b.factors) if (!columns.includes(f.label)) columns.push(f.label);
   }
   return (
-    <div style={{ overflowX: 'auto', maxWidth: '100%' }}>
+    <div className="rf-scroll-x">
       <table className="rf-table" aria-label="Per-building rating">
         <thead>
           <tr>

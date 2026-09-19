@@ -35,7 +35,7 @@ describe('Schema', () => {
         expect(rows).toHaveLength(2);
         expect(within(rows[0]).getByText('Policy.custom_flag_7')).toBeInTheDocument();
         expect(within(rows[0]).getByText('Y')).toBeInTheDocument();
-        expect(within(rows[1]).getAllByRole('cell')[1]).toHaveTextContent('—');
+        expect(within(rows[1]).getAllByRole('cell')[1]).toHaveTextContent('Empty in Federato');
         expect(within(rows[1]).getByText('No synonym and no sample values')).toBeInTheDocument();
     });
     it('shows mapped confidence at two decimals and resource coverage', () => {

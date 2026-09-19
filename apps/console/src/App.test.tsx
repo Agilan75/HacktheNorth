@@ -28,7 +28,7 @@ describe('App route table', () => {
     const nav = within(screen.getByRole('navigation', { name: 'Primary' }));
     expect(nav.getByRole('link', { name: 'Verification' })).toHaveAttribute('href', '/verification');
     expect(nav.getByRole('link', { name: 'Verification' })).toHaveAttribute('aria-current', 'page');
-    expect(NAV_ITEMS.map((n) => n.label)).toEqual(['Queue', 'Actions', 'Rules', 'Glossary', 'Aggregate', 'Verification']);
+    expect(NAV_ITEMS.map((n) => n.label)).toEqual(['Queue', 'Actions', 'Rules', 'Glossary', 'Aggregate', 'Explore', 'Verification']);
   });
 
   it('still routes the existing pages', () => {
@@ -38,5 +38,24 @@ describe('App route table', () => {
       </MemoryRouter>,
     );
     expect(screen.getByText('aggregate page')).toBeInTheDocument();
+  });
+
+  it('shows a not-found page with a way back for an unknown address, and still redirects / to the queue', () => {
+    render(
+      <MemoryRouter initialEntries={['/s/does-not-exist']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
+    expect(screen.getByText('/s/does-not-exist')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to the queue' })).toHaveAttribute('href', '/queue');
+    expect(screen.queryByText('queue page')).toBeNull();
+    cleanup();
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('queue page')).toBeInTheDocument();
   });
 });

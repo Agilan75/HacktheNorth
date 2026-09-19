@@ -353,6 +353,11 @@ export interface QueueRowView {
   readonly contradictionCount: number;
   readonly oneFlipFromFit: boolean;
   readonly assignedUnderwriter: string | null;
+  /** Where the underwriter name came from: Retrofit routing, or Federato's own record. */
+  readonly underwriterSource: 'routed' | 'federato' | null;
+  /** Some values were hand-authored (synthetic backfill), not read from Federato. */
+  readonly synthetic: boolean;
+  readonly totalTiv: number | null;
   readonly pendingAction: string | null;
   readonly explanationLine: string;
   readonly outOfAppetiteLine: boolean;
@@ -380,6 +385,8 @@ export interface SubmissionDetailView {
   /** The line to show: Federato's own (`cyber`, ...) on a triage knockout, otherwise `lineOfBusiness`. */
   readonly displayLineOfBusiness: string;
   readonly accountKind: AccountKind;
+  /** Some values were hand-authored (synthetic backfill), not read from Federato. */
+  readonly synthetic: boolean;
   /** Null only when the API predates the facts (an older deploy); `facts.source` says whether they were read. */
   readonly facts: SubmissionFactsView | null;
   /** Non-null on the 38 real property accounts the verification covered. */

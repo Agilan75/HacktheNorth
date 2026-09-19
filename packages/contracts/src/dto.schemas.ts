@@ -467,6 +467,7 @@ export const queueRowSchema = z.object({
   lineOfBusiness: z.string(),
   outOfAppetiteLine: z.boolean(),
   accountKind: accountKindSchema,
+  synthetic: z.boolean(),
   appetiteScore: z.number(),
   primaryState: z.string().nullable(),
   totalTiv: z.number().nullable(),
@@ -482,6 +483,7 @@ export const queueRowSchema = z.object({
     .nullable(),
   oneFlipFromFit: z.boolean(),
   assignedUnderwriter: underwriterSchema.nullable(),
+  federatoUnderwriter: z.string().nullable(),
   pendingAction: z
     .object({ id: idSchema, type: actionTypeSchema, status: actionStatusSchema })
     .nullable(),
@@ -585,6 +587,7 @@ export const submissionDetailSchema: z.ZodType<SubmissionDetailDto> = z.object({
   lineOfBusiness: lineOfBusinessSchema,
   displayLineOfBusiness: z.string(),
   accountKind: accountKindSchema,
+  synthetic: z.boolean(),
   facts: submissionFactsSchema,
   verification: accountVerificationSchema.nullable(),
   insuredName: z.string().nullable(),
