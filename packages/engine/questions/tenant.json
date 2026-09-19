@@ -1,0 +1,248 @@
+{
+  "lineOfBusiness": "tenant",
+  "version": "1.0.0",
+  "questions": [
+    {
+      "id": "q-portable-heater",
+      "field": "hazards.portableHeater",
+      "prompt": "Do you use a portable heater in this room?",
+      "inputType": "boolean",
+      "options": [
+        {
+          "value": true,
+          "label": "Yes"
+        },
+        {
+          "value": false,
+          "label": "No"
+        }
+      ],
+      "accessibilityLabel": "Portable heater. Answer yes if you use a plug-in or portable heater in this room."
+    },
+    {
+      "id": "q-heater-near-combustible",
+      "field": "hazards.heaterNearCombustible",
+      "prompt": "Is the heater close to curtains, bedding or other fabric?",
+      "inputType": "boolean",
+      "options": [
+        {
+          "value": true,
+          "label": "Yes"
+        },
+        {
+          "value": false,
+          "label": "No"
+        }
+      ],
+      "accessibilityLabel": "Heater near fabric. Answer yes if the heater sits close to curtains, bedding or other soft furnishings."
+    },
+    {
+      "id": "q-extension-cord",
+      "field": "hazards.extensionCord",
+      "prompt": "Is an extension cord in use in this room?",
+      "inputType": "boolean",
+      "options": [
+        {
+          "value": true,
+          "label": "Yes"
+        },
+        {
+          "value": false,
+          "label": "No"
+        }
+      ],
+      "accessibilityLabel": "Extension cord. Answer yes if anything in this room is plugged into an extension cord."
+    },
+    {
+      "id": "q-power-bar-overload",
+      "field": "hazards.powerBarOverload",
+      "prompt": "Is any power bar full, or plugged into another power bar?",
+      "inputType": "boolean",
+      "options": [
+        {
+          "value": true,
+          "label": "Yes"
+        },
+        {
+          "value": false,
+          "label": "No"
+        }
+      ],
+      "accessibilityLabel": "Power bar. Answer yes if a power bar has every socket used, or is plugged into another power bar."
+    },
+    {
+      "id": "q-candle",
+      "field": "hazards.candle",
+      "prompt": "Do you burn candles with a real flame in this room?",
+      "inputType": "boolean",
+      "options": [
+        {
+          "value": true,
+          "label": "Yes"
+        },
+        {
+          "value": false,
+          "label": "No"
+        }
+      ],
+      "accessibilityLabel": "Candles. Answer yes if you light candles with a real flame in this room."
+    },
+    {
+      "id": "q-stove",
+      "field": "hazards.stove",
+      "prompt": "Is there a stove, hot plate or other cooking appliance in this room?",
+      "inputType": "boolean",
+      "options": [
+        {
+          "value": true,
+          "label": "Yes"
+        },
+        {
+          "value": false,
+          "label": "No"
+        }
+      ],
+      "accessibilityLabel": "Cooking appliance. Answer yes if this room has a stove, hot plate or other cooking appliance."
+    },
+    {
+      "id": "q-blocked-exit",
+      "field": "hazards.blockedExit",
+      "prompt": "Is anything blocking the door or the window you would leave by in an emergency?",
+      "inputType": "boolean",
+      "options": [
+        {
+          "value": true,
+          "label": "Yes"
+        },
+        {
+          "value": false,
+          "label": "No"
+        }
+      ],
+      "accessibilityLabel": "Blocked exit. Answer yes if furniture or belongings block the way out of this room."
+    },
+    {
+      "id": "q-window-ac-unit",
+      "field": "hazards.windowAcUnit",
+      "prompt": "Is there an air conditioner in the window?",
+      "inputType": "boolean",
+      "options": [
+        {
+          "value": true,
+          "label": "Yes"
+        },
+        {
+          "value": false,
+          "label": "No"
+        }
+      ],
+      "accessibilityLabel": "Window air conditioner. Answer yes if an air-conditioning unit sits in a window of this room."
+    },
+    {
+      "id": "q-water-heater",
+      "field": "hazards.waterHeater",
+      "prompt": "Is there a water heater inside your unit?",
+      "inputType": "boolean",
+      "options": [
+        {
+          "value": true,
+          "label": "Yes"
+        },
+        {
+          "value": false,
+          "label": "No"
+        }
+      ],
+      "accessibilityLabel": "Water heater. Answer yes if a hot-water tank or water heater is inside your unit."
+    },
+    {
+      "id": "q-high-value-contents",
+      "field": "hazards.highValueContents",
+      "prompt": "Do you keep jewellery, cameras, laptops, TVs or instruments worth over $2,500 in total here?",
+      "inputType": "boolean",
+      "options": [
+        {
+          "value": true,
+          "label": "Yes"
+        },
+        {
+          "value": false,
+          "label": "No"
+        }
+      ],
+      "accessibilityLabel": "High-value items. Answer yes if jewellery, cameras, laptops, TVs or instruments here are worth more than 2,500 dollars in total."
+    },
+    {
+      "id": "q-smoke-detector-count",
+      "field": "hazards.smokeDetectorCount",
+      "prompt": "How many working smoke detectors are in your unit?",
+      "inputType": "number",
+      "accessibilityLabel": "Smoke detectors. Enter how many working smoke detectors are in your unit. Enter 0 if there are none.",
+      "unit": "detectors"
+    },
+    {
+      "id": "q-year-built",
+      "field": "buildings[0].yearBuilt",
+      "prompt": "About what year was your building built?",
+      "inputType": "number",
+      "accessibilityLabel": "Year built. Enter the year your building was built, as four digits. A best guess is fine.",
+      "unit": "year"
+    },
+    {
+      "id": "q-contents-limit",
+      "field": "exposure.contentsLimit",
+      "prompt": "About how much would it cost to replace everything you own?",
+      "inputType": "single_select",
+      "options": [
+        {
+          "value": 15000,
+          "label": "Up to $15,000"
+        },
+        {
+          "value": 25000,
+          "label": "About $25,000"
+        },
+        {
+          "value": 50000,
+          "label": "About $50,000"
+        },
+        {
+          "value": 75000,
+          "label": "About $75,000"
+        },
+        {
+          "value": 100000,
+          "label": "About $100,000"
+        },
+        {
+          "value": 150000,
+          "label": "More than $100,000"
+        }
+      ],
+      "accessibilityLabel": "Contents value. Choose roughly what it would cost to replace everything you own.",
+      "unit": "dollars"
+    },
+    {
+      "id": "q-term-months",
+      "field": "exposure.termMonths",
+      "prompt": "How long do you want the policy to last?",
+      "inputType": "single_select",
+      "options": [
+        {
+          "value": 4,
+          "label": "4 months"
+        },
+        {
+          "value": 8,
+          "label": "8 months"
+        },
+        {
+          "value": 12,
+          "label": "12 months"
+        }
+      ],
+      "accessibilityLabel": "Policy length. Choose 4, 8 or 12 months.",
+      "unit": "months"
+    }
+  ]
+}

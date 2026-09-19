@@ -5,7 +5,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import type {
+  BookStats,
   CanonicalSubmission,
+  LineOfBusiness,
+  SubmissionType,
   FeatureVector,
   Rulebook,
   VectorComponentSpec,
@@ -446,6 +449,203 @@ describe('vectorize — a pure function of the merged submission', () => {
     );
     expect(vector.x[4]).toBe(75_000);
     expect(vector.t[4]).toBe(1);
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/* CP1 FX1 — G-11 categorical canonicalization and PRD 12 scaled range         */
+/* -------------------------------------------------------------------------- */
+
+/** V-6 completeness: 100 x known required components / required components. */
+function completenessOf(m: readonly (0 | 1)[]): number {
+  let required = 0;
+  let known = 0;
+  for (const c of SPEC.components) {
+    if (!c.required) continue;
+    required += 1;
+    if (m[c.index] === 1) known += 1;
+  }
+  return required === 0 ? 100 : (100 * known) / required;
+}
+
+function withSubmissionType(value: string): CanonicalSubmission {
+  return {
+    ...submissionB1(),
+    submissionType: [
+      { value: value as SubmissionType, provenance: { source: 'self_reported' } },
+    ],
+  };
+}
+
+describe('G-11 — categorical fields are trimmed and case-folded; blank is missing', () => {
+  it('"NEW_BUSINESS", " new ", "new" and "new_business" are all new business, tier 1', () => {
+    for (const raw of ['NEW_BUSINESS', ' new ', 'new', 'new_business', ' New ']) {
+      const vector = vectorize(withSubmissionType(raw), SPEC, RULEBOOK);
+      expect(vector.x[0], raw).toBe(1);
+      expect(vector.m[0], raw).toBe(1);
+      expect(vector.t[0], raw).toBe(1);
+    }
+  });
+
+  it('"RENEWAL" is a known renewal: tier 0 and a knockout', () => {
+    for (const raw of ['RENEWAL', ' renewal ', 'Renewal']) {
+      const vector = vectorize(withSubmissionType(raw), SPEC, RULEBOOK);
+      expect(vector.x[0], raw).toBe(0);
+      expect(vector.m[0], raw).toBe(1);
+      // G-3: a known component at tier 0 sets the knockout mask.
+      expect(vector.t[0], raw).toBe(0);
+    }
+  });
+
+  it('a blank submission type is MISSING: m 0, x/t null, no knockout, completeness 8/9', () => {
+    const full = completenessOf(vectorize(submissionB1(), SPEC, RULEBOOK).m);
+    expect(full).toBe(100);
+    for (const raw of ['', '   ', '\t\n']) {
+      const vector = vectorize(withSubmissionType(raw), SPEC, RULEBOOK);
+      expect(vector.x[0], JSON.stringify(raw)).toBeNull();
+      expect(vector.m[0], JSON.stringify(raw)).toBe(0);
+      expect(vector.t[0], JSON.stringify(raw)).toBeNull();
+      expect(vector.t.some((t) => t === 0), JSON.stringify(raw)).toBe(false);
+      expect(completenessOf(vector.m)).toBeCloseTo((100 * 8) / 9, 12);
+    }
+  });
+
+  it('line of business is case-folded; a blank line is MISSING', () => {
+    const at = (lob: string) =>
+      vectorize({ ...submissionB1(), lineOfBusiness: lob as LineOfBusiness }, SPEC, RULEBOOK);
+    for (const raw of ['COMMERCIAL_PROPERTY', ' commercial_property ', 'Commercial_Property']) {
+      const v = at(raw);
+      expect(v.x[1], raw).toBe(1);
+      expect(v.t[1], raw).toBe(1);
+    }
+    expect(at('TENANT').x[1]).toBe(0);
+    expect(at('TENANT').t[1]).toBe(0);
+    for (const raw of ['', '   ']) {
+      const v = at(raw);
+      expect(v.x[1], JSON.stringify(raw)).toBeNull();
+      expect(v.m[1], JSON.stringify(raw)).toBe(0);
+      expect(v.t[1], JSON.stringify(raw)).toBeNull();
+      expect(v.t.some((t) => t === 0)).toBe(false);
+      expect(completenessOf(v.m)).toBeCloseTo((100 * 8) / 9, 12);
+    }
+  });
+
+  it('a blank primary state is MISSING; a non-blank unknown code is out-of-list (tier 0)', () => {
+    const base = submissionB1();
+    const at = (state: string) =>
+      vectorize({ ...base, rollup: { ...base.rollup!, primaryState: state } }, SPEC, RULEBOOK);
+    for (const raw of ['', '   ']) {
+      const v = at(raw);
+      expect(v.x[2], JSON.stringify(raw)).toBeNull();
+      expect(v.m[2], JSON.stringify(raw)).toBe(0);
+      expect(v.t[2], JSON.stringify(raw)).toBeNull();
+      expect(v.t.some((t) => t === 0)).toBe(false);
+      expect(completenessOf(v.m)).toBeCloseTo((100 * 8) / 9, 12);
+    }
+    expect(at(' fl ').t[2]).toBe(1);
+    expect(at('ZZ').t[2]).toBe(0);
+  });
+
+  it('blank submission type, line and state together drop completeness to 6/9', () => {
+    const base = submissionB1();
+    const v = vectorize(
+      {
+        ...base,
+        lineOfBusiness: '  ' as LineOfBusiness,
+        submissionType: [{ value: '' as SubmissionType, provenance: { source: 'self_reported' } }],
+        rollup: { ...base.rollup!, primaryState: ' ' },
+      },
+      SPEC,
+      RULEBOOK,
+    );
+    expect(v.m.slice(0, 3)).toEqual([0, 0, 0]);
+    expect(v.t.some((t) => t === 0)).toBe(false);
+    expect(completenessOf(v.m)).toBeCloseTo((100 * 6) / 9, 12);
+  });
+});
+
+describe('PRD 12 — every scaled component is finite and in [0, 1]', () => {
+  const MAX = Number.MAX_VALUE;
+  const absurd: readonly (number | null)[] = [1, 1, 2, MAX, -MAX, -MAX, -0.5, 1.5, MAX, -3, 42];
+
+  const inUnit = (scaled: readonly (number | null)[]) => {
+    for (const [i, s] of scaled.entries()) {
+      expect(s, `component ${i}`).not.toBeNull();
+      expect(Number.isFinite(s as number), `component ${i} = ${String(s)}`).toBe(true);
+      expect(s as number, `component ${i}`).toBeGreaterThanOrEqual(0);
+      expect(s as number, `component ${i}`).toBeLessThanOrEqual(1);
+    }
+  };
+
+  it('±Number.MAX_VALUE and negative shares scale into [0, 1] against a normal book', () => {
+    const stats = computeBookStats(
+      [
+        vectorOf([1, 1, 2, 10_000_000, 50_000, 0, 0, 1, 0, 0, 1]),
+        vectorOf([1, 1, 2, 100_000_000, 200_000, 0.5, 0.5, 0.5, 1_000_000, 1, 10]),
+      ],
+      SPEC,
+    );
+    inUnit(scaleVector(absurd, SPEC, stats));
+  });
+
+  it('stays in [0, 1] against a book that itself contains ±Number.MAX_VALUE', () => {
+    const stats = computeBookStats(
+      [
+        vectorOf(absurd),
+        vectorOf([1, 1, 2, -MAX, MAX, MAX, MAX, -MAX, -MAX, MAX, -MAX]),
+        vectorOf([1, 1, 2, 10_000_000, 50_000, 0, 0, 1, 0, 0, 1]),
+      ],
+      SPEC,
+    );
+    inUnit(scaleVector(absurd, SPEC, stats));
+    inUnit(scaleVector([1, 1, 2, 10_000_000, 50_000, 0, 0, 1, 0, 0, 1], SPEC, stats));
+  });
+
+  it('a book whose raw min/max span overflows to Infinity never yields NaN', () => {
+    const stats: BookStats = {
+      ...computeBookStats([vectorOf(B1)], SPEC),
+      components: SPEC.components.map((c) => ({
+        index: c.index,
+        key: c.key,
+        min: -MAX,
+        max: MAX,
+        mean: 0,
+        median: 0,
+        count: 2,
+      })),
+    };
+    inUnit(scaleVector(absurd, SPEC, stats));
+    const mid = scaleVector(withComponent(B1, 3, 0), SPEC, stats);
+    expect(mid[3]).toBeCloseTo(0.5, 12);
+  });
+
+  it('null / NaN / ±Infinity stay MISSING (null), and absurd finite values stay KNOWN', () => {
+    const x = [1, 1, 2, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, null, -MAX, MAX, null, null];
+    const scaled = scaleVector(x, SPEC, computeBookStats([vectorOf(B1)], SPEC));
+    expect(scaled.slice(3, 7)).toEqual([null, null, null, null]);
+    expect(scaled[7]).toBe(0);
+    expect(scaled[8]).not.toBeNull();
+  });
+
+  it('case 40: an absurd submission vectorizes with every component known and scales into [0, 1]', () => {
+    const base = submissionB1();
+    const v = vectorize(
+      {
+        ...base,
+        rollup: { ...base.rollup!, pctTivPre1990: -MAX, fiveYearLoss: MAX, pctTivPost2010: -0.5 },
+      },
+      SPEC,
+      RULEBOOK,
+    );
+    expect(v.m.slice(0, 9)).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1]);
+    expect(v.t[8]).toBe(0);
+    const stats = computeBookStats([v, vectorOf(B1)], SPEC);
+    const scaled = scaleVector(v.x, SPEC, stats);
+    for (const s of scaled.slice(0, 9)) {
+      expect(Number.isFinite(s as number)).toBe(true);
+      expect(s as number).toBeGreaterThanOrEqual(0);
+      expect(s as number).toBeLessThanOrEqual(1);
+    }
   });
 });
 

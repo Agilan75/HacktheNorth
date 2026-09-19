@@ -5,5 +5,5 @@ import type { QueueRowView, SubmissionDetailView } from '../panels/types.js';
  * tested without the API. Stub frozen by W0-4; unit C01 replaces these bodies.
  */
 export declare function fixtureQueue(): readonly QueueRowView[];
-export declare function fixtureSubmission(_kind: 'fit' | 'refer' | 'dnf' | 'no-policy'): SubmissionDetailView;
+export declare function fixtureSubmission(kind: 'fit' | 'refer' | 'dnf' | 'no-policy'): SubmissionDetailView;
 //# sourceMappingURL=dto.d.ts.map

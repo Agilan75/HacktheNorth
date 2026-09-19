@@ -9,7 +9,8 @@ export interface AdapterBannerProps {
  *
  * The banner states the adapter in words ("Live Federato API" / "Snapshot"),
  * never by colour alone, and has role="status" so a screen reader announces a
- * change. Stub frozen by W0-4; unit C03 replaces this body only.
+ * change. It renders something in every state — loading, error and unknown
+ * included — so it can never disappear from the header.
  */
-export declare function AdapterBanner(_props: AdapterBannerProps): ReactElement;
+export declare function AdapterBanner(props: AdapterBannerProps): ReactElement;
 //# sourceMappingURL=AdapterBanner.d.ts.map

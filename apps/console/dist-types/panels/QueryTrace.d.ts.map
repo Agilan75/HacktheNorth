@@ -1,1 +1,1 @@
-{"version":3,"file":"QueryTrace.d.ts","sourceRoot":"","sources":["../../src/panels/QueryTrace.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAE,YAAY,EAAE,MAAM,OAAO,CAAC;AAE1C,OAAO,KAAK,EAAE,oBAAoB,EAAE,MAAM,YAAY,CAAC;AAEvD;;;;;GAKG;AACH,wBAAgB,UAAU,CAAC,MAAM,EAAE,oBAAoB,GAAG,YAAY,CAErE"}
+{"version":3,"file":"QueryTrace.d.ts","sourceRoot":"","sources":["../../src/panels/QueryTrace.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAK,EAAiB,YAAY,EAAE,MAAM,OAAO,CAAC;AAOzD,OAAO,KAAK,EAAuB,oBAAoB,EAAE,MAAM,YAAY,CAAC;AA2H5E;;;;;GAKG;AACH,wBAAgB,UAAU,CAAC,KAAK,EAAE,oBAAoB,GAAG,YAAY,CAwBpE"}

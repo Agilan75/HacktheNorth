@@ -13,5 +13,5 @@ export interface CardProps {
  *
  * Stub frozen by W0-4. Unit C02 replaces this body only.
  */
-export declare function Card(_props: CardProps): ReactElement;
+export declare function Card(props: CardProps): ReactElement;
 //# sourceMappingURL=Card.d.ts.map

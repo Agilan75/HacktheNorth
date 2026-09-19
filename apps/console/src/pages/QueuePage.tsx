@@ -1,4 +1,190 @@
+import { useId, useMemo, useState } from 'react';
 import type { ReactElement } from 'react';
+import { Link, useNavigate } from 'react-router';
+
+import {
+  formatMoney,
+  formatPercent,
+  formatScore,
+  pluralize,
+  titleCase,
+} from '@retrofit/contracts';
+
+import { submissionPath } from '../App.js';
+import { useApi } from '../api/useApi.js';
+import { Badge } from '../components/atoms/Badge.js';
+import { VerdictPill } from '../components/atoms/VerdictPill.js';
+import { DataTable } from '../components/DataTable.js';
+import type { DataTableColumn } from '../components/DataTable.js';
+import { Filters } from '../components/Filters.js';
+import type { FilterOptions, QueueFilterValue } from '../components/Filters.js';
+import type { QueueRowView } from '../panels/types.js';
+
+/** Label PRD §10 fixes for the collapsed non-property group. */
+const OUT_OF_APPETITE_LABEL = 'Out of appetite: line of business';
+
+const EMPTY_FILTER: QueueFilterValue = {
+  line: null,
+  verdict: null,
+  state: null,
+  underwriter: null,
+  search: '',
+};
+
+/** Distinct, non-empty values, sorted for a stable dropdown. */
+function distinct(values: readonly (string | null)[]): readonly string[] {
+  const set = new Set<string>();
+  for (const v of values) {
+    if (typeof v === 'string' && v.trim().length > 0) set.add(v);
+  }
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+/** Filter options come from the rows the API returned — never a hard-coded list. */
+function buildOptions(rows: readonly QueueRowView[]): FilterOptions {
+  return {
+    lines: distinct(rows.map((r) => r.lineOfBusiness)),
+    states: distinct(rows.map((r) => r.primaryState)),
+    underwriters: distinct(rows.map((r) => r.assignedUnderwriter)),
+  };
+}
+
+function matches(row: QueueRowView, f: QueueFilterValue): boolean {
+  if (f.line !== null && row.lineOfBusiness !== f.line) return false;
+  if (f.verdict !== null && row.verdict !== f.verdict) return false;
+  if (f.state !== null && row.primaryState !== f.state) return false;
+  if (f.underwriter !== null && row.assignedUnderwriter !== f.underwriter) return false;
+  const q = f.search.trim().toLowerCase();
+  if (q.length > 0) {
+    const haystack = [row.insuredName, row.submissionId, row.explanationLine]
+      .join(' ')
+      .toLowerCase();
+    if (!haystack.includes(q)) return false;
+  }
+  return true;
+}
+
+function isActive(f: QueueFilterValue): boolean {
+  return (
+    f.line !== null ||
+    f.verdict !== null ||
+    f.state !== null ||
+    f.underwriter !== null ||
+    f.search.trim().length > 0
+  );
+}
+
+/**
+ * Order by the rank the API assigned (PRD §6.8 / INTERPRETATIONS P-6 are
+ * applied server-side). The page never recomputes a rank; it only restores the
+ * API's order after filtering, with the id as a deterministic tiebreak.
+ */
+function byRank(a: QueueRowView, b: QueueRowView): number {
+  if (a.rank !== b.rank) return a.rank - b.rank;
+  return a.submissionId < b.submissionId ? -1 : a.submissionId > b.submissionId ? 1 : 0;
+}
+
+function premiumCell(row: QueueRowView): string {
+  return `${formatMoney(row.quotedPremium)} vs ${formatMoney(row.predictedPremium)}`;
+}
+
+function buildColumns(): readonly DataTableColumn<QueueRowView>[] {
+  return [
+    {
+      key: 'rank',
+      header: 'Rank',
+      align: 'right',
+      render: (r) => String(r.rank),
+      sortValue: (r) => r.rank,
+    },
+    {
+      key: 'quality',
+      header: 'Quality',
+      headerTitle: 'Quality index, 0–100 (PRD §6.8)',
+      align: 'right',
+      render: (r) => formatScore(r.qualityIndex, { decimals: 1 }),
+      sortValue: (r) => r.qualityIndex,
+    },
+    {
+      key: 'verdict',
+      header: 'Verdict',
+      render: (r) => <VerdictPill verdict={r.verdict} />,
+      sortValue: (r) => r.verdict,
+    },
+    {
+      key: 'insured',
+      header: 'Insured',
+      render: (r) => (
+        <Link to={submissionPath(r.submissionId)} aria-label={`Open ${r.insuredName}`}>
+          {r.insuredName}
+        </Link>
+      ),
+      sortValue: (r) => r.insuredName,
+    },
+    {
+      key: 'appetite',
+      header: 'Appetite',
+      headerTitle: 'Appetite score, 0–100',
+      align: 'right',
+      render: (r) => formatScore(r.appetiteScore),
+      sortValue: (r) => r.appetiteScore,
+    },
+    {
+      key: 'premium',
+      header: 'Quoted vs predicted',
+      headerTitle: 'Quoted premium vs predicted premium (USD)',
+      align: 'right',
+      render: premiumCell,
+      sortValue: (r) => r.quotedPremium,
+    },
+    {
+      key: 'adequacy',
+      header: 'Adequacy',
+      headerTitle: 'Quoted premium ÷ predicted premium',
+      align: 'right',
+      render: (r) => formatPercent(r.adequacy),
+      sortValue: (r) => r.adequacy,
+    },
+    {
+      key: 'completeness',
+      header: 'Completeness',
+      align: 'right',
+      render: (r) => formatPercent(r.completeness, { from: 'percent' }),
+      sortValue: (r) => r.completeness,
+    },
+    {
+      key: 'contradictions',
+      header: 'Contradictions',
+      align: 'right',
+      render: (r) => String(r.contradictionCount),
+      sortValue: (r) => r.contradictionCount,
+    },
+    {
+      key: 'flip',
+      header: 'Flip',
+      headerTitle: 'One movable change away from FIT',
+      render: (r) => (r.oneFlipFromFit ? <Badge label="1 flip from FIT" tone="attention" /> : null),
+      sortValue: (r) => (r.oneFlipFromFit ? 1 : 0),
+    },
+    {
+      key: 'underwriter',
+      header: 'Underwriter',
+      render: (r) => r.assignedUnderwriter ?? 'Unassigned',
+      sortValue: (r) => r.assignedUnderwriter,
+    },
+    {
+      key: 'pending',
+      header: 'Pending action',
+      render: (r) => (r.pendingAction === null ? 'None' : titleCase(r.pendingAction)),
+      sortValue: (r) => r.pendingAction,
+    },
+    {
+      key: 'explanation',
+      header: 'Why',
+      render: (r) => r.explanationLine,
+    },
+  ];
+}
 
 /**
  * PRD 10 /queue - the ranked table, filters, and the collapsed 'Out of appetite: line of business' group.
@@ -7,5 +193,93 @@ import type { ReactElement } from 'react';
  * Route registration lives in src/App.tsx and is frozen.
  */
 export function QueuePage(): ReactElement {
-  throw new Error('NOT_IMPLEMENTED:C04');
+  const queue = useApi((client) => client.getQueue(), []);
+  const navigate = useNavigate();
+  const [filter, setFilter] = useState<QueueFilterValue>(EMPTY_FILTER);
+  const [outOpen, setOutOpen] = useState(false);
+  const groupId = useId();
+
+  const rows = useMemo<readonly QueueRowView[]>(() => queue.data ?? [], [queue.data]);
+  const options = useMemo(() => buildOptions(rows), [rows]);
+  const columns = useMemo(() => buildColumns(), []);
+
+  const { inAppetite, outOfAppetite } = useMemo(() => {
+    const visible = rows.filter((r) => matches(r, filter)).sort(byRank);
+    return {
+      inAppetite: visible.filter((r) => !r.outOfAppetiteLine),
+      outOfAppetite: visible.filter((r) => r.outOfAppetiteLine),
+    };
+  }, [rows, filter]);
+
+  const onRowClick = (row: QueueRowView): void => {
+    void navigate(submissionPath(row.submissionId));
+  };
+
+  const shown = inAppetite.length + outOfAppetite.length;
+  const filtered = isActive(filter);
+
+  return (
+    <section className="queue-page" aria-labelledby={`${groupId}-title`}>
+      <h1 id={`${groupId}-title`}>Queue</h1>
+
+      <Filters value={filter} options={options} onChange={setFilter} />
+
+      {queue.error !== null ? (
+        <div role="alert" className="queue-error">
+          <p>Could not load the queue: {queue.error.message}</p>
+          <button type="button" onClick={queue.reload}>
+            Retry
+          </button>
+        </div>
+      ) : null}
+
+      <p role="status" aria-live="polite" className="queue-count">
+        {queue.loading && queue.data === null
+          ? 'Loading the queue…'
+          : filtered
+            ? `Showing ${shown} of ${pluralize(rows.length, 'submission')}`
+            : pluralize(rows.length, 'submission')}
+      </p>
+
+      <DataTable<QueueRowView>
+        caption="Ranked submissions, best first"
+        columns={columns}
+        rows={inAppetite}
+        rowKey={(r) => r.submissionId}
+        emptyLabel={
+          filtered ? 'No submissions match these filters.' : 'No submissions in appetite.'
+        }
+        loading={queue.loading && queue.data === null}
+        onRowClick={onRowClick}
+      />
+
+      {outOfAppetite.length > 0 ? (
+        <section className="queue-out-of-appetite" aria-labelledby={`${groupId}-out`}>
+          <h2 id={`${groupId}-out`}>
+            <button
+              type="button"
+              aria-expanded={outOpen}
+              aria-controls={`${groupId}-out-body`}
+              onClick={() => setOutOpen((v) => !v)}
+              style={{ minHeight: 44 }}
+            >
+              {`${OUT_OF_APPETITE_LABEL} (${outOfAppetite.length})`}
+            </button>
+          </h2>
+          <div id={`${groupId}-out-body`} hidden={!outOpen}>
+            {outOpen ? (
+              <DataTable<QueueRowView>
+                caption={OUT_OF_APPETITE_LABEL}
+                columns={columns}
+                rows={outOfAppetite}
+                rowKey={(r) => r.submissionId}
+                emptyLabel="No out-of-appetite submissions."
+                onRowClick={onRowClick}
+              />
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+    </section>
+  );
 }

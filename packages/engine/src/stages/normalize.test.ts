@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { discover } from './discover.js';
-import { normalize } from './normalize.js';
+import {
+  canonicalConstructionType,
+  canonicalLineOfBusiness,
+  canonicalStateCode,
+  canonicalSubmissionType,
+  normalize,
+} from './normalize.js';
 import { COMMERCIAL_SPEC, FLAT_BUNDLE, HQ_SCHEMA, NO_POLICY_BUNDLE } from './discover.test.js';
 import type { RawBundle, Sourced } from '../types.js';
 
@@ -224,5 +230,37 @@ describe('normalize', () => {
     expect(normalize(FLAT_BUNDLE, map, 'commercial_property')).toEqual(
       normalize(FLAT_BUNDLE, map, 'commercial_property'),
     );
+  });
+});
+
+describe('G-11 canonicalizers (exported for stage 6, CP1 FX1)', () => {
+  it('submission type: trimmed, case-folded; blank and non-string are missing', () => {
+    for (const raw of ['NEW_BUSINESS', ' new ', 'new', 'new_business', 'New Business', 'newbusiness']) {
+      expect(canonicalSubmissionType(raw), raw).toBe('new_business');
+    }
+    for (const raw of ['RENEWAL', ' renewal ', 'Renew']) {
+      expect(canonicalSubmissionType(raw), raw).toBe('renewal');
+    }
+    for (const raw of ['', '   ', null, undefined, 3]) {
+      expect(canonicalSubmissionType(raw), String(raw)).toBeNull();
+    }
+    expect(canonicalSubmissionType('rewrite')).toBeNull();
+  });
+
+  it('line of business: lower snake_case; blank is missing', () => {
+    expect(canonicalLineOfBusiness('COMMERCIAL_PROPERTY')).toBe('commercial_property');
+    expect(canonicalLineOfBusiness(' Commercial Property ')).toBe('commercial_property');
+    expect(canonicalLineOfBusiness('Tenant')).toBe('tenant');
+    expect(canonicalLineOfBusiness('')).toBeNull();
+    expect(canonicalLineOfBusiness('   ')).toBeNull();
+    expect(canonicalLineOfBusiness(null)).toBeNull();
+  });
+
+  it('state (G-7) and construction (G-8); blank is missing', () => {
+    expect(canonicalStateCode(' oh ')).toBe('OH');
+    expect(canonicalStateCode('   ')).toBeNull();
+    expect(canonicalStateCode('')).toBeNull();
+    expect(canonicalConstructionType('Masonry Non-Combustible')).toBe('masonry_non_combustible');
+    expect(canonicalConstructionType('  ')).toBeNull();
   });
 });

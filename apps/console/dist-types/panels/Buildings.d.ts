@@ -6,5 +6,5 @@ import type { BuildingsPanelProps } from './types.js';
  * Stub frozen by W0-4. Unit C09 replaces this body only — never the signature,
  * never the import list's shape, never this file's path.
  */
-export declare function Buildings(_props: BuildingsPanelProps): ReactElement;
+export declare function Buildings(props: BuildingsPanelProps): ReactElement;
 //# sourceMappingURL=Buildings.d.ts.map

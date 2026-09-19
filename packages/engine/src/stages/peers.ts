@@ -8,7 +8,7 @@ import type {
   VectorSpec,
 } from '../types.js';
 import { K_PEERS, PEER_COMPONENT_MIN_INDEX } from '../constants.js';
-import { isFiniteNumber, mean, median, scaledEuclidean } from '../util/math.js';
+import { isFiniteNumber, mean, median } from '../util/math.js';
 import { scaleVector } from './vectorize.js';
 
 /* -------------------------------------------------------------------------- */
@@ -57,6 +57,69 @@ function isReduced(vector: FeatureVector, full: readonly number[], coarse: reado
   return true;
 }
 
+
+/** Outcome of one pair distance: a finite, non-negative number, or why there is none. */
+type PairDistance =
+  | { readonly ok: true; readonly distance: number; readonly comparedComponents: number }
+  | { readonly ok: false; readonly reason: string };
+
+/**
+ * Scaled Euclidean distance over the known components in `include` (PRD 6.4):
+ *
+ *   d = sqrt( sum_i (a_i - b_i)^2 / nCompared )
+ *
+ * Robust on its own, whatever scaling hands it (CP1 FX2):
+ * - a component is compared only when both masks say known AND both scaled
+ *   values are finite; anything else is skipped and not counted;
+ * - the sum is taken over values pre-divided by the largest magnitude compared,
+ *   so ±Number.MAX_VALUE cannot overflow to Infinity or NaN; the result is
+ *   capped at Number.MAX_VALUE, so it is always finite and >= 0;
+ * - symmetric: every step is the same IEEE operation in either order
+ *   ((a/s - b/s)^2 === (b/s - a/s)^2, summed in index order);
+ * - zero only when every compared pair is identical: a non-zero difference that
+ *   underflows in the pre-division is floored at Number.MIN_VALUE.
+ * No component comparable is the one case with no distance.
+ */
+function pairDistance(
+  a: readonly (number | null | undefined)[],
+  b: readonly (number | null | undefined)[],
+  maskA: readonly (0 | 1)[],
+  maskB: readonly (0 | 1)[],
+  include: readonly number[],
+): PairDistance {
+  const used: number[] = [];
+  let scale = 0;
+  let anyDifferent = false;
+  for (const i of include) {
+    if (maskA[i] !== 1 || maskB[i] !== 1) continue;
+    const ai = a[i];
+    const bi = b[i];
+    if (!isFiniteNumber(ai) || !isFiniteNumber(bi)) continue;
+    used.push(i);
+    scale = Math.max(scale, Math.abs(ai), Math.abs(bi));
+    if (ai !== bi) anyDifferent = true;
+  }
+  if (used.length === 0) {
+    return {
+      ok: false,
+      reason: 'no comparable component: no index in componentsUsed is known with a finite scaled value on both sides',
+    };
+  }
+  if (!anyDifferent) return { ok: true, distance: 0, comparedComponents: used.length };
+
+  // Pre-divide only when a square could overflow; otherwise keep the plain formula.
+  const s = scale > 1 ? scale : 1;
+  let acc = 0;
+  for (const i of used) {
+    const d = (a[i] as number) / s - (b[i] as number) / s;
+    acc += d * d;
+  }
+  let distance = s * Math.sqrt(acc / used.length);
+  if (!Number.isFinite(distance)) distance = Number.MAX_VALUE;
+  if (!(distance > 0)) distance = Number.MIN_VALUE;
+  return { ok: true, distance, comparedComponents: used.length };
+}
+
 /* -------------------------------------------------------------------------- */
 /* Stage                                                                       */
 /* -------------------------------------------------------------------------- */
@@ -79,15 +142,9 @@ export function peers(
   const scored: PeerMatch[] = [];
   for (const candidate of candidates) {
     const candidateScaled = scaleVector(candidate.vector.x, spec, bookStats);
-    const d = scaledEuclidean(
-      selfScaled,
-      candidateScaled,
-      vector.m,
-      candidate.vector.m,
-      componentsUsed,
-    );
-    // P-1: nothing compared means the pair is not a peer at all.
-    if (d === null) continue;
+    const d = pairDistance(selfScaled, candidateScaled, vector.m, candidate.vector.m, componentsUsed);
+    // P-1: nothing compared (d.reason) means the pair is not a peer at all.
+    if (!d.ok) continue;
     scored.push({
       id: candidate.id,
       ...(candidate.label === undefined ? {} : { label: candidate.label }),

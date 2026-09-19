@@ -17,11 +17,32 @@ export interface AggregateResponse {
     }[];
     readonly topKnockoutFactors: readonly {
         readonly factorId: string;
+        /** The guideline's own label, from `AggregateDto` (C14). */
+        readonly label?: string;
         readonly count: number;
     }[];
     readonly oneFlipAway: readonly QueueRowView[];
     readonly bookAdequacy: number | null;
     readonly verification: Readonly<Record<string, number | string | null>>;
+    /** `AggregateDto.counts` without `byVerdict` (that is `countsByVerdict`). C14. */
+    readonly counts?: {
+        readonly total: number;
+        readonly scored: number;
+        readonly knockedOut: number;
+        readonly byLine: Readonly<Record<string, number>>;
+    };
+    /** `AggregateDto.bookAdequacy` in full: median, underpriced count and n. C14. */
+    readonly bookAdequacyDetail?: {
+        readonly median: number | null;
+        readonly underpricedCount: number;
+        readonly n: number;
+    };
+    /** The engine's single flip move per one-flip submission id, kept when a queue row replaces it. C14. */
+    readonly oneFlipMoves?: Readonly<Record<string, {
+        readonly moveLabel: string;
+        readonly scoreAfter: number;
+        readonly premiumAfter: number | null;
+    }>>;
 }
 export interface RulesResponse {
     readonly rulebooks: readonly unknown[];
@@ -50,6 +71,5 @@ export interface ApiClient {
     getRules(): Promise<RulesResponse>;
     getGlossary(): Promise<GlossaryResponse>;
 }
-/** Stub frozen by W0-4. Unit C01 replaces this body only. */
-export declare function createApiClient(_options: ApiClientOptions): ApiClient;
+export declare function createApiClient(options: ApiClientOptions): ApiClient;
 //# sourceMappingURL=client.d.ts.map

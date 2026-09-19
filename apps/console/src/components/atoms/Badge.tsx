@@ -11,6 +11,11 @@ export interface BadgeProps {
  *
  * Stub frozen by W0-4. Unit C02 replaces this body only.
  */
-export function Badge(_props: BadgeProps): ReactElement {
-  throw new Error('NOT_IMPLEMENTED:C02');
+export function Badge(props: BadgeProps): ReactElement {
+  const tone = props.tone ?? 'neutral';
+  return (
+    <span className={`rf-badge rf-badge--${tone}`} data-tone={tone} title={props.title}>
+      {props.label}
+    </span>
+  );
 }

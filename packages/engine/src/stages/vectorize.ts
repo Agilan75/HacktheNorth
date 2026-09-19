@@ -19,6 +19,7 @@ import {
   PREMIUM_ACCEPTABLE_MIN,
   PREMIUM_TARGET_MAX,
   PREMIUM_TARGET_MIN,
+  RATIO_TOLERANCE,
   SOURCE_CONFIDENCE,
   SWEEP_FALLBACK_CONFIDENCE,
   TARGET_STATES,
@@ -31,15 +32,18 @@ import {
 } from '../constants.js';
 import {
   clamp01,
-  divideScale,
   isFiniteNumber,
   log1pScale,
   logScale,
   mean,
   median,
-  minMax,
   safeDiv,
 } from '../util/math.js';
+import {
+  canonicalLineOfBusiness,
+  canonicalStateCode,
+  canonicalSubmissionType,
+} from './normalize.js';
 
 /* -------------------------------------------------------------------------- */
 /* Private helpers (HELPERS.md: private to this file, never exported)          */
@@ -125,11 +129,10 @@ function isCanonicalSlot(value: readonly unknown[]): boolean {
   );
 }
 
-/** G-7: state codes compare as trimmed upper-case two-letter strings. */
+/** G-7 / G-11: state codes compare as trimmed upper-case strings; blank is missing. */
 function stateTierOf(state: unknown): number | null {
-  if (typeof state !== 'string') return null;
-  const code = state.trim().toUpperCase();
-  if (code === '') return null;
+  const code = canonicalStateCode(state);
+  if (code === null) return null;
   if (TARGET_STATES.includes(code)) return 2;
   if (ACCEPTABLE_STATES.includes(code)) return 1;
   return 0;
@@ -141,13 +144,21 @@ function rawComponent(
   component: VectorComponentSpec,
 ): number | null {
   switch (component.key) {
+    // G-11: trimmed and case-folded; empty or whitespace-only is missing (G-2).
     case 'isNewBusiness': {
-      const value = pickValue(submission.submissionType);
+      const value: unknown = pickValue(submission.submissionType);
       if (value === null || value === undefined) return null;
-      return value === 'new_business' ? 1 : 0;
+      if (typeof value === 'string' && value.trim() === '') return null;
+      return canonicalSubmissionType(value) === 'new_business' ? 1 : 0;
     }
-    case 'isPropertyLine':
-      return submission.lineOfBusiness === 'commercial_property' ? 1 : 0;
+    case 'isPropertyLine': {
+      const value: unknown = submission.lineOfBusiness;
+      if (value === null || value === undefined) return null;
+      if (typeof value !== 'string') return 0;
+      const line = canonicalLineOfBusiness(value);
+      if (line === null) return null;
+      return line === 'commercial_property' ? 1 : 0;
+    }
     case 'stateTier':
       return stateTierOf(readSource(submission, component.source));
     default:
@@ -323,6 +334,43 @@ export function tiersFor(
   return t;
 }
 
+/**
+ * PRD 12: clamp into [0, 1]. Unlike `clamp01`, +Infinity maps to 1 (not 0), and
+ * NaN maps to 0, so an overflowed intermediate still lands on the right edge.
+ */
+function clampUnit(v: number): number {
+  if (Number.isNaN(v)) return 0;
+  if (v <= 0) return 0;
+  if (v >= 1) return 1;
+  return v;
+}
+
+/** `v / divisor` into [0, 1]; a zero or non-finite divisor gives 0 (as `divideScale`). */
+function divideUnit(v: number, divisor: number): number {
+  if (!isFiniteNumber(divisor) || divisor === 0) return 0;
+  return clampUnit(v / divisor);
+}
+
+/**
+ * Min-max into [0, 1], overflow-safe. Identical to `minMax` for ordinary
+ * inputs; when `max - min` or `v - min` overflows to ±Infinity (a book or value
+ * near ±Number.MAX_VALUE) both are computed on halves, which cannot overflow,
+ * so the ratio is never Infinity/Infinity = NaN.
+ */
+function minMaxUnit(v: number, min: number, max: number): number {
+  if (!isFiniteNumber(v) || !isFiniteNumber(min) || !isFiniteNumber(max)) return 0;
+  let span = max - min;
+  let offset = v - min;
+  if (!Number.isFinite(span) || !Number.isFinite(offset)) {
+    span = max / 2 - min / 2;
+    offset = v / 2 - min / 2;
+    if (span <= RATIO_TOLERANCE / 2) return 0;
+  } else if (span <= RATIO_TOLERANCE) {
+    return 0;
+  }
+  return clampUnit(offset / span);
+}
+
 /** Each component of `x` mapped into 0..1 scaling space per its spec rule. */
 export function scaleVector(
   x: readonly (number | null)[],
@@ -339,12 +387,14 @@ export function scaleVector(
       continue;
     }
     const rule = component.scaling.rule;
+    // PRD 12: every scaled component is clamped into [0, 1]. A finite but
+    // absurd raw value (±Number.MAX_VALUE, a negative share) is KNOWN and clamps.
     if (rule === 'none') {
-      out[component.index] = value;
+      out[component.index] = clampUnit(value);
       continue;
     }
     if (rule === 'divide') {
-      out[component.index] = divideScale(value, component.scaling.divisor ?? 1);
+      out[component.index] = divideUnit(value, component.scaling.divisor ?? 1);
       continue;
     }
     const componentStats = byIndex.get(component.index);
@@ -354,7 +404,7 @@ export function scaleVector(
       out[component.index] = 0;
       continue;
     }
-    out[component.index] = minMax(
+    out[component.index] = minMaxUnit(
       transform(value, component),
       componentStats.min,
       componentStats.max,

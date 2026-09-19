@@ -10,5 +10,5 @@ export interface SkeletonProps {
  *
  * Stub frozen by W0-4. Unit C02 replaces this body only.
  */
-export declare function Skeleton(_props: SkeletonProps): ReactElement;
+export declare function Skeleton(props: SkeletonProps): ReactElement;
 //# sourceMappingURL=Skeleton.d.ts.map

@@ -3,8 +3,8 @@ import type { PeerBenchmarkPanelProps } from './types.js';
 /**
  * PRD 10 (d) The five nearest accounts with distance, rate and losses.
  *
- * Stub frozen by W0-4. Unit C08 replaces this body only — never the signature,
- * never the import list's shape, never this file's path.
+ * Rows render in the order the engine returned them (distance ascending, ties
+ * by id — INTERPRETATIONS P-4); the median and mean are the engine's (P-3).
  */
-export declare function PeerBenchmark(_props: PeerBenchmarkPanelProps): ReactElement;
+export declare function PeerBenchmark(props: PeerBenchmarkPanelProps): ReactElement;
 //# sourceMappingURL=PeerBenchmark.d.ts.map

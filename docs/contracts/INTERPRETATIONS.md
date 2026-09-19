@@ -34,10 +34,11 @@ headed *"2025 Sample: Commercial Property Underwriting Guidelines"*, columns
 | G-4 | Money is USD, plain numbers. `$150M` means `150000000` exactly. `$50K` means `50000`. |
 | G-5 | Years are integers. A non-integer `yearBuilt` is floored before comparison. |
 | G-6 | Shares (`pctTiv*`) are in `[0, 1]`, not percentages. "50%" means `0.5`. |
-| G-7 | US state codes are compared as upper-case two-letter strings after trimming. Anything else is out-of-list, not missing, **unless the field is absent**, which is missing. |
+| G-7 | US state codes are compared as upper-case two-letter strings after trimming. Anything else is out-of-list, not missing, **unless the field is absent or blank** (see G-11), which is missing. |
 | G-8 | Construction types are compared after normalizing to lower snake_case (`"Masonry Non-Combustible"` → `masonry_non_combustible`). |
 | G-9 | Every tier assignment below is exhaustive: for a known input, exactly one of Target / Acceptable / Not Acceptable applies. There are no gaps and no overlaps. |
 | G-10 | `refer` is a **flag, not a score**. A refer rule leaves the factor at its Acceptable tier value (0.6) and raises REFER at stage 9. It never zeroes a factor and never sets a knockout. |
+| G-11 | **Every categorical text field** — primary risk state, construction type, submission type (`business_type`) and line of business — is **trimmed, case-folded and normalized to lower snake_case** before comparison — every run of spaces, hyphens and underscores becomes a single `_`, exactly as G-8 already does for construction — and a value that is **empty or whitespace-only after trimming is missing** (G-2), exactly like `null`. It never tier-0s and never knocks out. `"NEW_BUSINESS"`, `"New Business"`, `"new-business"`, `"new_business"`, `" New "` and `"new"` are the same known value, and `"Commercial Property"` is `commercial_property`; `""` and `"   "` are missing. *Added at CP1 (DECISIONS CP1-2, tightened CP1-10 to say snake_case explicitly after a second 100K pass found "New Business" and "Commercial Property" still split the two implementations): the 100K differential found that G-7 and G-8 covered only state and construction, leaving submission type and line of business unspecified, and the two implementations filled the gap differently. Real Federato data encodes absence as `null`, so this changes no real account.* |
 
 ---
 

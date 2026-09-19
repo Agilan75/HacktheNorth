@@ -17,6 +17,6 @@ export interface FiltersProps {
     readonly options: FilterOptions;
     readonly onChange: (next: QueueFilterValue) => void;
 }
-/** PRD §10 /queue filters. Stub frozen by W0-4; unit C03 replaces this body only. */
-export declare function Filters(_props: FiltersProps): ReactElement;
+/** PRD §10 /queue filters: line, verdict, state, underwriter, plus free-text search. */
+export declare function Filters(props: FiltersProps): ReactElement;
 //# sourceMappingURL=Filters.d.ts.map

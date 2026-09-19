@@ -9,7 +9,10 @@ export interface TooltipProps {
 /**
  * Glossary-powered tooltip (PRD §10 /glossary: "also powers tooltips").
  * Keyboard reachable and described by aria-describedby, never hover-only.
- * Stub frozen by W0-4; unit C13 replaces this body only.
+ *
+ * The description element is always in the DOM so screen readers get the
+ * definition on focus; the visual bubble opens on hover or focus and closes
+ * on blur, mouse leave, or Escape.
  */
-export declare function Tooltip(_props: TooltipProps): ReactElement;
+export declare function Tooltip(props: TooltipProps): ReactElement;
 //# sourceMappingURL=Tooltip.d.ts.map

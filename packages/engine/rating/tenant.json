@@ -1,0 +1,43 @@
+{
+  "lineOfBusiness": "tenant",
+  "version": "1.0.0",
+  "baseMonthlyRate": 14,
+  "contents": [
+    { "key": "contents_to_10k", "upTo": 10000, "factor": 0.85 },
+    { "key": "contents_to_20k", "upTo": 20000, "factor": 1.0 },
+    { "key": "contents_to_35k", "upTo": 35000, "factor": 1.2 },
+    { "key": "contents_to_50k", "upTo": 50000, "factor": 1.4 },
+    { "key": "contents_over_50k", "upTo": null, "factor": 1.7 }
+  ],
+  "buildingAge": [
+    { "key": "built_pre_1940", "upTo": 1939, "factor": 1.3 },
+    { "key": "built_1940_1969", "upTo": 1969, "factor": 1.2 },
+    { "key": "built_1970_1989", "upTo": 1989, "factor": 1.1 },
+    { "key": "built_1990_2009", "upTo": 2009, "factor": 1.0 },
+    { "key": "built_2010_plus", "upTo": null, "factor": 0.92 }
+  ],
+  "hazards": {
+    "portableHeater": 1.15,
+    "heaterNearCombustible": 1.25,
+    "extensionCord": 1.08,
+    "powerBarOverload": 1.12,
+    "candle": 1.1,
+    "stove": 1.1,
+    "blockedExit": 1.2,
+    "windowAcUnit": 1.03,
+    "waterHeater": 1.05,
+    "highValueContents": 1.1
+  },
+  "term": {
+    "4": 1.12,
+    "5": 1.1,
+    "6": 1.08,
+    "7": 1.07,
+    "8": 1.05,
+    "9": 1.04,
+    "10": 1.03,
+    "11": 1.01,
+    "12": 1.0
+  },
+  "smokeDetector": { "present": 0.92, "absent": 1.15 }
+}

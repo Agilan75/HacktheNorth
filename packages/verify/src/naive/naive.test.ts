@@ -298,7 +298,7 @@ describe('missing data, hostile values and determinism', () => {
     expect(naiveEvaluate(withB1({ totalTiv: -1 })).factors[3]?.tierValue).toBe(0.6);
     expect(naiveEvaluate(withB1({ quotedPremium: 1e18 })).factors[4]?.tierValue).toBe(0);
     expect(naiveEvaluate(withB1({ primaryState: '  oh ' })).factors[2]?.tierValue).toBe(1);
-    expect(naiveEvaluate(withB1({ primaryState: '' })).factors[2]?.tierValue).toBe(0);
+    expect(naiveEvaluate(withB1({ primaryState: '' })).factors[2]?.tierValue).toBeNull(); // G-11
     expect(naiveEvaluate(withB1({ fiveYearLoss: -50000 })).factors[7]?.tierValue).toBe(1);
     expect(
       naiveEvaluate(withB1({ pctTivAcceptableConstruction: 1.0000001 })).factors[6]?.tierValue,
@@ -345,5 +345,79 @@ describe('missing data, hostile values and determinism', () => {
     const b = naiveEvaluate(withB1({ totalTiv: 50000000, quotedPremium: null }));
     expect(a).toEqual(b);
     expect(a).not.toBe(b);
+  });
+});
+
+describe('INTERPRETATIONS G-11 (CP1): blank categorical strings are missing', () => {
+  // Construction type reaches the oracle only as the numeric share
+  // pctTivAcceptableConstruction (NAIVE_SPEC 4.1), so its blank-string case is
+  // resolved upstream; the three string fields are exercised here.
+  const FIELDS = [
+    { key: 'submissionType', index: 0, id: 'submission_type' },
+    { key: 'lineOfBusiness', index: 1, id: 'line_of_business' },
+    { key: 'primaryState', index: 2, id: 'primary_risk_state' },
+  ] as const;
+
+  for (const { key, index, id } of FIELDS) {
+    for (const blank of ['', '   ', '\t\n ']) {
+      it(`${key} = ${JSON.stringify(blank)} is missing: no knockout, 8/9 complete`, () => {
+        const r = naiveEvaluate(withB1({ [key]: blank }));
+        const f = r.factors[index];
+        expect(f?.factorId).toBe(id);
+        expect(f?.tier).toBeNull();
+        expect(f?.tierValue).toBeNull();
+        expect(f?.points).toBe(0);
+        expect(f?.knockout).toBe(false);
+        expect(r.knockoutFactorIds).toEqual([]);
+        expect(r.completeness).toBeCloseTo((8 / 9) * 100, 9);
+        expect(r.verdict).toBe('REFER');
+        expect(r.referReasons).toEqual(['missing_data']);
+      });
+    }
+
+    it(`${key} blank behaves exactly like null`, () => {
+      const blank = naiveEvaluate(withB1({ [key]: '  ' }));
+      const nul = naiveEvaluate(withB1({ [key]: null }));
+      expect(blank).toEqual(nul);
+    });
+  }
+
+  it('all three string fields blank: 6/9 complete, never knocks out', () => {
+    const r = naiveEvaluate(
+      withB1({ submissionType: '', lineOfBusiness: ' ', primaryState: '   ' }),
+    );
+    expect(r.completeness).toBeCloseTo((6 / 9) * 100, 9);
+    expect(r.knockoutFactorIds).toEqual([]);
+    expect(r.verdict).toBe('REFER');
+  });
+
+  it('"new" and "new_business" in any case, trimmed, are the same known value (tier 1)', () => {
+    for (const v of [' New ', 'NEW_BUSINESS', 'new', 'new_business', 'NEW', '\tnew_Business  ']) {
+      const r = naiveEvaluate(withB1({ submissionType: v }));
+      expect(r.factors[0]?.tierValue).toBe(1);
+      expect(r).toEqual(naiveEvaluate(B1));
+    }
+  });
+
+  it('renewal in any case remains Not Acceptable; other non-blank strings stay out-of-list', () => {
+    for (const v of ['renewal', ' Renewal ', 'RENEWAL', 'news', 'x']) {
+      const r = naiveEvaluate(withB1({ submissionType: v }));
+      expect(r.factors[0]?.tierValue).toBe(0);
+      expect(r.knockoutFactorIds).toEqual(['submission_type']);
+    }
+    expect(naiveEvaluate(withB1({ primaryState: 'ZZ' })).factors[2]?.tierValue).toBe(0);
+    expect(naiveEvaluate(withB1({ lineOfBusiness: ' Commercial_Property ' })).factors[1]?.tierValue)
+      .toBe(1);
+  });
+});
+
+describe('G-11 snake_case (CP1-10)', () => {
+  it('reads spaced and hyphenated categorical values the way G-8 reads construction', () => {
+    for (const st of ['New Business', 'new-business', ' NEW  BUSINESS ']) {
+      const r = naiveEvaluate(withB1({ submissionType: st }));
+      expect(r.factors.find((f) => f.factorId === 'submission_type')?.tierValue).toBe(1);
+    }
+    const lob = naiveEvaluate(withB1({ lineOfBusiness: 'Commercial Property' }));
+    expect(lob.factors.find((f) => f.factorId === 'line_of_business')?.tierValue).toBe(1);
   });
 });

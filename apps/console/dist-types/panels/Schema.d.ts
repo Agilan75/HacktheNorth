@@ -6,5 +6,5 @@ import type { SchemaPanelProps } from './types.js';
  * Stub frozen by W0-4. Unit C07 replaces this body only — never the signature,
  * never the import list's shape, never this file's path.
  */
-export declare function Schema(_props: SchemaPanelProps): ReactElement;
+export declare function Schema(props: SchemaPanelProps): ReactElement;
 //# sourceMappingURL=Schema.d.ts.map

@@ -25,10 +25,24 @@ function known(n: number | null | undefined): n is number {
   return typeof n === 'number' && Number.isFinite(n);
 }
 
-/** G-7 / G-8: compare codes and enums after trimming and case folding. */
+/**
+ * G-7 / G-8 / G-11: compare codes and enums after trimming and case folding.
+ * A non-string, or a string that is empty or whitespace-only after trimming,
+ * is MISSING (G-11, CP1) — exactly like null. Never tier 0, never a knockout.
+ */
 function code(s: string | null | undefined): string | null {
   if (typeof s !== 'string') return null;
-  return s.trim();
+  const t = s.trim();
+  return t === '' ? null : t;
+}
+
+/**
+ * G-11 (tightened at CP1): categorical text is trimmed, case-folded and put in
+ * lower snake_case -- every run of spaces, hyphens and underscores becomes one
+ * `_`, exactly as G-8 does for construction. So "New Business" is new_business.
+ */
+function snake(s: string): string {
+  return s.trim().toLowerCase().replace(/[\s\-_]+/g, '_');
 }
 
 function tierLabel(value: number): NaiveTierLabel {
@@ -63,7 +77,10 @@ export const naiveEvaluate: NaiveEvaluate = (input: NaiveInput): NaiveResult => 
   const submissionType = code(input.submissionType);
   if (submissionType === null) {
     tSubmissionType = null;
-  } else if (submissionType.toLowerCase() === 'new_business') {
+  } else if (
+    snake(submissionType) === 'new_business' ||
+    snake(submissionType) === 'new' // G-11: same known value
+  ) {
     tSubmissionType = 1; // Acceptable → T-BLANK
   } else {
     tSubmissionType = 0; // renewal, and every other value
@@ -74,7 +91,7 @@ export const naiveEvaluate: NaiveEvaluate = (input: NaiveInput): NaiveResult => 
   const lineOfBusiness = code(input.lineOfBusiness);
   if (lineOfBusiness === null) {
     tLineOfBusiness = null;
-  } else if (lineOfBusiness.toLowerCase() === 'commercial_property') {
+  } else if (snake(lineOfBusiness) === 'commercial_property') {
     tLineOfBusiness = 1; // Acceptable → T-BLANK
   } else {
     tLineOfBusiness = 0;
@@ -99,7 +116,7 @@ export const naiveEvaluate: NaiveEvaluate = (input: NaiveInput): NaiveResult => 
     } else if (st === 'NC' || st === 'SC' || st === 'GA' || st === 'VA' || st === 'UT') {
       tPrimaryRiskState = 0.6; // Acceptable-only remainder
     } else {
-      tPrimaryRiskState = 0; // all other states, including ''
+      tPrimaryRiskState = 0; // all other non-blank states (blank is missing, G-11)
     }
   }
 

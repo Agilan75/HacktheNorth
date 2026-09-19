@@ -18,6 +18,13 @@ export interface DataTableProps<Row> {
     readonly loading?: boolean;
     readonly onRowClick?: (row: Row) => void;
 }
-/** Stub frozen by W0-4. Unit C03 replaces this body only. */
-export declare function DataTable<Row>(_props: DataTableProps<Row>): ReactElement;
+/**
+ * Accessible data table shared by every console list (PRD §10, §13).
+ *
+ * - `caption` is always rendered as the table's <caption>.
+ * - Sortable headers are real buttons with `aria-sort` on the <th>.
+ * - Row activation works by click, Enter and Space when `onRowClick` is set.
+ * - `loading` renders skeleton rows and marks the table `aria-busy`.
+ */
+export declare function DataTable<Row>(props: DataTableProps<Row>): ReactElement;
 //# sourceMappingURL=DataTable.d.ts.map

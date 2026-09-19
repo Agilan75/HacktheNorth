@@ -30,6 +30,7 @@ import type {
   Rule,
   Severity,
   Verdict,
+  VectorSpec,
   VoiResult,
 } from '@retrofit/engine';
 
@@ -328,6 +329,13 @@ export interface SubmissionDetailDto {
   readonly shareSlug: string | null;
   readonly createdAt: string;
   readonly updatedAt: string;
+  /**
+   * The active vector spec for `lineOfBusiness` (key, label, immovable,
+   * appetiteFactor, ... per component), so the console can label `vector`
+   * without a private copy. Optional: added at CP1 (request C01); absent when
+   * the spec could not be read.
+   */
+  readonly vectorSpec?: VectorSpec;
 }
 
 /* -------------------------------------------------------------------------- */

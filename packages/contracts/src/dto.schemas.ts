@@ -501,6 +501,13 @@ export const sweepSchema: z.ZodType<SweepDto> = z.object({
   updatedAt: isoDateSchema,
 });
 
+/** Opaque: `@retrofit/engine` owns `VectorSpec` (added at CP1, request C01). */
+export const vectorSpecSchema = opaque<NonNullable<SubmissionDetailDto['vectorSpec']>>(
+  'lineOfBusiness',
+  'version',
+  'components',
+);
+
 export const submissionDetailSchema: z.ZodType<SubmissionDetailDto> = z.object({
   id: idSchema,
   externalId: z.string(),
@@ -528,6 +535,7 @@ export const submissionDetailSchema: z.ZodType<SubmissionDetailDto> = z.object({
   shareSlug: z.string().nullable(),
   createdAt: isoDateSchema,
   updatedAt: isoDateSchema,
+  vectorSpec: vectorSpecSchema.optional(),
 });
 
 export const ingestResponseSchema: z.ZodType<IngestResponseDto> = z.object({

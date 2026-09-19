@@ -1,0 +1,307 @@
+{
+  "id": "commercial",
+  "lineOfBusiness": "commercial_property",
+  "version": "1.0.0",
+  "source": "docs/federato/APPETITE_GUIDELINES.pdf, page 2, table \"2025 Sample: Commercial Property Underwriting Guidelines\" (columns Factor / Acceptable / Target / Not Acceptable); boundaries and interpretations per docs/contracts/INTERPRETATIONS.md",
+  "weights": {
+    "submission_type": 0.1,
+    "line_of_business": 0.15,
+    "primary_risk_state": 0.15,
+    "tiv": 0.15,
+    "total_premium": 0.15,
+    "building_age": 0.1,
+    "construction_type": 0.1,
+    "loss_value": 0.1
+  },
+  "rules": [
+    {
+      "id": "AG-ST-A",
+      "lineOfBusiness": "commercial_property",
+      "factor": "submission_type",
+      "tier": "acceptable",
+      "when": [{ "field": "isNewBusiness", "op": "eq", "value": 1 }],
+      "weight": 0.1,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Submission type\"", "quote": "New business" },
+      "interpretation": "Matched on the data, not the PDF prose: Federato Policy.business_type \"new\" (canonical new_business) sets isNewBusiness = 1. Target column is blank, so Acceptable scores 1 (INTERPRETATIONS T-BLANK)."
+    },
+    {
+      "id": "AG-ST-NA",
+      "lineOfBusiness": "commercial_property",
+      "factor": "submission_type",
+      "tier": "not_acceptable",
+      "when": [{ "field": "isNewBusiness", "op": "eq", "value": 0 }],
+      "weight": 0.1,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Submission type\"", "quote": "Renewal business" },
+      "interpretation": "Matched on the data, not the PDF prose: Federato Policy.business_type \"renewal\" (or any value other than \"new\") sets isNewBusiness = 0."
+    },
+    {
+      "id": "AG-LOB-A",
+      "lineOfBusiness": "commercial_property",
+      "factor": "line_of_business",
+      "tier": "acceptable",
+      "when": [{ "field": "isPropertyLine", "op": "eq", "value": 1 }],
+      "weight": 0.15,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Line of business\"", "quote": "Property" },
+      "interpretation": "Federato line_of_business \"property\" sets isPropertyLine = 1. Target column is blank, so Acceptable scores 1 (INTERPRETATIONS T-BLANK)."
+    },
+    {
+      "id": "AG-LOB-NA",
+      "lineOfBusiness": "commercial_property",
+      "factor": "line_of_business",
+      "tier": "not_acceptable",
+      "when": [{ "field": "isPropertyLine", "op": "eq", "value": 0 }],
+      "weight": 0.15,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Line of business\"", "quote": "All other lines" },
+      "interpretation": "Federato line_of_business health, cgl, auto, cyber, excess or lpl sets isPropertyLine = 0."
+    },
+    {
+      "id": "AG-STATE-T",
+      "lineOfBusiness": "commercial_property",
+      "factor": "primary_risk_state",
+      "tier": "target",
+      "when": [{ "field": "stateTier", "op": "eq", "value": 2 }],
+      "weight": 0.15,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Primary risk state\"", "quote": "OH, PA, MD, CO, CA, FL" },
+      "interpretation": "Primary risk state is the state carrying the largest share of TIV (INTERPRETATIONS I-1). stateTier 2 = OH, PA, MD, CO, CA, FL."
+    },
+    {
+      "id": "AG-STATE-A",
+      "lineOfBusiness": "commercial_property",
+      "factor": "primary_risk_state",
+      "tier": "acceptable",
+      "when": [{ "field": "stateTier", "op": "eq", "value": 1 }],
+      "weight": 0.15,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Primary risk state\"", "quote": "OH, PA, MD, CO, CA, FL, NC, SC, GA, VA, UT" },
+      "interpretation": "Primary risk state is the state carrying the largest share of TIV (INTERPRETATIONS I-1). stateTier 1 = NC, SC, GA, VA, UT (the Acceptable list less the Target list)."
+    },
+    {
+      "id": "AG-STATE-NA",
+      "lineOfBusiness": "commercial_property",
+      "factor": "primary_risk_state",
+      "tier": "not_acceptable",
+      "when": [{ "field": "stateTier", "op": "eq", "value": 0 }],
+      "weight": 0.15,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Primary risk state\"", "quote": "All other states" },
+      "interpretation": "Primary risk state is the state carrying the largest share of TIV (INTERPRETATIONS I-1). stateTier 0 = any other two-letter code."
+    },
+    {
+      "id": "AG-TIV-T",
+      "lineOfBusiness": "commercial_property",
+      "factor": "tiv",
+      "tier": "target",
+      "when": [
+        { "field": "totalTiv", "op": "gte", "value": 50000000 },
+        { "field": "totalTiv", "op": "lte", "value": 100000000 }
+      ],
+      "weight": 0.15,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"TIV (Total Insured Value)\"", "quote": "$50M-$100M" }
+    },
+    {
+      "id": "AG-TIV-A-LOW",
+      "lineOfBusiness": "commercial_property",
+      "factor": "tiv",
+      "tier": "acceptable",
+      "when": [{ "field": "totalTiv", "op": "lt", "value": 50000000 }],
+      "weight": 0.15,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"TIV (Total Insured Value)\"", "quote": "Up to $150M" }
+    },
+    {
+      "id": "AG-TIV-A-HIGH",
+      "lineOfBusiness": "commercial_property",
+      "factor": "tiv",
+      "tier": "acceptable",
+      "when": [
+        { "field": "totalTiv", "op": "gt", "value": 100000000 },
+        { "field": "totalTiv", "op": "lte", "value": 150000000 }
+      ],
+      "weight": 0.15,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"TIV (Total Insured Value)\"", "quote": "Up to $150M" }
+    },
+    {
+      "id": "AG-TIV-NA",
+      "lineOfBusiness": "commercial_property",
+      "factor": "tiv",
+      "tier": "not_acceptable",
+      "when": [{ "field": "totalTiv", "op": "gt", "value": 150000000 }],
+      "weight": 0.15,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"TIV (Total Insured Value)\"", "quote": "Over $150M" },
+      "fixHint": "Bring total insured value to $150M or less; $50M to $100M is Target."
+    },
+    {
+      "id": "AG-PREM-T",
+      "lineOfBusiness": "commercial_property",
+      "factor": "total_premium",
+      "tier": "target",
+      "when": [
+        { "field": "quotedPremium", "op": "gte", "value": 75000 },
+        { "field": "quotedPremium", "op": "lte", "value": 100000 }
+      ],
+      "weight": 0.15,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Total premium\"", "quote": "$75K-$100K" }
+    },
+    {
+      "id": "AG-PREM-A-LOW",
+      "lineOfBusiness": "commercial_property",
+      "factor": "total_premium",
+      "tier": "acceptable",
+      "when": [
+        { "field": "quotedPremium", "op": "gte", "value": 50000 },
+        { "field": "quotedPremium", "op": "lt", "value": 75000 }
+      ],
+      "weight": 0.15,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Total premium\"", "quote": "$50K-$175K" }
+    },
+    {
+      "id": "AG-PREM-A-HIGH",
+      "lineOfBusiness": "commercial_property",
+      "factor": "total_premium",
+      "tier": "acceptable",
+      "when": [
+        { "field": "quotedPremium", "op": "gt", "value": 100000 },
+        { "field": "quotedPremium", "op": "lte", "value": 175000 }
+      ],
+      "weight": 0.15,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Total premium\"", "quote": "$50K-$175K" }
+    },
+    {
+      "id": "AG-PREM-NA-LOW",
+      "lineOfBusiness": "commercial_property",
+      "factor": "total_premium",
+      "tier": "not_acceptable",
+      "when": [{ "field": "quotedPremium", "op": "lt", "value": 50000 }],
+      "weight": 0.15,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Total premium\"", "quote": "Under $50K or over $175K" },
+      "fixHint": "Bring the quoted premium into $50K to $175K; $75K to $100K is Target."
+    },
+    {
+      "id": "AG-PREM-NA-HIGH",
+      "lineOfBusiness": "commercial_property",
+      "factor": "total_premium",
+      "tier": "not_acceptable",
+      "when": [{ "field": "quotedPremium", "op": "gt", "value": 175000 }],
+      "weight": 0.15,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Total premium\"", "quote": "Under $50K or over $175K" },
+      "fixHint": "Bring the quoted premium into $50K to $175K; $75K to $100K is Target."
+    },
+    {
+      "id": "AG-AGE-NA",
+      "lineOfBusiness": "commercial_property",
+      "factor": "building_age",
+      "tier": "not_acceptable",
+      "when": [{ "field": "pctTivPre1990", "op": "gt", "value": 0.5 }],
+      "weight": 0.1,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Building age\"", "quote": "Older than 1990" },
+      "interpretation": "Mirrors the construction wording: Not Acceptable when more than 50% of TIV is in buildings with yearBuilt < 1990 (INTERPRETATIONS I-2, 3.4)."
+    },
+    {
+      "id": "AG-AGE-T",
+      "lineOfBusiness": "commercial_property",
+      "factor": "building_age",
+      "tier": "target",
+      "when": [
+        { "field": "pctTivPre1990", "op": "lte", "value": 0.5 },
+        { "field": "pctTivPost2010", "op": "gt", "value": 0.5 }
+      ],
+      "weight": 0.1,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Building age\"", "quote": "Newer than 2010" },
+      "interpretation": "Target when more than 50% of TIV is in buildings with yearBuilt >= 2010 and no more than 50% is pre-1990 (INTERPRETATIONS 3.4)."
+    },
+    {
+      "id": "AG-AGE-A",
+      "lineOfBusiness": "commercial_property",
+      "factor": "building_age",
+      "tier": "acceptable",
+      "when": [
+        { "field": "pctTivPre1990", "op": "lte", "value": 0.5 },
+        { "field": "pctTivPost2010", "op": "lte", "value": 0.5 }
+      ],
+      "weight": 0.1,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Building age\"", "quote": "Newer than 1990" },
+      "interpretation": "Acceptable when neither the pre-1990 nor the 2010-or-later share of TIV exceeds 50% (INTERPRETATIONS 3.4)."
+    },
+    {
+      "id": "AG-AGE-REFER",
+      "lineOfBusiness": "commercial_property",
+      "factor": "building_age",
+      "tier": "refer",
+      "when": [
+        { "field": "pctTivPre1990", "op": "lte", "value": 0.5 },
+        { "field": "rollup.oldestYearBuilt", "op": "lt", "value": 1990 }
+      ],
+      "weight": 0.1,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Building age\"", "quote": "Older than 1990" },
+      "interpretation": "R-AGE-REFER: refer when any building has a known yearBuilt < 1990 (whatever its TIV) and pctTivPre1990 <= 0.5, naming rollup.pre1990BuildingIds. A flag, not a score: the factor keeps its tier and no knockout is set."
+    },
+    {
+      "id": "AG-CON-A",
+      "lineOfBusiness": "commercial_property",
+      "factor": "construction_type",
+      "tier": "acceptable",
+      "when": [{ "field": "pctTivAcceptableConstruction", "op": "gte", "value": 0.5 }],
+      "weight": 0.1,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Construction type\"", "quote": ">50% JM, non-combustible/steel, or masonry non-combustible" },
+      "interpretation": "Acceptable Federato Building.construction_type values: \"Joisted Masonry\" (JM), \"Non-Combustible\", \"Steel Frame\" (steel), \"Masonry Non-Combustible\", plus \"Fire Resistive\" and \"Modified Fire Resistive\" assumed acceptable and flagged (INTERPRETATIONS I-3). Exactly 50% is Acceptable. Target column is blank, so Acceptable scores 1 (T-BLANK).",
+      "fixHint": "Raise the share of TIV in JM, non-combustible/steel, masonry non-combustible or fire-resistive construction to at least 50%."
+    },
+    {
+      "id": "AG-CON-NA",
+      "lineOfBusiness": "commercial_property",
+      "factor": "construction_type",
+      "tier": "not_acceptable",
+      "when": [{ "field": "pctTivAcceptableConstruction", "op": "lt", "value": 0.5 }],
+      "weight": 0.1,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Construction type\"", "quote": ">50% other types" },
+      "interpretation": "\"Other types\" in the data are \"Frame\" and \"Wood Frame\", plus any unknown or unrecognised class on a building with known TIV. Not Acceptable iff the other share is strictly greater than 50%."
+    },
+    {
+      "id": "AG-LOSS-A",
+      "lineOfBusiness": "commercial_property",
+      "factor": "loss_value",
+      "tier": "acceptable",
+      "when": [{ "field": "fiveYearLoss", "op": "lte", "value": 100000 }],
+      "weight": 0.1,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Loss value\"", "quote": "Under $100,000" },
+      "interpretation": "Five-year loss = paid indemnity + paid expense + reserves over claims dated within five years of the received date, both ends inclusive (INTERPRETATIONS I-4). Exactly $100,000 is not \"over\", so it is Acceptable; Target column is blank, so Acceptable scores 1 (T-BLANK)."
+    },
+    {
+      "id": "AG-LOSS-NA",
+      "lineOfBusiness": "commercial_property",
+      "factor": "loss_value",
+      "tier": "not_acceptable",
+      "when": [{ "field": "fiveYearLoss", "op": "gt", "value": 100000 }],
+      "weight": 0.1,
+      "citation": { "doc": "APPETITE_GUIDELINES.pdf", "section": "p2 \"Loss value\"", "quote": "Over $100,000" },
+      "interpretation": "Five-year loss = paid indemnity + paid expense + reserves over claims dated within five years of the received date, both ends inclusive (INTERPRETATIONS I-4)."
+    }
+  ],
+  "interpretations": [
+    {
+      "id": "I-1",
+      "title": "Primary risk state is the state with the largest TIV share",
+      "decision": "The guideline names no field and policies span up to four states, so the primary risk state is the state carrying the greatest total TIV over buildings with a known state and TIV; exact ties go to the alphabetically first code. The other states are listed with their shares.",
+      "citation": { "doc": "PRD.md", "section": "6.6 Interpretations", "quote": "The state carrying the largest share of TIV. The explanation lists the others." },
+      "affects": ["stateTier", "rollup.primaryState", "rollup.stateShares"]
+    },
+    {
+      "id": "I-2",
+      "title": "Building age mirrors the construction wording",
+      "decision": "Not Acceptable when more than 50% of TIV is in buildings built before 1990; REFER when any building is pre-1990 and that share is 50% or less, naming the buildings.",
+      "citation": { "doc": "PRD.md", "section": "6.6 Interpretations", "quote": "Mirror the construction factor's wording: Not Acceptable when more than 50% of TIV is pre-1990; REFER when any building is pre-1990, naming the buildings." },
+      "affects": ["pctTivPre1990", "pctTivPost2010", "rollup.pre1990BuildingIds"]
+    },
+    {
+      "id": "I-3",
+      "title": "Fire Resistive and Modified Fire Resistive count as acceptable construction",
+      "decision": "\"Fire Resistive\" and \"Modified Fire Resistive\" are better classes than those the guideline lists but are not listed, so they count toward the acceptable construction share and the assumption is flagged.",
+      "citation": { "doc": "PRD.md", "section": "6.6 Interpretations", "quote": "Treat as acceptable and flag the assumption." },
+      "affects": ["pctTivAcceptableConstruction"]
+    },
+    {
+      "id": "I-4",
+      "title": "Loss value is five-year incurred loss",
+      "decision": "Loss value = paid indemnity + paid expense + open reserves over claims dated within five years of the submission's received date, both ends inclusive. Zero claims in the window is a known $0, not missing.",
+      "citation": { "doc": "PRD.md", "section": "6.6 Interpretations", "quote": "paid indemnity + paid expense + open reserves, dated within five years of the submission's received date" },
+      "affects": ["fiveYearLoss"]
+    }
+  ]
+}

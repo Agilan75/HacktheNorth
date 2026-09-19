@@ -3,8 +3,8 @@ import type { ReplyBoxProps } from './types.js';
 /**
  * PRD 10 (k) Paste or upload the broker reply; shows extracted fields with quotes.
  *
- * Stub frozen by W0-4. Unit C11 replaces this body only — never the signature,
- * never the import list's shape, never this file's path.
+ * Gemini extracts and code validates on the server; this box only sends text
+ * or a file and renders the typed result it gets back.
  */
-export declare function ReplyBox(_props: ReplyBoxProps): ReactElement;
+export declare function ReplyBox(props: ReplyBoxProps): ReactElement;
 //# sourceMappingURL=ReplyBox.d.ts.map

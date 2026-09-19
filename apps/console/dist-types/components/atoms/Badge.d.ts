@@ -9,5 +9,5 @@ export interface BadgeProps {
  *
  * Stub frozen by W0-4. Unit C02 replaces this body only.
  */
-export declare function Badge(_props: BadgeProps): ReactElement;
+export declare function Badge(props: BadgeProps): ReactElement;
 //# sourceMappingURL=Badge.d.ts.map

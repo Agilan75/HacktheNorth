@@ -231,19 +231,40 @@ function moveLabel(component: ComponentSpec, from: number | null, to: number): s
 /* flipBounds                                                                 */
 /* -------------------------------------------------------------------------- */
 
-/** Turn the rulebook's thresholds into per-component acceptable intervals. */
-export function flipBounds(
+/** A bound together with the exact interval (inclusivity kept) it was read from. */
+interface ResolvedBound {
+  readonly bound: FlipBound;
+  readonly interval: Interval | null;
+}
+
+/**
+ * The shared body of `flipBounds` and `flip`. `flip` needs the chosen
+ * interval's inclusivity for F-5, which `FlipBound` (frozen) does not carry.
+ *
+ * The nearest interval is measured in RAW units: `flipBounds` has no
+ * `BookStats`, and without them every `log_minmax` component scales to 0, which
+ * would make every candidate interval tie. Within one component any monotone
+ * scaling orders same-side landings identically, so raw distance is the honest
+ * choice here; F-4's scaled length is applied later, across components, in `flip`.
+ */
+function resolveBounds(
   vector: FeatureVector,
   spec: VectorSpec,
   rulebook: Rulebook,
-): FlipBound[] {
+): ResolvedBound[] {
   const components = spec.components as readonly ComponentSpec[];
   const keys = new Set(components.map((component) => component.key));
   const resolve = vectorResolver(vector, spec);
-  const scaled = scaleVector(vector.x, spec, null);
 
   return components.map((component) => {
     const from = vector.m[component.index] === 1 ? (vector.x[component.index] ?? null) : null;
+    const immovable = component.immovable === true;
+    // A component can sit outside every interval that names it and still pass:
+    // `pctTivPost2010` appears only in AG-AGE-T, yet building_age is Acceptable
+    // through AG-AGE-A at post2010 = 0. Its factor's tier (T-SPAN: shared by
+    // every component of the factor) is the judge; only tier 0 is failing.
+    const tier = vector.t[component.index];
+    const factorPasses = component.factor !== null && isFiniteNumber(tier) && tier > 0;
 
     const intervals: Interval[] = [];
     for (const rule of rulebook.rules) {
@@ -256,12 +277,15 @@ export function flipBounds(
 
     if (intervals.length === 0) {
       return {
-        componentIndex: component.index,
-        componentKey: component.key,
-        min: null,
-        max: null,
-        satisfied: true,
-        immovable: component.immovable === true,
+        bound: {
+          componentIndex: component.index,
+          componentKey: component.key,
+          min: null,
+          max: null,
+          satisfied: true,
+          immovable,
+        },
+        interval: null,
       };
     }
 
@@ -276,10 +300,7 @@ export function flipBounds(
       for (const interval of intervals) {
         const landing = landingFor(interval, from);
         if (landing === null) continue;
-        const cost =
-          from === null
-            ? 1
-            : Math.abs(scaledValueAt(landing, component, spec, null) - (scaled[component.index] ?? 0));
+        const cost = from === null ? 0 : Math.abs(landing - from);
         if (cost < bestCost || (cost === bestCost && interval.preferred && !best.preferred)) {
           best = interval;
           bestCost = cost;
@@ -289,14 +310,26 @@ export function flipBounds(
     }
 
     return {
-      componentIndex: component.index,
-      componentKey: component.key,
-      min: chosen.lo,
-      max: chosen.hi,
-      satisfied: from !== null && contains(chosen, from),
-      immovable: component.immovable === true,
+      bound: {
+        componentIndex: component.index,
+        componentKey: component.key,
+        min: chosen.lo,
+        max: chosen.hi,
+        satisfied: from !== null && (contains(chosen, from) || factorPasses),
+        immovable,
+      },
+      interval: chosen,
     };
   });
+}
+
+/** Turn the rulebook's thresholds into per-component acceptable intervals. */
+export function flipBounds(
+  vector: FeatureVector,
+  spec: VectorSpec,
+  rulebook: Rulebook,
+): FlipBound[] {
+  return resolveBounds(vector, spec, rulebook).map((resolved) => resolved.bound);
 }
 
 /** One component's value in scaled (0..1) space, holding the others irrelevant. */
@@ -356,8 +389,8 @@ export function flip(
     };
   }
 
-  const bounds = flipBounds(vector, spec, rulebook);
-  const failing = bounds.filter((bound) => !bound.satisfied);
+  const resolved = resolveBounds(vector, spec, rulebook).filter((r) => !r.bound.satisfied);
+  const failing = resolved.map((r) => r.bound);
   const blockedByImmovable = failing.filter((b) => b.immovable).map((b) => b.componentKey);
 
   // F-3: nothing that fails can be moved.
@@ -371,23 +404,12 @@ export function flip(
 
   const scaledBefore = scaleVector(vector.x, spec, bookStats);
   const candidates: Candidate[] = [];
-  for (const bound of failing) {
-    if (bound.immovable) continue;
+  for (const { bound, interval } of resolved) {
+    if (bound.immovable || interval === null) continue; // F-2
     const component = components[bound.componentIndex];
     if (component === undefined) continue;
     const from = vector.m[component.index] === 1 ? (vector.x[component.index] ?? null) : null;
-    const to = landingFor(
-      {
-        lo: bound.min,
-        loInclusive: true,
-        hi: bound.max,
-        hiInclusive: true,
-        ruleId: '',
-        fixHint: undefined,
-        preferred: false,
-      },
-      from,
-    );
+    const to = landingFor(interval, from); // F-5: inclusivity preserved
     if (to === null || !isFiniteNumber(to)) continue;
     const deltaScaled =
       from === null
@@ -395,7 +417,13 @@ export function flip(
         : Math.abs(
             scaledValueAt(to, component, spec, bookStats) - (scaledBefore[component.index] ?? 0),
           );
-    candidates.push({ component, from, to, deltaScaled, fixHint: fixHintFor(rulebook, component.key) });
+    candidates.push({
+      component,
+      from,
+      to,
+      deltaScaled,
+      fixHint: interval.fixHint ?? fixHintFor(rulebook, component.key),
+    });
   }
 
   if (candidates.length === 0) {

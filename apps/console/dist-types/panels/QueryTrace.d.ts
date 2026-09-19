@@ -6,5 +6,5 @@ import type { QueryTracePanelProps } from './types.js';
  * Stub frozen by W0-4. Unit C07 replaces this body only — never the signature,
  * never the import list's shape, never this file's path.
  */
-export declare function QueryTrace(_props: QueryTracePanelProps): ReactElement;
+export declare function QueryTrace(props: QueryTracePanelProps): ReactElement;
 //# sourceMappingURL=QueryTrace.d.ts.map

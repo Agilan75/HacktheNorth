@@ -5,6 +5,14 @@
  * stage and test uses. `read*` is the only I/O in the package, is never called
  * by a stage, and exists so the API and the CLIs have one typed entry point.
  */
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import {
+  questionFileSchema,
+  ratingTableSchema,
+  rulebookSchema,
+  vectorSpecSchema,
+} from './schemas.js';
 import type {
   Question,
   RatingTable,
@@ -13,42 +21,55 @@ import type {
   LineOfBusiness,
 } from './types.js';
 
-export function parseRulebook(_json: unknown): Rulebook {
-  throw new Error('NOT_IMPLEMENTED:E13');
+type DataKind = 'rules' | 'vectors' | 'rating' | 'questions';
+
+/** Data files are named by short line key, not by the LineOfBusiness enum. */
+const FILE_FOR_LINE: Readonly<Record<LineOfBusiness, string>> = {
+  commercial_property: 'commercial',
+  tenant: 'tenant',
+};
+
+export function parseRulebook(json: unknown): Rulebook {
+  return rulebookSchema.parse(json) as Rulebook;
 }
 
-export function parseVectorSpec(_json: unknown): VectorSpec {
-  throw new Error('NOT_IMPLEMENTED:E13');
+export function parseVectorSpec(json: unknown): VectorSpec {
+  return vectorSpecSchema.parse(json) as VectorSpec;
 }
 
-export function parseRatingTable(_json: unknown): RatingTable {
-  throw new Error('NOT_IMPLEMENTED:E13');
+export function parseRatingTable(json: unknown): RatingTable {
+  return ratingTableSchema.parse(json) as RatingTable;
 }
 
-export function parseQuestions(_json: unknown): Question[] {
-  throw new Error('NOT_IMPLEMENTED:E13');
+export function parseQuestions(json: unknown): Question[] {
+  return [...questionFileSchema.parse(json).questions] as Question[];
 }
 
-/** Absolute path of a packaged data file, resolved from this module's URL. */
-export function dataFilePath(
-  _kind: 'rules' | 'vectors' | 'rating' | 'questions',
-  _name: string,
-): string {
-  throw new Error('NOT_IMPLEMENTED:E13');
+/**
+ * Absolute path of a packaged data file, resolved from this module's URL.
+ * The data directories sit beside src/ (DECISIONS CP0-4), so V01 can read
+ * vectors/ without opening src/.
+ */
+export function dataFilePath(kind: DataKind, name: string): string {
+  return fileURLToPath(new URL(`../${kind}/${name}.json`, import.meta.url));
 }
 
-export function readVectorSpec(_line: LineOfBusiness): Promise<VectorSpec> {
-  throw new Error('NOT_IMPLEMENTED:E13');
+async function readJson(kind: DataKind, name: string): Promise<unknown> {
+  return JSON.parse(await readFile(dataFilePath(kind, name), 'utf8')) as unknown;
 }
 
-export function readRulebook(_name: 'commercial' | 'tenant' | 'extensions'): Promise<Rulebook> {
-  throw new Error('NOT_IMPLEMENTED:E13');
+export async function readVectorSpec(line: LineOfBusiness): Promise<VectorSpec> {
+  return parseVectorSpec(await readJson('vectors', FILE_FOR_LINE[line]));
 }
 
-export function readRatingTable(_line: LineOfBusiness): Promise<RatingTable> {
-  throw new Error('NOT_IMPLEMENTED:E13');
+export async function readRulebook(name: 'commercial' | 'tenant' | 'extensions'): Promise<Rulebook> {
+  return parseRulebook(await readJson('rules', name));
 }
 
-export function readQuestions(_line: LineOfBusiness): Promise<Question[]> {
-  throw new Error('NOT_IMPLEMENTED:E13');
+export async function readRatingTable(line: LineOfBusiness): Promise<RatingTable> {
+  return parseRatingTable(await readJson('rating', FILE_FOR_LINE[line]));
+}
+
+export async function readQuestions(line: LineOfBusiness): Promise<Question[]> {
+  return parseQuestions(await readJson('questions', FILE_FOR_LINE[line]));
 }

@@ -9,5 +9,5 @@ export interface CitationQuoteProps {
  *
  * Stub frozen by W0-4. Unit C02 replaces this body only.
  */
-export declare function CitationQuote(_props: CitationQuoteProps): ReactElement;
+export declare function CitationQuote(props: CitationQuoteProps): ReactElement;
 //# sourceMappingURL=CitationQuote.d.ts.map

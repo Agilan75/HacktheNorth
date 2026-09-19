@@ -1,5 +1,47 @@
 /*
- * Placeholder created by W0-4. Unit C02 replaces the body of this file with the
- * :root custom-property block produced by @retrofit/design (D01 cssVariableBlock()).
- * Do not hand-write token values here — they live in packages/design/src/tokens.ts.
+ * Retrofit design tokens (PRD 13). GENERATED from @retrofit/design cssVariableBlock()
+ * by unit C02. Do not hand-edit values; change packages/design/src/tokens.ts and
+ * regenerate. atoms.test.tsx fails if this block drifts from the token source.
  */
+:root {
+  --rf-paper: #FAF8F2;
+  --rf-ink: #1F1E1B;
+  --rf-red: #E4002B;
+  --rf-red-deep: #B80022;
+  --rf-red-tint: #FBE3E6;
+  --rf-muted: #7C8073;
+  --rf-muted-deep: #5E6357;
+  --rf-muted-tint: #EDEFE8;
+  --rf-font-display: 'Fraunces Variable', Fraunces, Georgia, 'Times New Roman', serif;
+  --rf-font-body: 'Inter Variable', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --rf-size-display: 34px;
+  --rf-size-title: 28px;
+  --rf-size-heading: 22px;
+  --rf-size-body: 17px;
+  --rf-size-small: 15px;
+  --rf-size-micro: 13px;
+  --rf-leading-display: 40px;
+  --rf-leading-title: 32px;
+  --rf-leading-heading: 28px;
+  --rf-leading-body: 24px;
+  --rf-leading-small: 20px;
+  --rf-leading-micro: 16px;
+  --rf-weight-regular: 400;
+  --rf-weight-medium: 500;
+  --rf-weight-semibold: 600;
+  --rf-space-xs: 4px;
+  --rf-space-sm: 8px;
+  --rf-space-md: 12px;
+  --rf-space-lg: 16px;
+  --rf-space-xl: 24px;
+  --rf-space-xxl: 32px;
+  --rf-space-xxxl: 48px;
+  --rf-space-huge: 64px;
+  --rf-grid-unit: 4px;
+  --rf-radius-card: 16px;
+  --rf-radius-pill: 999px;
+  --rf-border-width: 1px;
+  --rf-border-color: #EDEFE8;
+  --rf-shadow-none: none;
+  --rf-min-touch-target: 44px;
+}

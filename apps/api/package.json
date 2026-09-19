@@ -6,7 +6,9 @@
   "description": "Thin Hono server: routes, SQLite storage, enrichment, Gemini layer.",
   "exports": {
     ".": "./src/index.ts",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./llm": "./src/llm/index.ts",
+    "./env": "./src/env.ts"
   },
   "scripts": {
     "typecheck": "tsc -b",

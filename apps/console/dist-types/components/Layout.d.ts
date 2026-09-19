@@ -12,6 +12,10 @@ export interface LayoutProps {
     readonly banner: ReactNode;
     readonly children: ReactNode;
 }
-/** Stub frozen by W0-4. Unit C03 replaces this body only. */
-export declare function Layout(_props: LayoutProps): ReactElement;
+/**
+ * Console shell: skip link, header (brand, primary nav, adapter banner), main.
+ * The banner is rendered unconditionally in the header on every route —
+ * PRD §10 "Never hidden".
+ */
+export declare function Layout(props: LayoutProps): ReactElement;
 //# sourceMappingURL=Layout.d.ts.map

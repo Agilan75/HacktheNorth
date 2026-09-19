@@ -1,0 +1,278 @@
+{
+  "id": "tenant",
+  "lineOfBusiness": "tenant",
+  "version": "1.0.0",
+  "source": "Retrofit tenant rulebook (Retrofit's own rules, PRD 6.6). Not an Intact or Federato document: every citation below points at this file.",
+  "weights": {
+    "hazard_portable_heater": 0.1,
+    "hazard_heater_near_combustible": 0.15,
+    "hazard_extension_cord": 0.05,
+    "hazard_power_bar_overload": 0.1,
+    "hazard_candle": 0.05,
+    "hazard_stove": 0.05,
+    "hazard_blocked_exit": 0.15,
+    "hazard_window_ac_unit": 0.05,
+    "hazard_water_heater": 0.05,
+    "hazard_high_value_contents": 0.05,
+    "smoke_detection": 0.1,
+    "building_age": 0.05,
+    "contents_limit": 0.025,
+    "term": 0.025
+  },
+  "rules": [
+    {
+      "id": "T-HZ-HEATER",
+      "lineOfBusiness": "tenant",
+      "factor": "hazard_portable_heater",
+      "tier": "acceptable",
+      "when": [{ "field": "hazardPortableHeater", "op": "eq", "value": 1 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Hazards - portable heater",
+        "quote": "A portable heater in the room is acceptable, and carries a surcharge while it is in use."
+      },
+      "fixHint": "Keep the heater at least one metre from anything soft, or switch to a fixed heat source.",
+      "ratingFactor": "hazards.portableHeater"
+    },
+    {
+      "id": "T-HZ-HEATER-COMBUSTIBLE",
+      "lineOfBusiness": "tenant",
+      "factor": "hazard_heater_near_combustible",
+      "tier": "not_acceptable",
+      "when": [{ "field": "hazardHeaterNearCombustible", "op": "eq", "value": 1 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Hazards - heater near soft furnishings",
+        "quote": "A portable heater within 20 degrees of curtains, fabric or bedding at a similar distance is not acceptable."
+      },
+      "fixHint": "Move the heater away from the curtains, fabric or bedding, then re-photograph that side of the room.",
+      "ratingFactor": "hazards.heaterNearCombustible",
+      "interpretation": "TN-PAIR"
+    },
+    {
+      "id": "T-HZ-EXTENSION-CORD",
+      "lineOfBusiness": "tenant",
+      "factor": "hazard_extension_cord",
+      "tier": "acceptable",
+      "when": [{ "field": "hazardExtensionCord", "op": "eq", "value": 1 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Hazards - extension cord",
+        "quote": "An extension cord in use is acceptable, and carries a surcharge while it is in use."
+      },
+      "fixHint": "Plug the appliance straight into a wall outlet and put the extension cord away.",
+      "ratingFactor": "hazards.extensionCord"
+    },
+    {
+      "id": "T-HZ-POWER-BAR",
+      "lineOfBusiness": "tenant",
+      "factor": "hazard_power_bar_overload",
+      "tier": "refer",
+      "when": [{ "field": "hazardPowerBarOverload", "op": "eq", "value": 1 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Hazards - overloaded power bar",
+        "quote": "An overloaded power bar is referred to an underwriter before a quote is bound."
+      },
+      "fixHint": "Spread the plugs across more than one wall outlet so no power bar is full.",
+      "ratingFactor": "hazards.powerBarOverload"
+    },
+    {
+      "id": "T-HZ-CANDLE",
+      "lineOfBusiness": "tenant",
+      "factor": "hazard_candle",
+      "tier": "acceptable",
+      "when": [{ "field": "hazardCandle", "op": "eq", "value": 1 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Hazards - open-flame candle",
+        "quote": "An open-flame candle is acceptable, and carries a surcharge."
+      },
+      "fixHint": "Swap open-flame candles for battery candles.",
+      "ratingFactor": "hazards.candle"
+    },
+    {
+      "id": "T-HZ-STOVE",
+      "lineOfBusiness": "tenant",
+      "factor": "hazard_stove",
+      "tier": "acceptable",
+      "when": [{ "field": "hazardStove", "op": "eq", "value": 1 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Hazards - cooking appliance",
+        "quote": "A cooking appliance in the room is acceptable, and carries a surcharge."
+      },
+      "ratingFactor": "hazards.stove"
+    },
+    {
+      "id": "T-HZ-BLOCKED-EXIT",
+      "lineOfBusiness": "tenant",
+      "factor": "hazard_blocked_exit",
+      "tier": "not_acceptable",
+      "when": [{ "field": "hazardBlockedExit", "op": "eq", "value": 1 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Hazards - blocked exit",
+        "quote": "A blocked exit is not acceptable."
+      },
+      "fixHint": "Clear the path to the door or window, then re-photograph it.",
+      "ratingFactor": "hazards.blockedExit"
+    },
+    {
+      "id": "T-HZ-WINDOW-AC",
+      "lineOfBusiness": "tenant",
+      "factor": "hazard_window_ac_unit",
+      "tier": "acceptable",
+      "when": [{ "field": "hazardWindowAcUnit", "op": "eq", "value": 1 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Hazards - window air-conditioning unit",
+        "quote": "A window air-conditioning unit is acceptable, and carries a surcharge for water damage."
+      },
+      "ratingFactor": "hazards.windowAcUnit"
+    },
+    {
+      "id": "T-HZ-WATER-HEATER",
+      "lineOfBusiness": "tenant",
+      "factor": "hazard_water_heater",
+      "tier": "acceptable",
+      "when": [{ "field": "hazardWaterHeater", "op": "eq", "value": 1 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Hazards - water heater",
+        "quote": "A water heater inside the unit is acceptable, and carries a surcharge for water damage."
+      },
+      "ratingFactor": "hazards.waterHeater"
+    },
+    {
+      "id": "T-HZ-HIGH-VALUE",
+      "lineOfBusiness": "tenant",
+      "factor": "hazard_high_value_contents",
+      "tier": "refer",
+      "when": [{ "field": "hazardHighValueContents", "op": "eq", "value": 1 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Contents - high-value items",
+        "quote": "High-value contents on show are referred to an underwriter so they can be scheduled."
+      },
+      "fixHint": "List the jewellery, cameras, laptops, TVs or instruments so they can be scheduled.",
+      "ratingFactor": "hazards.highValueContents"
+    },
+    {
+      "id": "T-SMOKE-NONE",
+      "lineOfBusiness": "tenant",
+      "factor": "smoke_detection",
+      "tier": "refer",
+      "when": [{ "field": "smokeDetectorCount", "op": "eq", "value": 0 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Protection - smoke detection",
+        "quote": "A room with no smoke detector seen is referred to an underwriter."
+      },
+      "fixHint": "Install a smoke detector on the ceiling, then re-photograph the ceiling.",
+      "ratingFactor": "smokeDetector.absent",
+      "interpretation": "TN-SMOKE-CEILING"
+    },
+    {
+      "id": "T-SMOKE-PRESENT",
+      "lineOfBusiness": "tenant",
+      "factor": "smoke_detection",
+      "tier": "target",
+      "when": [{ "field": "smokeDetectorCount", "op": "gte", "value": 1 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Protection - smoke detection",
+        "quote": "A room with at least one smoke detector is target, and earns a credit."
+      },
+      "ratingFactor": "smokeDetector.present"
+    },
+    {
+      "id": "T-AGE-PRE-1950",
+      "lineOfBusiness": "tenant",
+      "factor": "building_age",
+      "tier": "refer",
+      "when": [{ "field": "buildingYearBuilt", "op": "lt", "value": 1950 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Building - year built",
+        "quote": "A building built before 1950 is referred to an underwriter for its wiring and heating."
+      },
+      "ratingFactor": "buildingAge"
+    },
+    {
+      "id": "T-AGE-1950-1989",
+      "lineOfBusiness": "tenant",
+      "factor": "building_age",
+      "tier": "acceptable",
+      "when": [
+        { "field": "buildingYearBuilt", "op": "gte", "value": 1950 },
+        { "field": "buildingYearBuilt", "op": "lt", "value": 1990 }
+      ],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Building - year built",
+        "quote": "A building built from 1950 up to 1989 is acceptable."
+      },
+      "ratingFactor": "buildingAge"
+    },
+    {
+      "id": "T-AGE-1990-PLUS",
+      "lineOfBusiness": "tenant",
+      "factor": "building_age",
+      "tier": "target",
+      "when": [{ "field": "buildingYearBuilt", "op": "gte", "value": 1990 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Building - year built",
+        "quote": "A building built in 1990 or later is target."
+      },
+      "ratingFactor": "buildingAge"
+    },
+    {
+      "id": "T-CONTENTS-STANDARD",
+      "lineOfBusiness": "tenant",
+      "factor": "contents_limit",
+      "tier": "target",
+      "when": [{ "field": "contentsLimit", "op": "lte", "value": 100000 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Contents - limit",
+        "quote": "A contents limit of $100,000 or less is target."
+      },
+      "ratingFactor": "contents"
+    },
+    {
+      "id": "T-CONTENTS-HIGH",
+      "lineOfBusiness": "tenant",
+      "factor": "contents_limit",
+      "tier": "refer",
+      "when": [{ "field": "contentsLimit", "op": "gt", "value": 100000 }],
+      "citation": {
+        "doc": "Retrofit tenant rulebook",
+        "section": "Contents - limit",
+        "quote": "A contents limit over $100,000 is referred to an underwriter."
+      },
+      "fixHint": "Lower the contents limit to $100,000 or less, or schedule the most valuable items.",
+      "ratingFactor": "contents"
+    }
+  ],
+  "interpretations": [
+    {
+      "id": "TN-PAIR",
+      "title": "Heater near soft furnishings is decided by geometry, not by the model",
+      "decision": "heaterNearCombustible is set by the engine's pair rule: a portable_heater within 20 degrees and the same or adjacent distance band of a curtain, fabric or bedding. Gemini only reports the objects.",
+      "citation": {
+        "doc": "docs/PRD.md",
+        "section": "6.3 Stages",
+        "quote": "a `portable_heater` within ±20° and the same or adjacent distance band of `curtain`/`fabric`/`bedding` → `heaterNearCombustible`"
+      },
+      "affects": ["hazardHeaterNearCombustible", "hazards.heaterNearCombustible"]
+    },
+    {
+      "id": "TN-SMOKE-CEILING",
+      "title": "No smoke detector counts only when the ceiling was seen",
+      "decision": "A smoke-detector count of 0 is recorded only when more than 50% of the ceiling was visible in the sweep; otherwise the count is missing and the question is asked instead.",
+      "affects": ["smokeDetectorCount", "hazards.smokeDetectorCount"]
+    }
+  ]
+}

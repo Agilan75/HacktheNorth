@@ -6,5 +6,5 @@ import type { ContradictionsPanelProps } from './types.js';
  * Stub frozen by W0-4. Unit C09 replaces this body only — never the signature,
  * never the import list's shape, never this file's path.
  */
-export declare function Contradictions(_props: ContradictionsPanelProps): ReactElement;
+export declare function Contradictions(props: ContradictionsPanelProps): ReactElement;
 //# sourceMappingURL=Contradictions.d.ts.map

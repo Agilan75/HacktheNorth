@@ -10,5 +10,5 @@ export interface VerdictPillProps {
  *
  * Stub frozen by W0-4. Unit C02 replaces this body only.
  */
-export declare function VerdictPill(_props: VerdictPillProps): ReactElement;
+export declare function VerdictPill(props: VerdictPillProps): ReactElement;
 //# sourceMappingURL=VerdictPill.d.ts.map

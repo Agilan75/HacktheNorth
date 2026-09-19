@@ -219,6 +219,33 @@ function toSubmissionType(v: unknown): SubmissionType | null {
   return null;
 }
 
+/* -------------------------------------------------------------------------- */
+/* G-11 canonicalizers — exported so stage 6 (vectorize) applies the same      */
+/* rule to input that never passed through normalize (CP1 FX1). Each one       */
+/* trims and case-folds; empty or whitespace-only after trimming is missing    */
+/* (null), per G-2.                                                            */
+/* -------------------------------------------------------------------------- */
+
+/** G-11 submission type: `'new_business'`, `'renewal'`, or null (missing or unrecognized). */
+export function canonicalSubmissionType(v: unknown): SubmissionType | null {
+  return toSubmissionType(v);
+}
+
+/** G-11 line of business, as lower snake_case; null when absent or blank. */
+export function canonicalLineOfBusiness(v: unknown): string | null {
+  return typeof v === 'string' ? toSnake(v) : null;
+}
+
+/** G-7 / G-11 primary risk state, trimmed upper case; null when absent or blank. */
+export function canonicalStateCode(v: unknown): string | null {
+  return typeof v === 'string' ? toStateCode(v) : null;
+}
+
+/** G-8 / G-11 construction type, lower snake_case; null when absent or blank. */
+export function canonicalConstructionType(v: unknown): string | null {
+  return typeof v === 'string' ? toSnake(v) : null;
+}
+
 function toStringArray(v: unknown): readonly string[] | null {
   if (!Array.isArray(v)) {
     const one = toText(v);
@@ -300,8 +327,10 @@ function collectEntities(
     out.push({ group, prefix, data: value, key, order: out.length });
   }
   for (const [childKey, child] of Object.entries(value)) {
+    // An ungrouped container (e.g. `exposure_units[]`) is walked through, never
+    // emitted, so entities hydrated beneath it are still found.
     const childGroup = groupOf(childKey);
-    if (childGroup === 'other') continue;
+    if (childGroup === 'other' && !isPlainObject(child) && !Array.isArray(child)) continue;
     const nextPrefix = prefix === '' ? childKey : `${prefix}.${childKey}`;
     collectEntities(child, nextPrefix, childGroup, out, depth + 1);
   }
