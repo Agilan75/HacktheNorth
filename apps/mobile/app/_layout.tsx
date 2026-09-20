@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { View } from 'react-native';
 import { Stack, router } from 'expo-router';
 import type { ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -69,7 +70,9 @@ export default function RootLayout() {
     if (loaded || error !== null) SplashScreen.hideAsync().catch(() => undefined);
   }, [loaded, error]);
 
-  if (!loaded && error === null) return null;
+  // Never nothing: a root that renders nothing is a blank window with no way
+  // back and no error to read. Paper, until the faces are in.
+  if (!loaded && error === null) return <View style={{ flex: 1, backgroundColor: COLORS.bone }} />;
 
   return (
     <>

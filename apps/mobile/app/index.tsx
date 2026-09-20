@@ -323,6 +323,10 @@ export default function ViewfinderScreen() {
     if (!alive.current) return;
     if (result.status === 'sent') {
       sessionStore.setSweepId(result.sweep.id);
+      // The photos are the server's now. Fifteen of them is six megabytes of
+      // base64, and holding it through the analysis is headroom the phone needs
+      // for the polling. Only on `sent`: a queued sweep still has to send them.
+      sessionStore.clearFrames();
       router.replace({ pathname: '/analyzing', params: { id: result.sweep.id } });
       return;
     }
