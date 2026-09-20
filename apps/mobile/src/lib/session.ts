@@ -20,6 +20,8 @@ export type TermMonths = 4 | 8 | 12;
 export const TERM_OPTIONS: readonly TermMonths[] = [4, 8, 12];
 export const DEFAULT_TERM: TermMonths = 12;
 export const ROOM_LABEL_MAX = 120;
+/** What a sweep is called when nothing asked. Matches the API's own default. */
+export const DEFAULT_ROOM_LABEL = 'Room';
 
 /** How the frames were gathered. The upload path is a first-class peer of the sweep. */
 export type FrameSource = 'sweep' | 'upload';
@@ -111,8 +113,10 @@ export function buildCreateRequest(s: SessionState): BuildRequestResult {
   const label = s.roomLabel.trim();
   const contents = s.contentsEstimateUsd;
   const request: SweepCreateRequestDto = {
-    // Both omitted rather than guessed: the server holds the one default.
-    ...(label.length > 0 ? { roomLabel: label } : {}),
+    // Always sent, never omitted: a deployed API older than this tree still
+    // requires the field and rejects the whole sweep without it. 'Room' is the
+    // same default `createSweep` would have applied, so nothing else changes.
+    roomLabel: label.length > 0 ? label : DEFAULT_ROOM_LABEL,
     termMonths: s.termMonths,
     ...(submissionId ? { submissionId } : {}),
     ...(contents !== null && Number.isFinite(contents) && contents > 0

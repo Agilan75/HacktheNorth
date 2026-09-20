@@ -121,9 +121,10 @@ describe('buildCreateRequest', () => {
     expect(r).toEqual({ ok: false, problems: ['no-frames'] });
   });
 
-  it('omits a blank room label so the server supplies its own default', () => {
+  it('names a blank room "Room" rather than omitting the field', () => {
     const r = buildCreateRequest({ ...initialSession, frames: [frame(0)] });
-    expect(r.ok && 'roomLabel' in r.request).toBe(false);
+    // Never omitted: an API older than this tree rejects a sweep without it.
+    expect(r.ok && r.request.roomLabel).toBe('Room');
     expect(r.ok && r.request.termMonths).toBe(12);
   });
 
