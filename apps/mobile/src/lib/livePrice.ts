@@ -23,6 +23,12 @@ export interface LiveEntry {
   readonly price: number;
   readonly sources: readonly LivePriceSource[];
   readonly firstSeenMs: number;
+  /**
+   * Bearing of the frame the item was first seen in, degrees clockwise from
+   * the sweep start. Null when the caller did not pass one. It is what anchors
+   * the item's tag to the room rather than to the screen.
+   */
+  readonly bearingDeg: number | null;
 }
 
 export interface LiveSnapshot {
@@ -39,7 +45,8 @@ export interface LiveReport extends LiveSnapshot {
 }
 
 export interface LivePricer {
-  onFrame(imageBase64: string): void;
+  /** `bearingDeg` anchors whatever is found to the direction the frame faced. */
+  onFrame(imageBase64: string, bearingDeg?: number): void;
   snapshot(): LiveSnapshot;
   subscribe(listener: () => void): () => void;
   finish(deadlineMs?: number): Promise<LiveReport>;
@@ -118,13 +125,18 @@ export function createLivePricer(
     }
   }
 
-  function add(item: LiveItem): void {
+  function add(item: LiveItem, bearingDeg: number | null): void {
     if (entries.has(item.key)) return;
-    // A brand read on a later frame upgrades the unbranded sighting of the same kind of item.
+    // A brand read on a later frame upgrades the unbranded sighting of the same
+    // kind of item, and inherits where that sighting was.
+    let inheritedBearing: number | null = null;
     if (branded(item)) {
       const plainKey = `${item.label}||`;
       const plain = entries.get(plainKey);
-      if (plain !== undefined) entries.delete(plainKey);
+      if (plain !== undefined) {
+        inheritedBearing = plain.bearingDeg;
+        entries.delete(plainKey);
+      }
     } else if ([...entries.values()].some((e) => e.item.label === item.label && branded(e.item))) {
       return;
     }
@@ -134,21 +146,23 @@ export function createLivePricer(
       price: item.tablePrice,
       sources: [],
       firstSeenMs: nowMs(),
+      bearingDeg: bearingDeg ?? inheritedBearing,
     });
     if (branded(item)) lookupQueue.push(item);
   }
 
   return {
-    onFrame(imageBase64) {
+    onFrame(imageBase64, bearingDeg) {
       if (identifying >= MAX_IDENTIFY_IN_FLIGHT) return;
       const gen = generation;
+      const at = typeof bearingDeg === 'number' && Number.isFinite(bearingDeg) ? bearingDeg : null;
       identifying += 1;
       publish();
       const run = api
         .identifyItems(imageBase64)
         .then(
           (r) => {
-            if (gen === generation) for (const item of r.items) add(item);
+            if (gen === generation) for (const item of r.items) add(item, at);
           },
           () => undefined,
         )

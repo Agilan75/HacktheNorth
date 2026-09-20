@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from 'react';
 import { AccessibilityInfo, ActivityIndicator, AppState, Linking, Pressable, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -7,21 +7,19 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { SaveFormat, manipulateAsync } from 'expo-image-manipulator';
 import * as Location from 'expo-location';
-import { DeviceMotion } from 'expo-sensors';
 
+import { ArOverlay } from '@/ar/ArOverlay';
+import { toDegrees, useWorldPose } from '@/ar/pose';
 import { getApi } from '@/lib/api';
-import { captureReducer, initialCaptureState, uploadBearings } from '@/lib/capture';
+import { captureReducer, initialCaptureState, summarize, uploadBearings } from '@/lib/capture';
 import type { PendingCapture } from '@/lib/capture';
-import { createHeadingFilter, headingFromReading } from '@/lib/heading';
 import { createLivePricer } from '@/lib/livePrice';
 import type { LivePricer } from '@/lib/livePrice';
 import { markLaunch } from '@/lib/timing';
 import { getSweepQueue } from '@/lib/queue';
-import { SESSION_PROBLEM_TEXT, buildCreateRequest, sessionStore } from '@/lib/session';
+import { SESSION_PROBLEM_TEXT, buildCreateRequest, sessionStore, useSession } from '@/lib/session';
 import type { SessionFrame } from '@/lib/session';
 import { Button, COLORS, MIN_TOUCH_TARGET, Notice, SPACE, Screen, Text } from '@/ui';
-import { LivePriceStrip } from '@/ui/LivePrices';
-import { ScanOverlay } from '@/ui/ScanOverlay';
 
 /**
  * The viewfinder. It is the first screen and it is the sweep: launch opens the
@@ -48,7 +46,8 @@ const JPEG_QUALITY = 0.7;
 const UPLOAD_PHOTO_COUNT = 3;
 /** No compass reading this long after subscribing means the compass is not working. */
 const HEADING_WATCHDOG_MS = 6000;
-const MOTION_INTERVAL_MS = 200;
+/** The pose runs at 60 Hz; the capture machine is fed at 10 Hz. */
+const HEADING_FEED_MS = 100;
 
 const sweepQueue = getSweepQueue((req) => getApi().createSweep(req));
 
@@ -105,13 +104,17 @@ export default function ViewfinderScreen() {
   const [asking, setAsking] = useState(false);
   const [compassProblem, setCompassProblem] = useState<CompassProblem | null>(null);
   const [cameraReady, setCameraReady] = useState(false);
-  const [headingLive, setHeadingLive] = useState(false);
   const [send, setSend] = useState<SendState>({ kind: 'idle' });
 
   const [capture, dispatch] = useReducer(captureReducer, initialCaptureState);
+  const summary = useMemo(() => summarize(capture), [capture]);
+  /**
+   * A sweep from earlier in this session, if any. Only then can a pin open
+   * `/hazard/[id]` on something the API has actually scored.
+   */
+  const priorSweepId = useSession((s) => s.sweepId);
 
   const cameraRef = useRef<CameraView>(null);
-  const filterRef = useRef(createHeadingFilter());
   const frameData = useRef(new Map<number, FrameData>());
   const pricerRef = useRef<LivePricer | null>(null);
   pricerRef.current ??= createLivePricer(getApi());
@@ -219,74 +222,36 @@ export default function ViewfinderScreen() {
 
   const sensing = gate === 'ready' && send.kind === 'idle' && capture.phase !== 'finished';
 
-  // Compass: watchHeadingAsync -> the circular filter -> the capture machine.
+  /**
+   * One pose for both jobs. The overlay draws with it, and the capture machine
+   * is driven by it, so there is a single subscription to the compass and the
+   * motion sensor rather than one each.
+   */
+  const pose = useWorldPose();
+
+  // The pose publishes at 60 Hz. The capture machine only ever needed compass
+  // rate, and it interpolates the panels between samples, so it is fed at 10 Hz.
+  const lastFedMs = useRef(0);
   useEffect(() => {
-    if (!sensing) return undefined;
-    let cancelled = false;
-    let gotReading = false;
-    let sub: Location.LocationSubscription | null = null;
-    filterRef.current.reset();
+    if (!sensing || !pose.ready) return;
+    const now = Date.now();
+    if (now - lastFedMs.current < HEADING_FEED_MS) return;
+    lastFedMs.current = now;
+    pitchRef.current = Math.round(pose.pitch * (180 / Math.PI));
+    dispatch({ type: 'heading', headingDeg: toDegrees(pose.yaw), atMs: now });
+  }, [sensing, pose]);
 
-    const watchdog = setTimeout(() => {
-      if (!cancelled && !gotReading) setCompassProblem('no-readings');
-    }, HEADING_WATCHDOG_MS);
-
-    Location.watchHeadingAsync(
-      (reading) => {
-        if (cancelled) return;
-        const raw = headingFromReading(reading);
-        if (raw === null) return;
-        const filtered = filterRef.current.push(raw);
-        if (filtered === null) return;
-        if (!gotReading) {
-          gotReading = true;
-          setHeadingLive(true);
-        }
-        dispatch({ type: 'heading', headingDeg: filtered, atMs: Date.now() });
-      },
-      () => {
-        if (!cancelled && !gotReading) setCompassProblem('error');
-      },
-    )
-      .then((s) => {
-        if (cancelled) s.remove();
-        else sub = s;
-      })
-      .catch(() => {
-        if (!cancelled) setCompassProblem('error');
-      });
-
-    return () => {
-      cancelled = true;
-      clearTimeout(watchdog);
-      sub?.remove();
-      setHeadingLive(false);
-    };
-  }, [sensing]);
-
-  // Pitch from DeviceMotion. Optional: without it frames simply carry no pitch.
+  // Neither sensor spoke: say so, and offer the photo path.
   useEffect(() => {
-    if (!sensing) return undefined;
-    let sub: { remove(): void } | null = null;
-    try {
-      DeviceMotion.setUpdateInterval(MOTION_INTERVAL_MS);
-      sub = DeviceMotion.addListener((m) => {
-        const beta = m.rotation?.beta;
-        // beta = 90 degrees held upright; 0 flat on its back.
-        if (typeof beta === 'number' && Number.isFinite(beta)) {
-          pitchRef.current = Math.round((beta * 180) / Math.PI - 90);
-        }
-      });
-    } catch {
-      sub = null;
-    }
-    return () => sub?.remove();
-  }, [sensing]);
+    if (!sensing || pose.ready) return undefined;
+    const watchdog = setTimeout(() => setCompassProblem('no-readings'), HEADING_WATCHDOG_MS);
+    return () => clearTimeout(watchdog);
+  }, [sensing, pose.ready]);
 
-  // Start the machine once the camera shows a picture and the compass speaks.
+  // Start the machine once the camera shows a picture and the pose is live.
   useEffect(() => {
-    if (sensing && cameraReady && headingLive && capture.phase === 'idle') dispatch({ type: 'start' });
-  }, [sensing, cameraReady, headingLive, capture.phase]);
+    if (sensing && cameraReady && pose.ready && capture.phase === 'idle') dispatch({ type: 'start' });
+  }, [sensing, cameraReady, pose.ready, capture.phase]);
 
   /* -------------------------------- capture ------------------------------- */
 
@@ -556,15 +521,21 @@ export default function ViewfinderScreen() {
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       />
-      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-        <ScanOverlay
-          state={capture}
-          onFinish={finishSweep}
-          middle={<LivePriceStrip snap={liveSnap} />}
-          footer={photoLink}
-          style={styles.overlay}
-        />
-      </View>
+      <ArOverlay
+        pose={pose}
+        panels={capture.panels}
+        coveragePct={summary.coveragePctDisplay}
+        canFinish={summary.canFinish}
+        onFinish={finishSweep}
+        live={liveSnap}
+        {...(priorSweepId !== null
+          ? {
+              onHazard: (hazardKey: string) =>
+                router.push({ pathname: '/hazard/[id]', params: { id: hazardKey, sweep: priorSweepId } }),
+            }
+          : {})}
+        footer={photoLink}
+      />
     </View>
   );
 }
