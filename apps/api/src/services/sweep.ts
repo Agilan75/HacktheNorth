@@ -1097,6 +1097,21 @@ export async function createSweep(deps: Deps, request: SweepCreateRequestDto): P
   return toSweepDto(row);
 }
 
+/**
+ * The same sweep with the frame images left out.
+ *
+ * Fifteen stored frames are about six megabytes of base64, and `/analyzing`
+ * polls this every 1.2 s without ever drawing one: a minute of that is a
+ * hundred megabytes through a phone, which is enough to end the app. The poll
+ * asks for this form; the screens that actually show a photo do not.
+ */
+export function withoutFrameImages(sweep: SweepDto): SweepDto {
+  return {
+    ...sweep,
+    frames: sweep.frames.map((f) => (f.imageRef === null ? f : { ...f, imageRef: null })),
+  };
+}
+
 /** Advances one stage: quality gate -> observe -> relate -> score -> questions. */
 export async function advanceSweep(deps: Deps, sweepId: string): Promise<SweepDto> {
   const repos = createRepos(deps.db);

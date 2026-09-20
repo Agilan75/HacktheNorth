@@ -187,6 +187,12 @@ export interface CallOptions {
   readonly signal?: AbortSignal;
   /** Override the client's retry policy for this call (e.g. `{ maxAttempts: 1 }`). */
   readonly retry?: Partial<RetryPolicy>;
+  /**
+   * `false` asks `GET /sweeps/:id` to leave the frame images out. Fifteen of
+   * them is about six megabytes, and a poll that never draws one should not be
+   * carrying them: a minute of polling is otherwise enough to end the app.
+   */
+  readonly images?: boolean;
 }
 
 export interface ApiClient {
@@ -395,7 +401,14 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     baseUrl,
     createSweep: (body, opts) =>
       request<SweepDto>('POST', API_PATHS.createSweep(), body, uploadTimeoutMs, opts),
-    getSweep: (id, opts) => request<SweepDto>('GET', API_PATHS.getSweep(id), undefined, timeoutMs, opts),
+    getSweep: (id, opts) =>
+      request<SweepDto>(
+        'GET',
+        opts?.images === false ? `${API_PATHS.getSweep(id)}?images=0` : API_PATHS.getSweep(id),
+        undefined,
+        timeoutMs,
+        opts,
+      ),
     nextQuestion: (id, opts) =>
       request<NextQuestionResponseDto>('GET', API_PATHS.nextQuestion(id), undefined, timeoutMs, opts),
     submitAnswers: (id, body, opts) =>
@@ -444,7 +457,9 @@ export async function pollSweep(client: ApiClient, id: string, opts: PollOptions
   const started = now();
   for (;;) {
     if (opts.signal?.aborted) throw new ApiError({ kind: 'aborted', message: 'polling cancelled' });
-    const callOpts: CallOptions = opts.signal === undefined ? {} : { signal: opts.signal };
+    // Never the images: this runs every 1.2 s and nothing on the way draws one.
+    const callOpts: CallOptions =
+      opts.signal === undefined ? { images: false } : { images: false, signal: opts.signal };
     const sweep = await client.getSweep(id, callOpts);
     opts.onUpdate?.(sweep);
     if (isRestingStage(sweep.stage)) return sweep;

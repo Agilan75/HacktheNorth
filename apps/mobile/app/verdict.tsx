@@ -122,7 +122,9 @@ export default function VerdictScreen() {
       }
       if (!loaded.current) setLoad({ kind: 'loading' });
       getApi()
-        .getSweep(sweepId, signal ? { signal } : undefined)
+        // Without the frame images: nothing here draws one, and carrying all
+        // fifteen is about six megabytes for a screen that shows a price.
+        .getSweep(sweepId, signal ? { images: false, signal } : { images: false })
         .then((sweep) => {
           loaded.current = true;
           setLoad({ kind: 'ready', sweep });
