@@ -29,6 +29,8 @@ function sweep(stage: SweepStageDto = 'received', id = 'sw_1'): SweepDto {
     observations: [],
     needsConfirmation: [],
     result: null,
+    hazardCosts: [],
+    pendingQuestion: null,
     askedQuestionIds: [],
     skippedCount: 0,
     error: null,

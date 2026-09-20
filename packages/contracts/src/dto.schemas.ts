@@ -567,6 +567,12 @@ export const sweepFrameSchema = z.object({
   imageRef: z.string().nullable(),
 });
 
+export const hazardCostSchema = z.object({
+  hazardKey: z.string().min(1),
+  factor: z.number(),
+  monthlyDelta: z.number().nullable(),
+});
+
 export const sweepSchema: z.ZodType<SweepDto> = z.object({
   id: idSchema,
   submissionId: idSchema.nullable(),
@@ -578,6 +584,8 @@ export const sweepSchema: z.ZodType<SweepDto> = z.object({
   observations: z.array(observationSchema),
   needsConfirmation: z.array(observationSchema),
   result: engineResultSchema.nullable(),
+  hazardCosts: z.array(hazardCostSchema),
+  pendingQuestion: questionSchema.nullable(),
   askedQuestionIds: z.array(idSchema),
   skippedCount: z.number().int().nonnegative(),
   error: z.string().nullable(),

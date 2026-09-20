@@ -1,80 +1,68 @@
-import { useCallback, useRef, useState } from 'react';
-import { Modal, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import type { SweepDto } from '@retrofit/contracts';
+import type { HazardCostDto, SweepDto } from '@retrofit/contracts';
 
 import { describeApiError, getApi } from '@/lib/api';
 import { sessionStore, useSession } from '@/lib/session';
+import { markVerdict } from '@/lib/timing';
 import {
   Button,
   COLORS,
   Card,
+  ChoiceGroup,
   Heading,
-  Hero,
   Icon,
   Notice,
   SPACE,
   Screen,
   SkeletonCard,
   Text,
+  TextField,
   VerdictPill,
 } from '@/ui';
-import type { HeroTone, IconName } from '@/ui';
+import type { IconName } from '@/ui';
 
 /**
- * Your quote — PRD §11 `/verdict` (unit M8).
+ * The quote. Price, verdict, the three dearest findings with what each one
+ * costs a month, one fix, the contents value the sweep derived, and at most one
+ * optional question.
  *
- * The verdict in words as well as colour, the price ESTIMATE with its
- * factor-by-factor breakdown exactly as the API returned it (PRD 6.7), the
- * deciding rule in plain words, the fix, "Verify my fix", and a Next-step sheet.
+ * Invariant: this screen does no arithmetic on money, scores or verdicts. Every
+ * number is a field of the API's reply, including each finding's monthly cost,
+ * which the API divides out of the engine's own factor composition.
  *
- * Invariant (PRD 1): this screen does no arithmetic on money, scores or
- * verdicts. Every number shown is a field of the API's `EngineResult`; the only
- * client-side work is formatting and comparing a factor against 1 to choose the
- * words "raises" / "lowers".
- *
- * Params: `id` (optional) — the sweep id; falls back to the session's sweepId.
+ * Everything the sweep derived or defaulted is editable here. An edit posts to
+ * the existing answers endpoint and the price is replaced with the rescored one.
  */
 
 type EngineResult = NonNullable<SweepDto['result']>;
-type Price = EngineResult['price'];
-type AppliedFactor = Price['factors'][number];
 type Verdict = EngineResult['verdict']['verdict'];
 
-/* -------------------------------------------------------------------------- */
-/* Private presentation helpers (formatting only — no arithmetic on numbers)  */
-/* -------------------------------------------------------------------------- */
-
+/** Whole dollars. Cents on a monthly renter premium are noise. */
 function money(n: number | null | undefined): string {
-  if (n === null || n === undefined || !Number.isFinite(n)) return 'not available';
-  const [whole = '0', cents = '00'] = Math.abs(n).toFixed(2).split('.');
-  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return `${n < 0 ? '-' : ''}$${grouped}.${cents}`;
+  if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+  const whole = Math.round(Math.abs(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return `${n < 0 ? '-' : ''}$${whole}`;
 }
 
-/** Plain-language tenant wording for each verdict. The pill adds its own glyph. */
 const VERDICT_WORDS: Readonly<Record<Verdict, string>> = {
-  FIT: 'Good to cover',
-  REFER: 'A person needs to review this',
-  DOES_NOT_FIT: 'Can’t be covered as it is',
+  FIT: 'Coverable',
+  REFER: 'Needs review',
+  DOES_NOT_FIT: 'Not coverable',
 };
 
-const VERDICT_SENTENCE: Readonly<Record<Verdict, string>> = {
-  FIT: 'This room fits what the insurer covers.',
-  REFER: 'This room might be covered, but a person at the insurer needs to look at it first.',
-  DOES_NOT_FIT: 'As it is today, this room is outside what the insurer covers.',
-};
-
-/**
- * Decorative only — `VerdictPill` still prints the word and its own glyph.
- * FIT keeps red (the pill's own fill colour); REFER moves to blue (PRD §13:
- * "red never means bad", so a filled red Hero must stay reserved for FIT);
- * DOES_NOT_FIT matches the pill's ink fill.
- */
-const HERO_TONE_BY_VERDICT: Readonly<Record<Verdict, HeroTone>> = {
-  FIT: 'red',
-  REFER: 'blue',
-  DOES_NOT_FIT: 'ink',
+const HAZARD_NAMES: Readonly<Record<string, string>> = {
+  portableHeater: 'Space heater',
+  heaterNearCombustible: 'Heater near fabric',
+  extensionCord: 'Extension cord',
+  powerBarOverload: 'Overloaded power bar',
+  candle: 'Open flame',
+  stove: 'Stove',
+  blockedExit: 'Blocked exit',
+  windowAcUnit: 'Window AC',
+  waterHeater: 'Water heater',
+  highValueContents: 'High-value contents',
 };
 
 const HAZARD_ICON: Readonly<Record<string, IconName>> = {
@@ -90,105 +78,21 @@ const HAZARD_ICON: Readonly<Record<string, IconName>> = {
   highValueContents: 'diamond-outline',
 };
 
-/** Decorative icon per priced factor — falls back to a neutral glyph. */
-function factorIcon(name: string): IconName {
-  const hazard = hazardKeyOfFactor(name);
-  if (hazard !== null) return HAZARD_ICON[hazard] ?? 'warning-outline';
-  switch (name) {
-    case 'contents':
-      return 'cube-outline';
-    case 'buildingAge':
-      return 'business-outline';
-    case 'smokeDetector':
-      return 'radio-button-on-outline';
-    case 'term':
-      return 'calendar-outline';
-    default:
-      return 'ellipse-outline';
-  }
-}
-
-const HAZARD_NAMES: Readonly<Record<string, string>> = {
-  portableHeater: 'Portable heater',
-  heaterNearCombustible: 'Heater close to soft furnishings',
-  extensionCord: 'Extension cord in use',
-  powerBarOverload: 'Overloaded power bar',
-  candle: 'Candle',
-  stove: 'Stove',
-  blockedExit: 'Blocked exit',
-  windowAcUnit: 'Window air conditioner',
-  waterHeater: 'Water heater',
-  highValueContents: 'High-value items',
-};
-
 function humanize(key: string): string {
   const spaced = key.replace(/[._]/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().trim();
   return spaced.length > 0 ? spaced.charAt(0).toUpperCase() + spaced.slice(1) : key;
 }
 
-function hazardName(hazardKey: string): string {
-  return HAZARD_NAMES[hazardKey] ?? humanize(hazardKey);
+const hazardName = (key: string): string => HAZARD_NAMES[key] ?? humanize(key);
+
+/** The best value on a sourced field: the last one written wins. */
+function latest(field: readonly { readonly value: unknown }[] | undefined): unknown {
+  return field === undefined || field.length === 0 ? undefined : field[field.length - 1]?.value;
 }
 
-/** `hazard.portableHeater` -> `portableHeater`; anything else -> null. */
-function hazardKeyOfFactor(name: string): string | null {
-  return name.startsWith('hazard.') ? name.slice('hazard.'.length) : null;
-}
-
-/** Flip component key `hazardPortableHeater` -> `portableHeater`. */
-function hazardKeyOfComponent(componentKey: string): string | null {
-  const m = /^hazard([A-Z].*)$/.exec(componentKey);
-  if (m === null || m[1] === undefined) return null;
-  return m[1].charAt(0).toLowerCase() + m[1].slice(1);
-}
-
-function factorName(name: string): string {
-  const hazard = hazardKeyOfFactor(name);
-  if (hazard !== null) return hazardName(hazard);
-  switch (name) {
-    case 'contents':
-      return 'Value of your belongings';
-    case 'buildingAge':
-      return 'Age of the building';
-    case 'smokeDetector':
-      return 'Smoke detector';
-    case 'term':
-      return 'Length of the policy';
-    default:
-      return humanize(name);
-  }
-}
-
-/** Words for the direction of a multiplier. A comparison, not a calculation. */
-function factorEffect(factor: number): string {
-  if (!Number.isFinite(factor)) return 'not known';
-  if (factor > 1) return 'raises your price';
-  if (factor < 1) return 'lowers your price';
-  return 'no change';
-}
-
-function factorText(factor: number): string {
-  return Number.isFinite(factor) ? `× ${String(factor)}` : '× ?';
-}
-
-/** Hazard keys the API priced in, in the API's order. */
-function pricedHazards(price: Price): string[] {
-  const out: string[] = [];
-  for (const f of price.factors) {
-    const k = hazardKeyOfFactor(f.name);
-    if (k !== null && !out.includes(k)) out.push(k);
-  }
-  return out;
-}
-
-/** The hazard the Verify button should open on: the flip's first hazard move, else the first priced hazard. */
-function defaultHazard(result: EngineResult): string | null {
-  const priced = pricedHazards(result.price);
-  for (const move of result.flip.flip?.moves ?? []) {
-    const k = hazardKeyOfComponent(move.componentKey);
-    if (k !== null && priced.includes(k)) return k;
-  }
-  return priced[0] ?? null;
+function numberOf(field: readonly { readonly value: unknown }[] | undefined): number | null {
+  const v = latest(field);
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -207,14 +111,14 @@ export default function VerdictScreen() {
   const sweepId = (typeof params.id === 'string' && params.id.length > 0 ? params.id : null) ?? sessionSweepId;
 
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [ruleOpen, setRuleOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveProblem, setSaveProblem] = useState<string | null>(null);
   const loaded = useRef(false);
 
   const fetchSweep = useCallback(
     (signal?: AbortSignal) => {
       if (sweepId === null) {
-        setLoad({ kind: 'error', message: 'We don’t have a room scan to show yet. Start a new scan first.' });
+        setLoad({ kind: 'error', message: 'No scan yet.' });
         return;
       }
       if (!loaded.current) setLoad({ kind: 'loading' });
@@ -241,12 +145,29 @@ export default function VerdictScreen() {
     }, [fetchSweep]),
   );
 
+  /** One rescore path for every correction on this screen. */
+  const apply = useCallback(
+    async (body: Parameters<ReturnType<typeof getApi>['submitAnswers']>[1]) => {
+      if (sweepId === null) return;
+      setSaveProblem(null);
+      setSaving(true);
+      try {
+        const next = await getApi().submitAnswers(sweepId, body);
+        setLoad({ kind: 'ready', sweep: next });
+      } catch (error) {
+        setSaveProblem(describeApiError(error));
+      } finally {
+        setSaving(false);
+      }
+    },
+    [sweepId],
+  );
+
   if (load.kind === 'loading') {
     return (
       <Screen>
-        <SkeletonCard accessibilityLabel="Loading your quote" lines={2} />
-        <SkeletonCard accessibilityLabel="Loading your quote" lines={4} />
-        <SkeletonCard accessibilityLabel="Loading your quote" lines={3} />
+        <SkeletonCard accessibilityLabel="Loading the quote" lines={2} />
+        <SkeletonCard accessibilityLabel="Loading the quote" lines={4} />
       </Screen>
     );
   }
@@ -257,7 +178,7 @@ export default function VerdictScreen() {
         <Notice tone="error" actionLabel={sweepId !== null ? 'Try again' : undefined} onAction={sweepId !== null ? () => fetchSweep() : undefined}>
           {load.message}
         </Notice>
-        <Button label="Start a new scan" variant="secondary" onPress={() => router.replace('/new')} />
+        <Button label="Scan a room" variant="secondary" onPress={() => router.replace('/')} />
       </Screen>
     );
   }
@@ -269,235 +190,203 @@ export default function VerdictScreen() {
     return (
       <Screen>
         <Notice tone="info">
-          {sweep.stage === 'failed'
-            ? `We couldn’t finish checking this room.${sweep.error ? ` ${sweep.error}` : ''}`
-            : 'Your quote isn’t ready yet. We’re still working it out.'}
+          {sweep.stage === 'failed' ? (sweep.error ?? 'The scan could not be read.') : 'No price yet.'}
         </Notice>
-        {sweep.stage === 'failed' ? (
-          <Button label="Scan the room again" onPress={() => router.replace('/new')} />
-        ) : (
-          <Button label="Check again" onPress={() => fetchSweep()} />
-        )}
+        <Button
+          label={sweep.stage === 'failed' ? 'Scan again' : 'Check again'}
+          onPress={() => (sweep.stage === 'failed' ? router.replace('/') : fetchSweep())}
+        />
       </Screen>
     );
   }
 
-  const verdict = result.verdict.verdict;
-  const price = result.price;
-  const hazards = pricedHazards(price);
-  const verifyHazard = defaultHazard(result);
-  const flip = result.flip.flip;
-  const decidingRule = result.verdict.decidingRule;
-  const why = result.verdict.reasons[0] ?? result.explanation ?? null;
-  const moreReasons = result.verdict.reasons.slice(1);
-  const questionsLeft = sweep.stage === 'questions';
+  return (
+    <Quote
+      sweep={sweep}
+      result={result}
+      saving={saving}
+      saveProblem={saveProblem}
+      onApply={apply}
+      onScanAgain={() => {
+        sessionStore.reset();
+        router.replace('/');
+      }}
+      onVerify={(hazardKey) =>
+        router.push({
+          pathname: '/verify-fix',
+          params: { id: sweep.id, ...(hazardKey !== null ? { hazard: hazardKey } : {}) },
+        })
+      }
+      onHazard={(hazardKey) =>
+        router.push({ pathname: '/hazard/[id]', params: { id: hazardKey, sweep: sweep.id } })
+      }
+    />
+  );
+}
 
-  const openVerify = (hazardKey: string | null) => {
-    router.push({
-      pathname: '/verify-fix',
-      params: { id: sweep.id, ...(hazardKey !== null ? { hazard: hazardKey } : {}) },
-    });
-  };
+/* -------------------------------------------------------------------------- */
+/* The quote                                                                  */
+/* -------------------------------------------------------------------------- */
+
+function Quote({
+  sweep,
+  result,
+  saving,
+  saveProblem,
+  onApply,
+  onScanAgain,
+  onVerify,
+  onHazard,
+}: {
+  readonly sweep: SweepDto;
+  readonly result: EngineResult;
+  readonly saving: boolean;
+  readonly saveProblem: string | null;
+  readonly onApply: (body: Parameters<ReturnType<typeof getApi>['submitAnswers']>[1]) => Promise<void>;
+  readonly onScanAgain: () => void;
+  readonly onVerify: (hazardKey: string | null) => void;
+  readonly onHazard: (hazardKey: string) => void;
+}) {
+  const price = result.price;
+  const verdict = result.verdict.verdict;
+  const top = sweep.hazardCosts.filter((h) => (h.monthlyDelta ?? 0) > 0).slice(0, 3);
+  const flip = result.flip.flip;
+  const fix = flip?.moves[0] ?? null;
+  const contents = numberOf(result.canonical.exposure.contentsLimit);
+  const yearBuilt = numberOf(result.canonical.buildings[0]?.yearBuilt);
+  const question = sweep.pendingQuestion;
+  const coverage = sweep.coverage;
+  const short = coverage !== null && !coverage.sufficient;
+
+  // The budget instrument: launch to a price on screen. Removed before shipping.
+  useEffect(() => {
+    if (price.predictedMonthlyPremium !== null) markVerdict();
+  }, [price.predictedMonthlyPremium]);
 
   return (
     <Screen
       footer={
         <>
-          {verifyHazard !== null ? (
+          {top.length > 0 ? (
             <Button
-              label="Verify my fix"
-              accessibilityHint="Take one new photo of the thing you fixed. We re-check it and update your estimate."
-              onPress={() => openVerify(verifyHazard)}
+              label="Fixed it? Recheck"
+              accessibilityHint="Takes one photo of the fix and reprices."
+              onPress={() => onVerify(top[0]?.hazardKey ?? null)}
             />
           ) : null}
-          <Button
-            label="What happens next"
-            variant="secondary"
-            fullWidth
-            accessibilityHint="Opens a sheet with your next steps."
-            onPress={() => setSheetOpen(true)}
-          />
+          <Button label="Scan another room" variant="secondary" fullWidth onPress={onScanAgain} />
         </>
       }
     >
-      {/* Verdict */}
-      <Hero
-        tone={HERO_TONE_BY_VERDICT[verdict]}
-        accessibilityLabel={`${sweep.roomLabel}. Result: ${VERDICT_WORDS[verdict]}. ${VERDICT_SENTENCE[verdict]}`}
+      {/* Price */}
+      <View
+        accessible
+        accessibilityRole="summary"
+        accessibilityLabel={`${money(price.predictedMonthlyPremium)} a month. ${money(price.predictedPremium)} a year. ${VERDICT_WORDS[verdict]}.`}
+        style={{ gap: SPACE.xs }}
       >
-        <Text tone="inverse" variant="small">
+        <Text variant="small" tone="muted">
           {sweep.roomLabel}
         </Text>
-        {/* REFER's pill is outlined (transparent fill), which only has the
-            contrast its redDeep text needs against Paper — never against a
-            gradient. Every verdict gets the same opaque Paper plate here so
-            none of them can quietly lose legibility on a coloured Hero. */}
-        <View style={{ backgroundColor: COLORS.paper, borderRadius: 999, alignSelf: 'flex-start' }}>
-          <VerdictPill
-            verdict={verdict}
-            text={VERDICT_WORDS[verdict]}
-            size="large"
-            accessibilityLabel={`Result: ${VERDICT_WORDS[verdict]}`}
-          />
+        <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: SPACE.sm }}>
+          <Text variant="display" weight="semibold" tone="accent">
+            {money(price.predictedMonthlyPremium)}
+          </Text>
+          <Text tone="muted">a month</Text>
         </View>
-        <Text tone="inverse">{VERDICT_SENTENCE[verdict]}</Text>
-      </Hero>
+        <Text variant="small" tone="muted">
+          {`${money(price.predictedPremium)} a year · ${String(price.termMonths ?? sweep.termMonths)}-month term`}
+        </Text>
+        {price.estimate ? (
+          <Text variant="small" tone="muted">
+            Demo rate
+          </Text>
+        ) : null}
+      </View>
 
-      {questionsLeft ? (
-        <Notice
-          tone="info"
-          actionLabel="Answer the questions"
-          onAction={() => router.push('/questions')}
-        >
-          There are still a few questions. Answering them can change this result.
-        </Notice>
+      <VerdictPill verdict={verdict} text={VERDICT_WORDS[verdict]} size="large" />
+
+      {saveProblem !== null ? <Notice tone="error">{saveProblem}</Notice> : null}
+
+      {/* The one optional question, after the price, never before it. */}
+      {question !== null ? (
+        <QuestionCard
+          question={question}
+          saving={saving}
+          onAnswer={(value) =>
+            void onApply({ answers: [{ questionId: question.id, field: question.field, value }] })
+          }
+          onSkip={() =>
+            void onApply({
+              answers: [{ questionId: question.id, field: question.field, value: null, skipped: true }],
+            })
+          }
+        />
       ) : null}
 
-      {/* Estimate */}
-      <Hero tone="blue" accessibilityRole="summary">
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
-          <Icon name="wallet-outline" size={20} color={COLORS.paper} />
-          <Text tone="inverse" variant="heading" weight="semibold">
-            Your price estimate
-          </Text>
-        </View>
-        <View
-          accessible
-          accessibilityLabel={`Estimate: ${money(price.predictedMonthlyPremium)} a month. ${money(price.predictedPremium)} a year.`}
-          style={{ gap: SPACE.xs }}
-        >
-          <Text variant="display" weight="semibold" tone="inverse">
-            {money(price.predictedMonthlyPremium)}
-            <Text variant="body" tone="inverse">
-              {' '}a month
-            </Text>
-          </Text>
-          <Text tone="inverse" style={{ opacity: 0.85 }}>
-            {`${money(price.predictedPremium)} a year${price.termMonths !== null ? ` · ${String(price.termMonths)}-month policy` : ''}`}
-          </Text>
-        </View>
-        <Text variant="small" tone="inverse" style={{ opacity: 0.85 }}>
-          {price.estimate
-            ? 'This is an estimate from a rating table, not a final price. An insurer confirms the real price.'
-            : 'Worked out from the rating table.'}
-        </Text>
-      </Hero>
-
-      <Card>
-        <Heading variant="heading">How we got this number</Heading>
-        <Text variant="small" tone="muted">
-          We start from a base monthly rate and multiply it by each factor below. Change one factor and you can check
-          the difference yourself.
-        </Text>
-        <View accessibilityRole="list" style={{ gap: SPACE.xs }}>
-          {price.factors.map((f, i) => (
-            <FactorRow
-              key={`${f.name}-${String(i)}`}
-              factor={f}
-              onPress={
-                hazardKeyOfFactor(f.name) !== null
-                  ? () => router.push({ pathname: '/hazard/[id]', params: { id: hazardKeyOfFactor(f.name) ?? '' } })
-                  : undefined
-              }
-            />
-          ))}
-        </View>
-      </Card>
-
-      {/* Deciding rule */}
-      <Card>
-        <Heading variant="heading">Why</Heading>
-        {why !== null ? <Text>{why}</Text> : <Text tone="muted">No single rule decided this.</Text>}
-        {moreReasons.length > 0 ? (
-          <View style={{ gap: SPACE.xs }}>
-            {moreReasons.map((r, i) => (
-              <Text key={String(i)} variant="small" tone="muted">{`• ${r}`}</Text>
+      {/* Top three findings, dearest first, each with what it costs a month. */}
+      {top.length > 0 ? (
+        <Card>
+          <Heading variant="heading">What costs you</Heading>
+          <View accessibilityRole="list" style={{ gap: SPACE.xs }}>
+            {top.map((h) => (
+              <HazardRow key={h.hazardKey} cost={h} onPress={() => onHazard(h.hazardKey)} />
             ))}
           </View>
-        ) : null}
-        {decidingRule !== null ? (
-          <>
-            <Button
-              label={ruleOpen ? 'Hide the rule we used' : 'Show the rule we used'}
-              variant="quiet"
-              fullWidth={false}
-              accessibilityState={{ expanded: ruleOpen }}
-              onPress={() => setRuleOpen((v) => !v)}
-            />
-            {ruleOpen ? (
-              <View
-                accessible
-                accessibilityLabel={`From ${decidingRule.citation.doc}, ${decidingRule.citation.section}: ${decidingRule.citation.quote}`}
-                style={{ borderLeftWidth: 3, borderLeftColor: COLORS.ink, paddingLeft: SPACE.md, gap: SPACE.xs }}
-              >
-                <Text variant="small" tone="muted">{`${decidingRule.citation.doc} · ${decidingRule.citation.section}`}</Text>
-                <Text variant="small">{`“${decidingRule.citation.quote}”`}</Text>
-              </View>
-            ) : null}
-          </>
-        ) : null}
-      </Card>
+        </Card>
+      ) : null}
 
-      {/* The fix */}
-      <Card tone={flip !== null ? 'accent' : 'plain'}>
+      {/* One fix. */}
+      <Card tone={fix !== null ? 'accent' : 'plain'}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
-          <Icon name="construct-outline" size={20} color={COLORS.ink} />
-          <Heading variant="heading">What to fix</Heading>
+          <Icon name="construct-outline" size={18} color={COLORS.ink} />
+          <Heading variant="heading">Fix</Heading>
         </View>
-        {flip !== null ? (
-          <>
-            {flip.moves.map((m, i) => (
-              <Text key={`${m.componentKey}-${String(i)}`}>{`• ${m.fixHint ?? m.label}`}</Text>
-            ))}
-            <View
-              accessible
-              accessibilityLabel={`If you do this, the result becomes ${VERDICT_WORDS[flip.verdictAfter]}. Estimate ${money(flip.premiumAfter)} a year instead of ${money(flip.premiumBefore)} a year.`}
-              style={{ gap: SPACE.xs }}
-            >
-              <Text weight="semibold">{`If you do this: ${VERDICT_WORDS[flip.verdictAfter]}`}</Text>
-              <Text>{`Estimate ${money(flip.premiumAfter)} a year, instead of ${money(flip.premiumBefore)} a year.`}</Text>
-            </View>
-          </>
-        ) : verdict === 'FIT' ? (
-          <Text>
-            {hazards.length > 0
-              ? 'Nothing needs fixing to be covered. Fixing the items marked “raises your price” above would lower your estimate.'
-              : 'Nothing needs fixing. We didn’t find anything that raises your price.'}
-          </Text>
+        {fix !== null && flip !== null ? (
+          <View
+            accessible
+            accessibilityLabel={`${fix.fixHint ?? fix.label}. Then ${VERDICT_WORDS[flip.verdictAfter]}, ${money(flip.premiumAfter)} a year instead of ${money(flip.premiumBefore)}.`}
+            style={{ gap: SPACE.xs }}
+          >
+            <Text weight="semibold">{fix.fixHint ?? fix.label}</Text>
+            <Text variant="small">
+              {`Then ${VERDICT_WORDS[flip.verdictAfter]}. ${money(flip.premiumAfter)} a year, from ${money(flip.premiumBefore)}.`}
+            </Text>
+          </View>
         ) : (
-          <Text>{result.flip.reason ?? 'We couldn’t find one change that would get this room covered.'}</Text>
+          <Text>{result.flip.reason ?? 'Nothing to fix.'}</Text>
         )}
-        {hazards.length > 1 ? (
+      </Card>
+
+      {/* Everything the sweep derived or defaulted, editable in place. */}
+      <Card>
+        <Heading variant="heading">From the scan</Heading>
+        <NumberEdit
+          label="Contents"
+          value={contents}
+          prefix="$"
+          help="Summed from what the scan priced."
+          saving={saving}
+          onSave={(v) => void onApply({ answers: [], edits: [{ field: 'exposure.contentsLimit', value: v }] })}
+        />
+        <NumberEdit
+          label="Year built"
+          value={yearBuilt}
+          help={yearBuilt === null ? 'Unknown.' : undefined}
+          saving={saving}
+          onSave={(v) => void onApply({ answers: [], edits: [{ field: 'buildings[0].yearBuilt', value: v }] })}
+        />
+        <TermEdit
+          value={price.termMonths ?? sweep.termMonths}
+          saving={saving}
+          onSave={(v) => void onApply({ answers: [], edits: [{ field: 'exposure.termMonths', value: v }] })}
+        />
+        {short && coverage !== null ? (
           <Text variant="small" tone="muted">
-            Fixed something else? Tap “Verify my fix”, then choose which one.
+            {`${String(Math.round(coverage.coveragePct))}% of the room scanned. A fuller scan tightens the price.`}
           </Text>
         ) : null}
       </Card>
-
-      <NextStepSheet
-        visible={sheetOpen}
-        verdict={verdict}
-        canVerify={verifyHazard !== null}
-        questionsLeft={questionsLeft}
-        onClose={() => setSheetOpen(false)}
-        onVerify={() => {
-          setSheetOpen(false);
-          openVerify(verifyHazard);
-        }}
-        onQuestions={() => {
-          setSheetOpen(false);
-          router.push('/questions');
-        }}
-        onNewRoom={() => {
-          setSheetOpen(false);
-          sessionStore.reset();
-          router.replace('/new');
-        }}
-        onRooms={() => {
-          setSheetOpen(false);
-          router.replace('/');
-        }}
-      />
     </Screen>
   );
 }
@@ -506,110 +395,206 @@ export default function VerdictScreen() {
 /* Pieces                                                                     */
 /* -------------------------------------------------------------------------- */
 
-function FactorRow({ factor, onPress }: { factor: AppliedFactor; onPress?: (() => void) | undefined }) {
-  const name = factorName(factor.name);
-  const effect = factorEffect(factor.factor);
-  const label = `${name}: ${factor.input}. Multiplied by ${Number.isFinite(factor.factor) ? String(factor.factor) : 'unknown'}, ${effect}.`;
-  const body = (
-    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md }}>
-      <View
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 16,
-          backgroundColor: COLORS.mutedTint,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Icon name={factorIcon(factor.name)} size={16} color={COLORS.mutedDeep} />
-      </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Text weight="semibold">{name}</Text>
-        <Text variant="small" tone="muted">{`${factor.input} · ${effect}`}</Text>
-      </View>
-      <Text weight="semibold" style={{ fontVariant: ['tabular-nums'] }}>
-        {factorText(factor.factor)}
-      </Text>
-    </View>
-  );
-  if (onPress) {
-    return (
-      <Card
-        padding="md"
-        onPress={onPress}
-        accessibilityLabel={label}
-        accessibilityHint="Shows the photo and what changes if you fix it."
-      >
-        {body}
-        <Text variant="small" tone="accent" importantForAccessibility="no" accessibilityElementsHidden>
-          See what we found ›
+function HazardRow({ cost, onPress }: { readonly cost: HazardCostDto; readonly onPress: () => void }) {
+  const name = hazardName(cost.hazardKey);
+  const delta = cost.monthlyDelta;
+  return (
+    <Card
+      padding="md"
+      onPress={onPress}
+      accessibilityLabel={`${name}. ${money(delta)} a month.`}
+      accessibilityHint="Shows the photo and what fixing it does."
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
+        <Icon name={HAZARD_ICON[cost.hazardKey] ?? 'warning-outline'} size={18} color={COLORS.mutedDeep} />
+        <Text weight="semibold" style={{ flex: 1 }}>
+          {name}
         </Text>
-      </Card>
+        <Text weight="semibold" style={{ fontVariant: ['tabular-nums'] }}>
+          {`+${money(delta)}/mo`}
+        </Text>
+      </View>
+    </Card>
+  );
+}
+
+/** A derived number, shown as a value until it is tapped, then an input. */
+function NumberEdit({
+  label,
+  value,
+  prefix,
+  help,
+  saving,
+  onSave,
+}: {
+  readonly label: string;
+  readonly value: number | null;
+  readonly prefix?: string;
+  readonly help?: string;
+  readonly saving: boolean;
+  readonly onSave: (value: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+
+  if (!editing) {
+    const shown = value === null ? 'Unknown' : `${prefix ?? ''}${value.toLocaleString('en-US')}`;
+    return (
+      <Row
+        label={label}
+        value={shown}
+        help={help}
+        onEdit={() => {
+          setDraft(value === null ? '' : String(value));
+          setEditing(true);
+        }}
+      />
     );
   }
+
+  const parsed = Number(draft.replace(/[^0-9.]/g, ''));
+  const valid = Number.isFinite(parsed) && parsed > 0;
   return (
-    <View
-      accessible
-      accessibilityLabel={label}
-      style={{ paddingVertical: SPACE.sm, paddingHorizontal: SPACE.md, minHeight: 44, justifyContent: 'center' }}
-    >
-      {body}
+    <View style={{ gap: SPACE.sm }}>
+      <TextField
+        label={label}
+        value={draft}
+        onChangeText={setDraft}
+        keyboardType="number-pad"
+        autoFocus
+        {...(help !== undefined ? { help } : {})}
+        {...(draft.length > 0 && !valid ? { error: 'Numbers only.' } : {})}
+      />
+      <View style={{ flexDirection: 'row', gap: SPACE.sm }}>
+        <Button
+          label="Save"
+          fullWidth={false}
+          disabled={!valid || saving}
+          loading={saving}
+          onPress={() => {
+            setEditing(false);
+            onSave(parsed);
+          }}
+        />
+        <Button label="Cancel" variant="quiet" fullWidth={false} onPress={() => setEditing(false)} />
+      </View>
     </View>
   );
 }
 
-interface NextStepSheetProps {
-  readonly visible: boolean;
-  readonly verdict: Verdict;
-  readonly canVerify: boolean;
-  readonly questionsLeft: boolean;
-  readonly onClose: () => void;
-  readonly onVerify: () => void;
-  readonly onQuestions: () => void;
-  readonly onNewRoom: () => void;
-  readonly onRooms: () => void;
+/** The term is one of three values, so it edits as a choice, not a field. */
+function TermEdit({
+  value,
+  saving,
+  onSave,
+}: {
+  readonly value: number;
+  readonly saving: boolean;
+  readonly onSave: (value: number) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  if (!editing) {
+    return <Row label="Term" value={`${String(value)} months`} onEdit={() => setEditing(true)} />;
+  }
+  return (
+    <ChoiceGroup
+      label="Term"
+      choices={[4, 8, 12].map((m) => ({ value: m, label: `${String(m)} months` }))}
+      value={value}
+      onChange={(v) => {
+        setEditing(false);
+        if (!saving && v !== value) onSave(v);
+      }}
+      direction="row"
+    />
+  );
 }
 
-const NEXT_STEP_LEAD: Readonly<Record<Verdict, string>> = {
-  FIT: 'You’re in good shape. Take this estimate to an insurer to get a real quote. Fixing any item that raises your price can bring it down first.',
-  REFER: 'A person at the insurer will look at this before they can quote. Fixing what’s listed under “What to fix” can make that quicker or unnecessary.',
-  DOES_NOT_FIT: 'As it is, an insurer would turn this down. Fix what’s listed under “What to fix”, then verify it with a photo to see the result change.',
-};
-
-function NextStepSheet(props: NextStepSheetProps) {
+function Row({
+  label,
+  value,
+  help,
+  onEdit,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly help?: string;
+  readonly onEdit: () => void;
+}) {
   return (
-    <Modal
-      visible={props.visible}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={props.onClose}
-      accessibilityViewIsModal
-    >
-      <Screen edges={['top', 'bottom', 'left', 'right']} title="What happens next">
-        <Text>{NEXT_STEP_LEAD[props.verdict]}</Text>
-        <View style={{ gap: SPACE.md }}>
-          {props.questionsLeft ? (
-            <Button
-              label="Answer the remaining questions"
-              accessibilityHint="Answering can change your result."
-              onPress={props.onQuestions}
-            />
-          ) : null}
-          {props.canVerify ? (
-            <Button
-              label="Verify my fix"
-              variant={props.questionsLeft ? 'secondary' : 'primary'}
-              fullWidth
-              accessibilityHint="Take one new photo of the thing you fixed."
-              onPress={props.onVerify}
-            />
-          ) : null}
-          <Button label="Scan another room" variant="secondary" fullWidth onPress={props.onNewRoom} />
-          <Button label="See all my rooms" variant="secondary" fullWidth onPress={props.onRooms} />
-          <Button label="Close" variant="quiet" fullWidth accessibilityHint="Back to your quote." onPress={props.onClose} />
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md, minHeight: 44 }}>
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text weight="semibold">{`${label}  ${value}`}</Text>
+        {help !== undefined ? (
+          <Text variant="small" tone="muted">
+            {help}
+          </Text>
+        ) : null}
+      </View>
+      <Button
+        label="Edit"
+        variant="quiet"
+        fullWidth={false}
+        accessibilityLabel={`Edit ${label.toLowerCase()}`}
+        accessibilityHint="Changes the number and reprices."
+        onPress={onEdit}
+      />
+    </View>
+  );
+}
+
+/** The single optional question, inline, after the price. Never a screen. */
+function QuestionCard({
+  question,
+  saving,
+  onAnswer,
+  onSkip,
+}: {
+  readonly question: NonNullable<SweepDto['pendingQuestion']>;
+  readonly saving: boolean;
+  readonly onAnswer: (value: string | number | boolean) => void;
+  readonly onSkip: () => void;
+}) {
+  const [draft, setDraft] = useState('');
+  const options = question.options ?? [];
+  const parsed = Number(draft.replace(/[^0-9.]/g, ''));
+  const valid = Number.isFinite(parsed) && parsed > 0;
+
+  return (
+    <Card tone="muted">
+      <Text weight="semibold">{question.prompt}</Text>
+      <Text variant="small" tone="muted">
+        Optional. It tightens the price.
+      </Text>
+      {options.length > 0 ? (
+        <ChoiceGroup
+          label={question.prompt}
+          choices={options.map((o) => ({ value: o.value, label: o.label }))}
+          value={null}
+          onChange={(v) => {
+            if (!saving) onAnswer(v);
+          }}
+          direction="row"
+        />
+      ) : (
+        <View style={{ gap: SPACE.sm }}>
+          <TextField
+            label={question.prompt}
+            accessibilityLabel={question.accessibilityLabel}
+            value={draft}
+            onChangeText={setDraft}
+            keyboardType="number-pad"
+          />
+          <Button
+            label="Set"
+            fullWidth={false}
+            disabled={!valid || saving}
+            loading={saving}
+            onPress={() => onAnswer(parsed)}
+          />
         </View>
-      </Screen>
-    </Modal>
+      )}
+      <Button label="Skip" variant="quiet" fullWidth={false} disabled={saving} onPress={onSkip} />
+    </Card>
   );
 }

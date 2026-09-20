@@ -22,7 +22,15 @@ const frame = (bearingDeg: number, extra: Partial<SessionFrame> = {}): SessionFr
 describe('session store', () => {
   it('starts blank with a 12-month term', () => {
     const s = createSessionStore().getState();
-    expect(s).toEqual({ roomLabel: '', termMonths: 12, submissionId: null, source: null, frames: [], sweepId: null });
+    expect(s).toEqual({
+      roomLabel: '',
+      termMonths: 12,
+      submissionId: null,
+      source: null,
+      frames: [],
+      contentsEstimateUsd: null,
+      sweepId: null,
+    });
   });
 
   it('holds room label, term, submission and sweep id', () => {
@@ -108,9 +116,27 @@ describe('session store', () => {
 });
 
 describe('buildCreateRequest', () => {
-  it('lists every reason it cannot send yet', () => {
+  it('needs frames, and nothing else', () => {
     const r = buildCreateRequest(initialSession);
-    expect(r).toEqual({ ok: false, problems: ['room-label-missing', 'no-frames'] });
+    expect(r).toEqual({ ok: false, problems: ['no-frames'] });
+  });
+
+  it('omits a blank room label so the server supplies its own default', () => {
+    const r = buildCreateRequest({ ...initialSession, frames: [frame(0)] });
+    expect(r.ok && 'roomLabel' in r.request).toBe(false);
+    expect(r.ok && r.request.termMonths).toBe(12);
+  });
+
+  it('sends the contents estimate the sweep priced, rounded to whole dollars', () => {
+    const priced = buildCreateRequest({
+      ...initialSession,
+      frames: [frame(0)],
+      contentsEstimateUsd: 21_299.6,
+    });
+    expect(priced.ok && priced.request.contentsEstimateUsd).toBe(21_300);
+    // Nothing priced means no field at all, never a zero the server would round up.
+    const bare = buildCreateRequest({ ...initialSession, frames: [frame(0)], contentsEstimateUsd: 0 });
+    expect(bare.ok && 'contentsEstimateUsd' in bare.request).toBe(false);
   });
 
   it('rejects an over-long room label', () => {

@@ -1,349 +1,656 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { AppState, Pressable, View } from 'react-native';
-import { useFocusEffect, useRouter } from 'expo-router';
-import type { SweepDto, SweepStageDto } from '@retrofit/contracts';
+import { useCallback, useEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react';
+import { AccessibilityInfo, ActivityIndicator, AppState, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
+import { SaveFormat, manipulateAsync } from 'expo-image-manipulator';
+import * as Location from 'expo-location';
+import { DeviceMotion } from 'expo-sensors';
 
-import { describeApiError, getApi } from '@/lib/api';
-import { getSweepQueue, queueStatusMessage } from '@/lib/queue';
-import type { QueueSnapshot } from '@/lib/queue';
-import { isTermMonths, sessionStore } from '@/lib/session';
-import type { FrameSource } from '@/lib/session';
-import {
-  Badge,
-  Brand,
-  Button,
-  COLORS,
-  Card,
-  Heading,
-  Hero,
-  Icon,
-  MIN_TOUCH_TARGET,
-  Notice,
-  Screen,
-  SkeletonCard,
-  SPACE,
-  Text,
-  VerdictPill,
-} from '@/ui';
-import type { IconName } from '@/ui';
+import { getApi } from '@/lib/api';
+import { captureReducer, initialCaptureState, uploadBearings } from '@/lib/capture';
+import type { PendingCapture } from '@/lib/capture';
+import { createHeadingFilter, headingFromReading } from '@/lib/heading';
+import { createLivePricer } from '@/lib/livePrice';
+import type { LivePricer } from '@/lib/livePrice';
+import { markLaunch } from '@/lib/timing';
+import { getSweepQueue } from '@/lib/queue';
+import { SESSION_PROBLEM_TEXT, buildCreateRequest, sessionStore } from '@/lib/session';
+import type { SessionFrame } from '@/lib/session';
+import { Button, COLORS, MIN_TOUCH_TARGET, Notice, SPACE, Screen, Text } from '@/ui';
+import { LivePriceStrip } from '@/ui/LivePrices';
+import { ScanOverlay } from '@/ui/ScanOverlay';
 
 /**
- * Your rooms — PRD §11 `/`. Unit M5.
+ * The viewfinder. It is the first screen and it is the sweep: launch opens the
+ * camera, the phone takes the photos as you turn, and Finish is the only tap
+ * between here and a price.
  *
- * The API has no "list my sweeps" route, so the rooms list is the rooms this
- * app sent during this launch (decision M5-1): every time the session store
- * gains a sweep id, the room is recorded here. Each card then loads the sweep
- * from GET /sweeps/:id and shows a skeleton until it arrives. Everything the
- * card says about the result (stage, verdict) comes from the API as-is.
+ * The compass heading from `watchHeadingAsync` goes through the circular filter
+ * into the capture reducer, which decides when a frame is due (every ~1.2 s once
+ * the heading has moved >= 10 degrees, at most 15). Each frame is downscaled to
+ * a 768 px long edge, JPEG q0.7, with a haptic tick, and is priced live.
+ *
+ * Every item the live pricer finds feeds one number: the replacement value sent
+ * with the sweep, which the server rounds into the contents limit. Nobody is
+ * asked what their belongings are worth.
+ *
+ * The client coverage only drives the overlay and the Finish lock. The API
+ * computes every number that counts.
  */
 
-/* -------------------------------------------------------------------------- */
-/* Rooms registry (module scope, in memory)                                   */
-/* -------------------------------------------------------------------------- */
+/** Long edge after downscale and JPEG quality: the prototype's encoder. */
+const MAX_EDGE = 768;
+const JPEG_QUALITY = 0.7;
+/** Photos the upload path asks for: bearings 0/120/240. */
+const UPLOAD_PHOTO_COUNT = 3;
+/** No compass reading this long after subscribing means the compass is not working. */
+const HEADING_WATCHDOG_MS = 6000;
+const MOTION_INTERVAL_MS = 200;
 
-interface RoomEntry {
-  readonly sweepId: string;
-  readonly roomLabel: string;
-  readonly termMonths: number;
-  readonly source: FrameSource | null;
+const sweepQueue = getSweepQueue((req) => getApi().createSweep(req));
+
+type PermissionKind = 'granted' | 'denied' | 'undetermined';
+
+interface LocationPermission {
+  readonly status: PermissionKind;
+  readonly canAskAgain: boolean;
 }
 
-let rooms: readonly RoomEntry[] = [];
-const roomListeners = new Set<() => void>();
-
-function recordFromSession(): void {
-  const s = sessionStore.getState();
-  if (s.sweepId === null || rooms.some((r) => r.sweepId === s.sweepId)) return;
-  rooms = [
-    { sweepId: s.sweepId, roomLabel: s.roomLabel.trim(), termMonths: s.termMonths, source: s.source },
-    ...rooms,
-  ];
-  for (const l of [...roomListeners]) l();
+function toKind(status: string): PermissionKind {
+  return status === 'granted' ? 'granted' : status === 'denied' ? 'denied' : 'undetermined';
 }
 
-recordFromSession();
-sessionStore.subscribe(recordFromSession);
+type CompassProblem = 'no-readings' | 'error';
 
-function subscribeRooms(listener: () => void): () => void {
-  roomListeners.add(listener);
-  return () => {
-    roomListeners.delete(listener);
-  };
-}
-const getRooms = (): readonly RoomEntry[] => rooms;
+type SendState =
+  | { readonly kind: 'idle' }
+  | { readonly kind: 'picking' }
+  | { readonly kind: 'preparing' }
+  | { readonly kind: 'sending'; readonly count: number }
+  | { readonly kind: 'queued'; readonly message: string }
+  | {
+      readonly kind: 'error';
+      readonly message: string;
+      /** What the main button does: resend the same photos, or nothing to resend. */
+      readonly next: 'resend' | 'none';
+    };
 
-/* -------------------------------------------------------------------------- */
-/* Words                                                                      */
-/* -------------------------------------------------------------------------- */
-
-const STAGE_WORDS: Readonly<Record<SweepStageDto, string>> = {
-  received: 'Photos received',
-  quality_gate: 'Checking photo quality',
-  observing: 'Looking at the room',
-  relating: 'Working out what matters',
-  scoring: 'Working out your quote',
-  questions: 'Waiting for your answers',
-  done: 'Quote ready',
-  failed: 'Could not finish',
-};
-
-/** Decorative only — `STAGE_WORDS` still carries the meaning in every card. */
-const STAGE_ICON: Readonly<Record<SweepStageDto, IconName>> = {
-  received: 'cloud-upload-outline',
-  quality_gate: 'checkmark-done-outline',
-  observing: 'eye-outline',
-  relating: 'git-network-outline',
-  scoring: 'calculator-outline',
-  questions: 'help-circle-outline',
-  done: 'checkmark-circle',
-  failed: 'alert-circle-outline',
-};
-
-const TENANT_VERDICT: Readonly<Record<'FIT' | 'REFER' | 'DOES_NOT_FIT', string>> = {
-  FIT: 'We can quote this room',
-  REFER: 'A person needs to check this',
-  DOES_NOT_FIT: 'We cannot quote this as it is',
-};
-
-function termWords(months: number): string {
-  return `${months}-month term`;
+/** Image data for a captured frame, keyed by the capture machine's frame index. */
+interface FrameData {
+  readonly imageBase64: string;
+  readonly uri: string;
+  readonly pitchDeg: number | undefined;
 }
 
-const sendSweep = getSweepQueue((req) => getApi().createSweep(req));
+/** Downscales a photo to a 768 px long edge JPEG (q0.7). Also converts HEIC from the library. */
+async function downscale(uri: string, width: number, height: number): Promise<{ base64: string; uri: string }> {
+  const longEdge = Math.max(width, height);
+  const resize =
+    longEdge > MAX_EDGE ? [{ resize: width >= height ? { width: MAX_EDGE } : { height: MAX_EDGE } }] : [];
+  const out = await manipulateAsync(uri, resize, { base64: true, compress: JPEG_QUALITY, format: SaveFormat.JPEG });
+  if (!out.base64) throw new Error('no image data');
+  return { base64: out.base64, uri: out.uri };
+}
 
-/* -------------------------------------------------------------------------- */
-/* Room card                                                                  */
-/* -------------------------------------------------------------------------- */
-
-type Load =
-  | { readonly kind: 'loading' }
-  | { readonly kind: 'ok'; readonly sweep: SweepDto }
-  | { readonly kind: 'error'; readonly message: string };
-
-function RoomCard({ entry, refreshKey }: { readonly entry: RoomEntry; readonly refreshKey: number }) {
+export default function ViewfinderScreen() {
   const router = useRouter();
-  const [load, setLoad] = useState<Load>({ kind: 'loading' });
-  const [retry, setRetry] = useState(0);
+
+  const [cameraPermission, requestCamera, refreshCamera] = useCameraPermissions();
+  const [locationPermission, setLocationPermission] = useState<LocationPermission | null>(null);
+  const [asked, setAsked] = useState(false);
+  /** True while the system dialogs are up, so the denied view does not flash behind them. */
+  const [asking, setAsking] = useState(false);
+  const [compassProblem, setCompassProblem] = useState<CompassProblem | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
+  const [headingLive, setHeadingLive] = useState(false);
+  const [send, setSend] = useState<SendState>({ kind: 'idle' });
+
+  const [capture, dispatch] = useReducer(captureReducer, initialCaptureState);
+
+  const cameraRef = useRef<CameraView>(null);
+  const filterRef = useRef(createHeadingFilter());
+  const frameData = useRef(new Map<number, FrameData>());
+  const pricerRef = useRef<LivePricer | null>(null);
+  pricerRef.current ??= createLivePricer(getApi());
+  const pricer = pricerRef.current;
+  const liveSnap = useSyncExternalStore(pricer.subscribe, pricer.snapshot);
+  const pitchRef = useRef<number | undefined>(undefined);
+  const capturingRef = useRef(false);
+  const alive = useRef(true);
 
   useEffect(() => {
-    const controller = new AbortController();
-    getApi()
-      .getSweep(entry.sweepId, { signal: controller.signal })
-      .then((sweep) => setLoad({ kind: 'ok', sweep }))
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) setLoad({ kind: 'error', message: describeApiError(error) });
-      });
-    return () => controller.abort();
-  }, [entry.sweepId, refreshKey, retry]);
+    markLaunch();
+    return () => {
+      alive.current = false;
+    };
+  }, []);
 
-  const open = useCallback(
-    (stage: SweepStageDto | null) => {
-      sessionStore.reset();
-      sessionStore.setRoomLabel(entry.roomLabel);
-      if (isTermMonths(entry.termMonths)) sessionStore.setTerm(entry.termMonths);
-      sessionStore.setSweepId(entry.sweepId);
-      router.push(stage === 'done' ? '/verdict' : '/analyzing');
-    },
-    [entry, router],
-  );
+  /* ------------------------------ permissions ----------------------------- */
 
-  if (load.kind === 'loading') {
-    return <SkeletonCard accessibilityLabel={`Loading ${entry.roomLabel || 'room'}`} />;
+  const readLocation = useCallback(async () => {
+    try {
+      const p = await Location.getForegroundPermissionsAsync();
+      if (alive.current) setLocationPermission({ status: toKind(p.status), canAskAgain: p.canAskAgain });
+    } catch {
+      if (alive.current) setLocationPermission({ status: 'denied', canAskAgain: false });
+    }
+  }, []);
+
+  useEffect(() => {
+    void readLocation();
+  }, [readLocation]);
+
+  // Coming back from Settings: read both permissions again.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      void refreshCamera();
+      void readLocation();
+    });
+    return () => sub.remove();
+  }, [refreshCamera, readLocation]);
+
+  const cameraKind: PermissionKind | null = cameraPermission ? toKind(cameraPermission.status) : null;
+  const undecided = cameraKind === 'undetermined' || locationPermission?.status === 'undetermined';
+
+  // Nothing stands between launch and the camera: the moment the permissions
+  // are readable and either is undecided, the system prompt goes up by itself.
+  useEffect(() => {
+    if (asked || asking || cameraKind === null || locationPermission === null || !undecided) return;
+    void allowAndStart();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [asked, asking, cameraKind, locationPermission, undecided]);
+
+  type Gate = 'checking' | 'camera-denied' | 'compass' | 'ready';
+  const gate: Gate =
+    cameraKind === null || locationPermission === null || asking || (undecided && !asked)
+      ? 'checking'
+      : cameraKind !== 'granted'
+        ? 'camera-denied'
+        : compassProblem !== null
+          ? 'compass'
+          : 'ready';
+
+  async function allowAndStart(): Promise<void> {
+    setAsking(true);
+    try {
+      if (cameraPermission?.status !== 'granted') await requestCamera();
+    } catch {
+      // Falls through to the camera-denied view with its own words.
+    }
+    try {
+      if (locationPermission?.status !== 'granted') {
+        const p = await Location.requestForegroundPermissionsAsync();
+        if (alive.current) setLocationPermission({ status: toKind(p.status), canAskAgain: p.canAskAgain });
+      }
+    } catch {
+      if (alive.current) setLocationPermission({ status: 'denied', canAskAgain: false });
+    }
+    if (alive.current) {
+      setAsked(true);
+      setAsking(false);
+    }
   }
 
-  if (load.kind === 'error') {
+  async function askCameraAgain(): Promise<void> {
+    if (cameraPermission && !cameraPermission.canAskAgain) {
+      await Linking.openSettings().catch(() => undefined);
+      return;
+    }
+    await requestCamera().catch(() => undefined);
+  }
+
+  async function retryCompass(): Promise<void> {
+    if (locationPermission?.status !== 'granted' && locationPermission?.canAskAgain) {
+      try {
+        const p = await Location.requestForegroundPermissionsAsync();
+        if (alive.current) setLocationPermission({ status: toKind(p.status), canAskAgain: p.canAskAgain });
+      } catch {
+        // The watchdog below reports it again if the compass still says nothing.
+      }
+    }
+    setCompassProblem(null);
+  }
+
+  /* -------------------------------- sensors ------------------------------- */
+
+  const sensing = gate === 'ready' && send.kind === 'idle' && capture.phase !== 'finished';
+
+  // Compass: watchHeadingAsync -> the circular filter -> the capture machine.
+  useEffect(() => {
+    if (!sensing) return undefined;
+    let cancelled = false;
+    let gotReading = false;
+    let sub: Location.LocationSubscription | null = null;
+    filterRef.current.reset();
+
+    const watchdog = setTimeout(() => {
+      if (!cancelled && !gotReading) setCompassProblem('no-readings');
+    }, HEADING_WATCHDOG_MS);
+
+    Location.watchHeadingAsync(
+      (reading) => {
+        if (cancelled) return;
+        const raw = headingFromReading(reading);
+        if (raw === null) return;
+        const filtered = filterRef.current.push(raw);
+        if (filtered === null) return;
+        if (!gotReading) {
+          gotReading = true;
+          setHeadingLive(true);
+        }
+        dispatch({ type: 'heading', headingDeg: filtered, atMs: Date.now() });
+      },
+      () => {
+        if (!cancelled && !gotReading) setCompassProblem('error');
+      },
+    )
+      .then((s) => {
+        if (cancelled) s.remove();
+        else sub = s;
+      })
+      .catch(() => {
+        if (!cancelled) setCompassProblem('error');
+      });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(watchdog);
+      sub?.remove();
+      setHeadingLive(false);
+    };
+  }, [sensing]);
+
+  // Pitch from DeviceMotion. Optional: without it frames simply carry no pitch.
+  useEffect(() => {
+    if (!sensing) return undefined;
+    let sub: { remove(): void } | null = null;
+    try {
+      DeviceMotion.setUpdateInterval(MOTION_INTERVAL_MS);
+      sub = DeviceMotion.addListener((m) => {
+        const beta = m.rotation?.beta;
+        // beta = 90 degrees held upright; 0 flat on its back.
+        if (typeof beta === 'number' && Number.isFinite(beta)) {
+          pitchRef.current = Math.round((beta * 180) / Math.PI - 90);
+        }
+      });
+    } catch {
+      sub = null;
+    }
+    return () => sub?.remove();
+  }, [sensing]);
+
+  // Start the machine once the camera shows a picture and the compass speaks.
+  useEffect(() => {
+    if (sensing && cameraReady && headingLive && capture.phase === 'idle') dispatch({ type: 'start' });
+  }, [sensing, cameraReady, headingLive, capture.phase]);
+
+  /* -------------------------------- capture ------------------------------- */
+
+  const takeFrame = useCallback(
+    async (p: PendingCapture) => {
+      const cam = cameraRef.current;
+      if (!cam || capturingRef.current) return;
+      capturingRef.current = true;
+      try {
+        const pic = await cam.takePictureAsync({ quality: 0.8, shutterSound: false });
+        const small = await downscale(pic.uri, pic.width, pic.height);
+        if (!alive.current) return;
+        frameData.current.set(p.index, { imageBase64: small.base64, uri: small.uri, pitchDeg: pitchRef.current });
+        pricer.onFrame(small.base64);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+        dispatch({ type: 'captured', atMs: Date.now(), ref: small.uri });
+      } catch {
+        if (alive.current) dispatch({ type: 'captureFailed' });
+      } finally {
+        capturingRef.current = false;
+      }
+    },
+    [pricer],
+  );
+
+  useEffect(() => {
+    if (capture.pending && capture.phase === 'sweeping') void takeFrame(capture.pending);
+  }, [capture.pending, capture.phase, takeFrame]);
+
+  /* --------------------------------- send --------------------------------- */
+
+  async function submitSession(): Promise<void> {
+    const built = buildCreateRequest(sessionStore.getState());
+    if (!built.ok) {
+      setSend({
+        kind: 'error',
+        message: built.problems.map((p) => SESSION_PROBLEM_TEXT[p]).join(' '),
+        next: 'none',
+      });
+      return;
+    }
+    setSend({ kind: 'sending', count: built.request.frames.length });
+    AccessibilityInfo.announceForAccessibility(`Sending ${built.request.frames.length} photos.`);
+    const result = await sweepQueue.submit(built.request);
+    if (!alive.current) return;
+    if (result.status === 'sent') {
+      sessionStore.setSweepId(result.sweep.id);
+      router.replace({ pathname: '/analyzing', params: { id: result.sweep.id } });
+      return;
+    }
+    if (result.status === 'failed') {
+      setSend({ kind: 'error', message: result.message, next: 'resend' });
+      return;
+    }
+    setSend({ kind: 'queued', message: result.message });
+    AccessibilityInfo.announceForAccessibility(result.message);
+    sweepQueue
+      .waitFor(result.queueId)
+      .then((sweep) => {
+        sessionStore.setSweepId(sweep.id);
+        if (alive.current) router.replace({ pathname: '/analyzing', params: { id: sweep.id } });
+      })
+      .catch(() => {
+        if (alive.current) {
+          setSend({ kind: 'error', message: 'The scan did not send. Try again.', next: 'resend' });
+        }
+      });
+  }
+
+  /**
+   * Finish is the only tap between launch and a price, so it goes straight to
+   * the upload. The running total is taken as it stands rather than waiting on
+   * the last online lookups: those take up to 5 s, and the contents figure is
+   * editable on the verdict anyway.
+   */
+  function finishSweep(): void {
+    const frames: SessionFrame[] = [];
+    for (const f of capture.frames) {
+      const data = frameData.current.get(f.index);
+      if (!data) continue;
+      frames.push({
+        bearingDeg: f.bearingDeg,
+        ...(data.pitchDeg !== undefined ? { pitchDeg: data.pitchDeg } : {}),
+        capturedAt: new Date(f.capturedAtMs).toISOString(),
+        imageBase64: data.imageBase64,
+        uri: data.uri,
+      });
+    }
+    dispatch({ type: 'finish' });
+    setCameraReady(false);
+    sessionStore.setSweepId(null);
+    sessionStore.setFrames(frames, 'sweep');
+    sessionStore.setContentsEstimate(pricer.snapshot().total);
+    void submitSession();
+  }
+
+  function scanAgain(): void {
+    pricer.reset();
+    frameData.current.clear();
+    sessionStore.clearFrames();
+    sessionStore.setSweepId(null);
+    setCompassProblem(null);
+    setCameraReady(false);
+    dispatch({ type: 'reset' });
+    setSend({ kind: 'idle' });
+  }
+
+  /** The upload path: pick up to 3 library photos, spaced at 0/120/240. */
+  async function usePhotos(): Promise<void> {
+    if (send.kind !== 'idle' && send.kind !== 'error') return;
+    setSend({ kind: 'picking' });
+    let picked: ImagePicker.ImagePickerResult;
+    try {
+      picked = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: UPLOAD_PHOTO_COUNT,
+        orderedSelection: true,
+        quality: 1,
+      });
+    } catch {
+      if (alive.current) setSend({ kind: 'error', message: 'The photo library did not open.', next: 'none' });
+      return;
+    }
+    if (!alive.current) return;
+    if (picked.canceled || picked.assets.length === 0) {
+      setSend({ kind: 'idle' });
+      return;
+    }
+    setSend({ kind: 'preparing' });
+    const assets = picked.assets.slice(0, UPLOAD_PHOTO_COUNT);
+    const bearings = uploadBearings(assets.length);
+    let frames: SessionFrame[];
+    try {
+      frames = await Promise.all(
+        assets.map(async (a, i) => {
+          const small = await downscale(a.uri, a.width, a.height);
+          return {
+            bearingDeg: bearings[i] ?? 0,
+            capturedAt: new Date().toISOString(),
+            imageBase64: small.base64,
+            uri: small.uri,
+          };
+        }),
+      );
+    } catch {
+      if (alive.current) setSend({ kind: 'error', message: 'One photo could not be read. Pick another.', next: 'none' });
+      return;
+    }
+    if (!alive.current) return;
+    dispatch({ type: 'reset' });
+    frameData.current.clear();
+    sessionStore.setSweepId(null);
+    sessionStore.setFrames(frames, 'upload');
+    sessionStore.setContentsEstimate(null);
+    await submitSession();
+  }
+
+  /* -------------------------------- render -------------------------------- */
+
+  /** A text link, not a button: the camera is the path, photos are the alternative. */
+  const photoLink = (
+    <Pressable
+      accessibilityRole="link"
+      accessibilityLabel="Upload photos instead"
+      accessibilityHint="Pick three photos of the room. Same quote."
+      onPress={() => void usePhotos()}
+      hitSlop={8}
+      style={styles.link}
+    >
+      <Text variant="small" tone="inverse" style={styles.linkText}>
+        Upload photos instead
+      </Text>
+    </Pressable>
+  );
+
+  if (send.kind !== 'idle') {
     return (
-      <Card>
-        <Heading variant="heading">{entry.roomLabel || 'Room'}</Heading>
-        <Notice
-          tone="error"
-          actionLabel="Try again"
-          onAction={() => {
-            setLoad({ kind: 'loading' });
-            setRetry((n) => n + 1);
-          }}
-        >
-          {load.message}
-        </Notice>
-      </Card>
+      <SendView
+        send={send}
+        onRetry={() => void submitSession()}
+        onRetryNow={() => void sweepQueue.retryNow()}
+        onScanAgain={scanAgain}
+        onUsePhotos={() => void usePhotos()}
+      />
     );
   }
 
-  const { sweep } = load;
-  const label = sweep.roomLabel || entry.roomLabel || 'Room';
-  const stageText = STAGE_WORDS[sweep.stage];
-  const verdict = sweep.result?.verdict.verdict ?? null;
-  const verdictText = verdict ? TENANT_VERDICT[verdict] : null;
-  const how = entry.source === 'upload' ? 'From uploaded photos' : 'From a room scan';
-  const a11y = [label, stageText, verdictText, termWords(sweep.termMonths), how].filter(Boolean).join('. ');
+  if (gate === 'checking') {
+    return (
+      <Screen>
+        <View accessible accessibilityRole="progressbar" accessibilityLabel="Opening the camera" style={styles.center}>
+          <ActivityIndicator color={COLORS.ink} />
+          <Text align="center">Opening the camera</Text>
+        </View>
+      </Screen>
+    );
+  }
+
+  if (gate === 'camera-denied') {
+    const settings = cameraPermission !== null && !cameraPermission.canAskAgain;
+    return (
+      <Screen
+        title="Camera off"
+        footer={
+          <>
+            <Button label="Upload 3 photos instead" icon="images-outline" onPress={() => void usePhotos()} />
+            <Button
+              label={settings ? 'Open Settings' : 'Allow the camera'}
+              icon={settings ? 'settings-outline' : 'camera-outline'}
+              variant="secondary"
+              accessibilityHint={settings ? 'Turn on Camera, then come back.' : 'Asks for camera access.'}
+              onPress={() => void askCameraAgain()}
+            />
+          </>
+        }
+      >
+        <Text>{settings ? 'Camera access is off for this app.' : 'Camera access was not allowed.'}</Text>
+        <Text>Three photos of the room give the same quote.</Text>
+      </Screen>
+    );
+  }
+
+  if (gate === 'compass') {
+    const locationOff = locationPermission?.status === 'denied';
+    return (
+      <Screen
+        title="No compass"
+        footer={
+          <>
+            <Button label="Upload 3 photos instead" icon="images-outline" onPress={() => void usePhotos()} />
+            {locationOff && locationPermission && !locationPermission.canAskAgain ? (
+              <Button
+                label="Open Settings"
+                icon="settings-outline"
+                variant="secondary"
+                accessibilityHint="Turn on Location, then come back."
+                onPress={() => void Linking.openSettings().catch(() => undefined)}
+              />
+            ) : null}
+            <Button label="Try again" icon="refresh-outline" variant="secondary" onPress={() => void retryCompass()} />
+          </>
+        }
+      >
+        <Text>
+          {locationOff
+            ? 'Location access is off, and the phone reads the compass through it. Direction only. Never stored.'
+            : 'The compass did not answer. Metal nearby can do this. Step away, or wave the phone in a figure 8.'}
+        </Text>
+        <Text>Three photos of the room give the same quote.</Text>
+      </Screen>
+    );
+  }
 
   return (
-    <Card
-      onPress={() => open(sweep.stage)}
-      accessibilityLabel={a11y}
-      accessibilityHint={sweep.stage === 'done' ? 'Opens your quote.' : 'Opens this room to carry on.'}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: SPACE.sm }}>
-        <Heading variant="heading" style={{ flexShrink: 1 }}>
-          {label}
-        </Heading>
-        <Icon name={STAGE_ICON[sweep.stage]} size={22} color={COLORS.mutedDeep} />
-      </View>
-      <Text tone="muted">{termWords(sweep.termMonths)}</Text>
-      {verdict && verdictText ? (
-        <VerdictPill verdict={verdict} text={verdictText} />
-      ) : (
-        <Badge
-          label={stageText}
-          tone={sweep.stage === 'failed' ? 'attention' : 'info'}
-          icon={STAGE_ICON[sweep.stage]}
+    <View style={styles.camera} accessibilityLabel="Room scan">
+      <StatusBar style="light" />
+      <CameraView
+        ref={cameraRef}
+        style={StyleSheet.absoluteFill}
+        facing="back"
+        animateShutter={false}
+        onCameraReady={() => setCameraReady(true)}
+        onMountError={() =>
+          setSend({ kind: 'error', message: 'The camera did not start.', next: 'none' })
+        }
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      />
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+        <ScanOverlay
+          state={capture}
+          onFinish={finishSweep}
+          middle={<LivePriceStrip snap={liveSnap} />}
+          footer={photoLink}
+          style={styles.overlay}
         />
-      )}
-      <Text variant="small" tone="muted">
-        {how}
-      </Text>
-      <Text variant="small" weight="semibold" style={{ alignSelf: 'flex-end' }}>
-        {sweep.stage === 'done' ? 'See quote ›' : 'Carry on ›'}
-      </Text>
-    </Card>
+      </View>
+    </View>
   );
 }
 
 /* -------------------------------------------------------------------------- */
-/* Screen                                                                     */
+/* After Finish: sending, queued, or a problem                                */
 /* -------------------------------------------------------------------------- */
 
-export default function RoomsScreen() {
-  const router = useRouter();
-  const list = useSyncExternalStore(subscribeRooms, getRooms, getRooms);
-  const [queueSnap, setQueueSnap] = useState<QueueSnapshot>(() => sendSweep.getSnapshot());
-  const [refreshKey, setRefreshKey] = useState(0);
-  const firstFocus = useRef(true);
+function SendView({
+  send,
+  onRetry,
+  onRetryNow,
+  onScanAgain,
+  onUsePhotos,
+}: {
+  readonly send: Exclude<SendState, { kind: 'idle' }>;
+  readonly onRetry: () => void;
+  readonly onRetryNow: () => void;
+  readonly onScanAgain: () => void;
+  readonly onUsePhotos: () => void;
+}) {
+  if (send.kind === 'picking' || send.kind === 'preparing' || send.kind === 'sending') {
+    const words =
+      send.kind === 'picking'
+        ? 'Opening your photos'
+        : send.kind === 'preparing'
+          ? 'Preparing photos'
+          : `Sending ${send.count} ${send.count === 1 ? 'photo' : 'photos'}`;
+    return (
+      <Screen>
+        <View
+          accessible
+          accessibilityRole="progressbar"
+          accessibilityLabel={words}
+          accessibilityState={{ busy: true }}
+          style={styles.center}
+        >
+          <ActivityIndicator color={COLORS.ink} size="large" />
+          <Text align="center">{words}</Text>
+        </View>
+      </Screen>
+    );
+  }
 
-  useEffect(() => sendSweep.subscribe(setQueueSnap), []);
-
-  // A queued sweep gets another go as soon as the app comes back to the front.
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'active') void sendSweep.retryNow();
-    });
-    return () => sub.remove();
-  }, []);
-
-  // Coming back to this screen reloads each room's stage.
-  useFocusEffect(
-    useCallback(() => {
-      if (firstFocus.current) {
-        firstFocus.current = false;
-        return;
-      }
-      setRefreshKey((n) => n + 1);
-    }, []),
-  );
-
-  const queueLine = queueStatusMessage(queueSnap);
+  if (send.kind === 'queued') {
+    return (
+      <Screen title="No connection">
+        <Notice tone="info">{send.message}</Notice>
+        <Text tone="muted">Photos are held on this phone. Sending resumes by itself.</Text>
+        <Button label="Send now" variant="secondary" onPress={onRetryNow} />
+      </Screen>
+    );
+  }
 
   return (
-    <Screen
-      footer={
-        <Button
-          label="New sweep"
-          icon="add-circle"
-          accessibilityHint="Starts a new room. You can scan with the camera or upload photos."
-          onPress={() => {
-            sessionStore.reset();
-            router.push('/new');
-          }}
-        />
-      }
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
-        <Brand size={32} showWordmark={false} />
-        <Heading accessibilityRole="header">Your rooms</Heading>
-      </View>
-      <Text tone="muted">
-        Scan a room with your camera, or upload three photos, and get a renter&apos;s insurance quote without
-        a long form.
-      </Text>
-
-      {queueLine ? (
-        <Notice
-          tone={queueSnap.pendingCount > 0 ? 'info' : 'error'}
-          {...(queueSnap.pendingCount > 0
-            ? { actionLabel: 'Try sending now', onAction: () => void sendSweep.retryNow() }
-            : {})}
-        >
-          {queueLine}
-        </Notice>
+    <Screen title="Not sent">
+      <Notice tone="error">{send.message}</Notice>
+      {send.next === 'resend' ? (
+        <Button label="Try again" accessibilityHint="Sends the same photos again." onPress={onRetry} />
       ) : null}
-
-      {list.length === 0 ? (
-        <Hero tone="blue" accessibilityLabel="No rooms yet. Tap New sweep to start.">
-          <Text tone="inverse" variant="heading" weight="semibold">
-            No rooms yet
-          </Text>
-          <Text tone="inverse">
-            Tap New sweep to start. It takes about a minute: name the room, then either turn slowly with your
-            camera or pick three photos.
-          </Text>
-          <View style={{ flexDirection: 'row', gap: SPACE.lg, marginTop: SPACE.sm }}>
-            <HowStep icon="camera-outline" label="Show us the room" />
-            <HowStep icon="search-outline" label="We check for risks" />
-            <HowStep icon="pricetag-outline" label="Get your quote" />
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="How it works"
-            accessibilityHint="Opens the About screen."
-            hitSlop={8}
-            onPress={() => router.push('/about')}
-            style={{ minHeight: MIN_TOUCH_TARGET, justifyContent: 'center', marginTop: SPACE.xs }}
-          >
-            <Text tone="inverse" weight="semibold" style={{ textDecorationLine: 'underline' }}>
-              How it works
-            </Text>
-          </Pressable>
-        </Hero>
-      ) : (
-        <View style={{ gap: SPACE.md }} accessibilityRole="list" accessibilityLabel={`${list.length} rooms`}>
-          {list.map((entry) => (
-            <RoomCard key={entry.sweepId} entry={entry} refreshKey={refreshKey} />
-          ))}
-        </View>
-      )}
-
-      {list.length > 0 ? (
-        <Text variant="small" tone="muted">
-          Rooms are kept until you close the app.
-        </Text>
-      ) : null}
+      <Button label="Scan again" variant="secondary" onPress={onScanAgain} />
+      <Button label="Upload 3 photos instead" variant="secondary" onPress={onUsePhotos} />
     </Screen>
   );
 }
 
-/** One icon + word in the empty-state "how it works" strip. Decorative: the Hero's own accessibilityLabel already says what matters. */
-function HowStep({ icon, label }: { readonly icon: IconName; readonly label: string }) {
-  return (
-    <View
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      style={{ flex: 1, alignItems: 'center', gap: SPACE.xs }}
-    >
-      <View
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 20,
-          backgroundColor: 'rgba(250,248,242,0.18)',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Icon name={icon} size={20} color={COLORS.paper} />
-      </View>
-      <Text tone="inverse" variant="micro" align="center">
-        {label}
-      </Text>
-    </View>
-  );
-}
+const styles = StyleSheet.create({
+  camera: {
+    flex: 1,
+    backgroundColor: COLORS.ink,
+  },
+  overlay: {
+    flex: 1,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACE.md,
+  },
+  link: {
+    minHeight: MIN_TOUCH_TARGET,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  linkText: {
+    textDecorationLine: 'underline',
+  },
+});

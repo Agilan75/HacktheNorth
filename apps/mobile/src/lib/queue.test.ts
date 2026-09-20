@@ -71,6 +71,8 @@ function sweepFor(req: SweepCreateRequestDto): SweepDto {
     observations: [],
     needsConfirmation: [],
     result: null,
+    hazardCosts: [],
+    pendingQuestion: null,
     askedQuestionIds: [],
     skippedCount: 0,
     error: null,

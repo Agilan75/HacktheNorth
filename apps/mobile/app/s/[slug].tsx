@@ -159,7 +159,7 @@ function SharedResult({ share }: { readonly share: ShareDto }) {
               void onShare();
             }}
           />
-          <Button label="Get your own quote" icon="camera-outline" variant="secondary" onPress={() => router.push('/new')} />
+          <Button label="Get your own quote" icon="camera-outline" variant="secondary" onPress={() => router.replace('/')} />
         </>
       }
     >
@@ -242,6 +242,26 @@ function SharedResult({ share }: { readonly share: ShareDto }) {
           {money(flip.premiumAfter) ? <Text>{`Price: about ${money(flip.premiumAfter)} a year.`}</Text> : null}
         </Card>
       ) : null}
+
+      <Footer />
     </Screen>
+  );
+}
+
+/**
+ * The only place attribution appears. It also carries the one line worth
+ * keeping from the About screen this rework deleted: a camera looked at the
+ * room, and code, not a model, priced it.
+ */
+function Footer() {
+  return (
+    <View style={{ gap: SPACE.xs }}>
+      <Text variant="small" tone="muted">
+        Retrofit prices a room from a camera sweep. Every rule and every number is code.
+      </Text>
+      <Text variant="micro" tone="muted">
+        Vision: Gemini
+      </Text>
+    </View>
   );
 }

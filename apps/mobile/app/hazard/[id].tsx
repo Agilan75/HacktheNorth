@@ -117,7 +117,7 @@ export default function HazardScreen() {
     return (
       <Screen title="We could not find this room">
         <Notice tone="error">Open this from your quote, after a scan or photos of the room.</Notice>
-        <Button label="Go to your rooms" onPress={() => router.replace('/')} />
+        <Button label="Scan a room" onPress={() => router.replace('/')} />
       </Screen>
     );
   }

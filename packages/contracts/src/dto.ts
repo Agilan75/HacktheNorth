@@ -619,6 +619,21 @@ export interface SweepCreateRequestDto {
   }[];
 }
 
+/**
+ * What one priced hazard adds to the monthly premium, at the price the engine
+ * just returned. The engine composes a tenant premium as
+ * `base x PI(factors)`, so removing one factor is a division, not an estimate.
+ * Computed in the API beside the other numbers, never on a phone.
+ */
+export interface HazardCostDto {
+  /** `portableHeater`, matching the `hazard.<key>` rating factor. */
+  readonly hazardKey: string;
+  /** The rating multiplier the engine applied. */
+  readonly factor: number;
+  /** Dollars per month this hazard adds. Null when there is no price. */
+  readonly monthlyDelta: number | null;
+}
+
 export interface SweepDto {
   readonly id: string;
   readonly submissionId: string | null;
@@ -628,9 +643,16 @@ export interface SweepDto {
   readonly frames: readonly SweepFrameDto[];
   readonly coverage: CoverageResult | null;
   readonly observations: readonly Observation[];
-  /** Observations under 0.6 waiting for the user to confirm or dismiss. */
+  /** Observations under 0.6. Reported, but they no longer hold the sweep open. */
   readonly needsConfirmation: readonly Observation[];
   readonly result: EngineResult | null;
+  /** Priced hazards, dearest first. The verdict screen shows the top three. */
+  readonly hazardCosts: readonly HazardCostDto[];
+  /**
+   * The one question still worth asking, or null. Never about anything a
+   * camera sweep can answer, and never more than one per sweep.
+   */
+  readonly pendingQuestion: Question | null;
   readonly askedQuestionIds: readonly string[];
   readonly skippedCount: number;
   readonly error: string | null;

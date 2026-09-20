@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import sharp from 'sharp';
 import type {
+  HazardCostDto,
   ObserveInput,
   ObserveOutput,
   RelateInput,
@@ -257,6 +258,14 @@ async function readObservableQuestionIds(): Promise<ReadonlySet<string>> {
   return out;
 }
 
+/**
+ * The observable ids as a plain value, so the synchronous `toSweepDto` can read
+ * them. It is written when the config loads, and every DTO that carries a
+ * result is built after `scoreSweep` has already awaited that load, so it is
+ * never read empty in a way that could surface a question the camera answered.
+ */
+let observableQuestionIdsNow: ReadonlySet<string> = new Set<string>();
+
 let tenantConfigPromise: Promise<TenantConfig> | null = null;
 
 /** @internal A18 — the tenant spec, rulebook, rating table and questions, read once. */
@@ -270,6 +279,7 @@ export function loadTenantConfig(): Promise<TenantConfig> {
         readQuestions('tenant'),
         readObservableQuestionIds(),
       ]);
+      observableQuestionIdsNow = observableQuestionIds;
       return {
         config: { spec, rulebook, ratingTable, bookStats: null, questions },
         questions,
@@ -338,9 +348,35 @@ function isPending(o: Observation): boolean {
   return o.derived !== true && math.clamp01(o.confidence) < MIN_OBSERVATION_CONFIDENCE;
 }
 
+/**
+ * What each priced hazard adds to the monthly premium, dearest first.
+ *
+ * The engine composes a tenant premium as `base x PI(factors)` (stages/price.ts),
+ * so the premium without one factor is exactly `monthly / factor` — a division,
+ * not an estimate. It is done here, beside every other number, so the phone can
+ * keep its rule of never doing arithmetic on money.
+ */
+function hazardCostsOf(result: EngineResult | null): HazardCostDto[] {
+  if (result === null) return [];
+  const monthly = result.price.predictedMonthlyPremium;
+  const out: HazardCostDto[] = [];
+  for (const f of result.price.factors) {
+    if (!f.name.startsWith('hazard.')) continue;
+    const factor = f.factor;
+    const priced = monthly !== null && Number.isFinite(monthly) && Number.isFinite(factor) && factor > 0;
+    out.push({
+      hazardKey: f.name.slice('hazard.'.length),
+      factor,
+      monthlyDelta: priced ? math.roundTo(monthly - monthly / factor, 2) : null,
+    });
+  }
+  return out.sort((a, b) => (b.monthlyDelta ?? 0) - (a.monthlyDelta ?? 0));
+}
+
 /** @internal A18 */
 export function toSweepDto(row: SweepRow): SweepDto {
   const result = row.result ?? null;
+  const asked = askedQuestionIdsOf(sessionOf(result));
   return {
     id: row.id,
     submissionId: row.submissionId ?? null,
@@ -352,7 +388,9 @@ export function toSweepDto(row: SweepRow): SweepDto {
     observations: row.observations,
     needsConfirmation: row.observations.filter(isPending),
     result,
-    askedQuestionIds: askedQuestionIdsOf(sessionOf(result)),
+    hazardCosts: hazardCostsOf(result),
+    pendingQuestion: qualifyingQuestion(result, asked, observableQuestionIdsNow),
+    askedQuestionIds: asked,
     skippedCount: result?.voi.skipped.length ?? 0,
     error: row.error ?? null,
     createdAt: row.createdAt,

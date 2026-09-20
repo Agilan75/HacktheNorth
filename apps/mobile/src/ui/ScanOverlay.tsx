@@ -49,8 +49,8 @@ export interface ScanOverlayProps {
   readonly state: CaptureState;
   /** Called when the person taps Finish and Finish is allowed. */
   readonly onFinish: () => void;
-  /** When given, shows "Use photos instead" (the upload path) as an equal choice. */
-  readonly onUsePhotos?: () => void;
+  /** Shown under Finish: the upload-photos link. */
+  readonly footer?: ReactNode;
   /** Shown between the ring and the controls (the live price chips). */
   readonly middle?: ReactNode;
   /** Shows a spinner on Finish while the screen submits the sweep. */
@@ -65,7 +65,7 @@ export interface ScanOverlayProps {
 export function ScanOverlay({
   state,
   onFinish,
-  onUsePhotos,
+  footer,
   middle,
   finishing = false,
   announce = true,
@@ -190,15 +190,7 @@ export function ScanOverlay({
           onPress={finishPress}
         />
 
-        {onUsePhotos ? (
-          <Button
-            label="Use photos instead"
-            variant="secondary"
-            fullWidth
-            accessibilityHint="Pick three or more photos of the room from your library instead of scanning."
-            onPress={onUsePhotos}
-          />
-        ) : null}
+        {footer}
       </View>
     </View>
   );
