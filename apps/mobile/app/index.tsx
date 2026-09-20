@@ -10,6 +10,9 @@ import * as Location from 'expo-location';
 
 import { ArOverlay } from '@/ar/ArOverlay';
 import { toDegrees, useWorldPose } from '@/ar/pose';
+import { hasViro, useViroPlanes, viroCameraPosition } from '@/ar/pose.viro';
+import { ViroSession } from '@/ar/ViroSession';
+import type { ViroSessionHandle } from '@/ar/ViroSession';
 import { getApi } from '@/lib/api';
 import { captureReducer, initialCaptureState, summarize, uploadBearings } from '@/lib/capture';
 import type { PendingCapture } from '@/lib/capture';
@@ -113,6 +116,14 @@ export default function ViewfinderScreen() {
    * `/hazard/[id]` on something the API has actually scored.
    */
   const priorSweepId = useSession((s) => s.sweepId);
+
+  /**
+   * True on a build that carries ViroReact. Expo Go is never it, and a session
+   * that cannot start flips this back to the camera rather than failing.
+   */
+  const [ar, setAr] = useState(hasViro);
+  const viroRef = useRef<ViroSessionHandle | null>(null);
+  const planes = useViroPlanes();
 
   const cameraRef = useRef<CameraView>(null);
   const frameData = useRef(new Map<number, FrameData>());
@@ -255,17 +266,31 @@ export default function ViewfinderScreen() {
 
   /* -------------------------------- capture ------------------------------- */
 
+  /**
+   * One frame, from whichever preview is live. An AR session hands back a
+   * screenshot file; `expo-camera` hands back a photo. Both are file URIs, so
+   * the rest of the capture path is the same either way.
+   */
+  const grab = useCallback(async (): Promise<{ uri: string; width: number; height: number }> => {
+    const session = viroRef.current;
+    if (session !== null) return session.takePicture();
+    const cam = cameraRef.current;
+    if (!cam) throw new Error('no camera');
+    const pic = await cam.takePictureAsync({ quality: 0.8, shutterSound: false });
+    return { uri: pic.uri, width: pic.width, height: pic.height };
+  }, []);
+
   const takeFrame = useCallback(
     async (p: PendingCapture) => {
-      const cam = cameraRef.current;
-      if (!cam || capturingRef.current) return;
+      if (capturingRef.current) return;
       capturingRef.current = true;
       try {
-        const pic = await cam.takePictureAsync({ quality: 0.8, shutterSound: false });
+        const pic = await grab();
         const small = await downscale(pic.uri, pic.width, pic.height);
         if (!alive.current) return;
         frameData.current.set(p.index, { imageBase64: small.base64, uri: small.uri, pitchDeg: pitchRef.current });
-        pricer.onFrame(small.base64);
+        // The bearing is what anchors whatever is found to the room.
+        pricer.onFrame(small.base64, p.bearingDeg);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
         dispatch({ type: 'captured', atMs: Date.now(), ref: small.uri });
       } catch {
@@ -274,7 +299,7 @@ export default function ViewfinderScreen() {
         capturingRef.current = false;
       }
     },
-    [pricer],
+    [grab, pricer],
   );
 
   useEffect(() => {
@@ -509,18 +534,32 @@ export default function ViewfinderScreen() {
   return (
     <View style={styles.camera} accessibilityLabel="Room scan">
       <StatusBar style="light" />
-      <CameraView
-        ref={cameraRef}
-        style={StyleSheet.absoluteFill}
-        facing="back"
-        animateShutter={false}
-        onCameraReady={() => setCameraReady(true)}
-        onMountError={() =>
-          setSend({ kind: 'error', message: 'The camera did not start.', next: 'none' })
-        }
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      />
+      {ar ? (
+        <ViroSession
+          onReady={(handle) => {
+            viroRef.current = handle;
+            setCameraReady(true);
+          }}
+          onUnavailable={() => {
+            // The AR session could not start. The camera and the sensors can.
+            viroRef.current = null;
+            setAr(false);
+          }}
+        />
+      ) : (
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          animateShutter={false}
+          onCameraReady={() => setCameraReady(true)}
+          onMountError={() =>
+            setSend({ kind: 'error', message: 'The camera did not start.', next: 'none' })
+          }
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+        />
+      )}
       <ArOverlay
         pose={pose}
         panels={capture.panels}
@@ -528,6 +567,8 @@ export default function ViewfinderScreen() {
         canFinish={summary.canFinish}
         onFinish={finishSweep}
         live={liveSnap}
+        planes={planes}
+        camera={viroCameraPosition()}
         {...(priorSweepId !== null
           ? {
               onHazard: (hazardKey: string) =>

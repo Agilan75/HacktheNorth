@@ -50,6 +50,20 @@
         {
           "motionPermission": "Retrofit reads device motion to tell how far you have turned, so it knows which parts of the room you have already scanned."
         }
+      ],
+      [
+        "@reactvision/react-viro",
+        {
+          "provider": "none",
+          "android": { "xRMode": "AR" },
+          "ios": {
+            "cameraUsagePermission": "Retrofit uses the camera to scan your room, so you can get a tenant quote without filling in a form.",
+            "microphoneUsagePermission": "Retrofit does not record audio. The AR framework asks for this before it will start.",
+            "photosPermission": "Retrofit reads a photo you pick when you use the upload path instead of scanning.",
+            "savePhotosPermission": "Retrofit does not save photos to your library.",
+            "locationUsagePermission": "Retrofit reads your compass heading while you scan, to map each photo to a direction in the room. Your location is never stored or shared."
+          }
+        }
       ]
     ],
     "experiments": {

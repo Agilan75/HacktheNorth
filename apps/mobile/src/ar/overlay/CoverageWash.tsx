@@ -18,13 +18,13 @@ import { StyleSheet } from 'react-native';
 import { Canvas, Group, Rect } from '@shopify/react-native-skia';
 import { COLORS } from '@retrofit/design';
 
-import { coverageBands, screenOf } from '../pose';
-import type { Viewport, WorldPose } from '../pose';
+import { bandSpan, coverageBands, planeForBearing } from '../pose';
+import type { Viewport, WallPlane, WorldPose } from '../pose';
 
 /** The one accent, at the one opacity the wash is allowed. */
 const WASH_OPACITY = 0.35;
 
-/** Share of the viewport height the band covers. */
+/** Share of the viewport height the band covers when no wall has been found. */
 const BAND_HEIGHT_RATIO = 0.42;
 
 export interface CoverageWashProps {
@@ -32,9 +32,15 @@ export interface CoverageWashProps {
   readonly panels: readonly boolean[];
   readonly pose: WorldPose;
   readonly view: Viewport;
+  /** Walls the AR session found. Empty on the gyro path, where the band is fixed. */
+  readonly planes?: readonly WallPlane[];
+  /** Camera position in the session's frame, metres. */
+  readonly camera?: readonly [number, number, number];
 }
 
-export function CoverageWash({ panels, pose, view }: CoverageWashProps) {
+const ORIGIN: readonly [number, number, number] = [0, 0, 0];
+
+export function CoverageWash({ panels, pose, view, planes = [], camera = ORIGIN }: CoverageWashProps) {
   const bands = useMemo(
     () => (pose.ready ? coverageBands(panels, view, pose.yaw) : []),
     [panels, view, pose.ready, pose.yaw],
@@ -42,10 +48,10 @@ export function CoverageWash({ panels, pose, view }: CoverageWashProps) {
 
   if (bands.length === 0) return null;
 
-  // The horizon, so the band tips with the phone rather than floating.
-  const horizon = screenOf({ bearing: pose.yaw, elevation: 0 }, view, pose);
-  const height = view.height * BAND_HEIGHT_RATIO;
-  const top = horizon.y - height / 2;
+  // On a development build the band is the wall the phone is looking at; on
+  // the Expo Go path it is a fixed band centred on the horizon.
+  const wall = planes.length > 0 ? planeForBearing(planes, pose.yaw, camera) : null;
+  const { top, height } = bandSpan(view, pose, wall, camera, BAND_HEIGHT_RATIO);
 
   return (
     <Canvas

@@ -16,6 +16,7 @@
  * Everything but the hook is pure and runs in node under vitest.
  */
 import { useGyroPose } from './pose.gyro';
+import { useViroPose, viroPoseIsLive } from './pose.viro';
 
 export interface WorldPose {
   /** Clockwise from the sweep's start bearing, 0..2PI. */
@@ -187,6 +188,86 @@ export interface CoverageBand {
   readonly width: number;
 }
 
+/** A detected wall, reduced to what the wash needs. Metres, session frame. */
+export interface WallPlane {
+  readonly id: string;
+  readonly center: readonly [number, number, number];
+  readonly height: number;
+}
+
+export interface BandSpan {
+  readonly top: number;
+  readonly height: number;
+}
+
+/**
+ * How tall the wash should be, in screen points.
+ *
+ * With no detected wall it is a fixed share of the viewport centred on the
+ * horizon: a band at a fixed radius, which is all the gyro path can know. With
+ * a wall, the band is the wall: its top and bottom edges are projected from the
+ * plane's own height and its distance from the camera, so the paint stops where
+ * the wall stops instead of running across the floor.
+ *
+ * `cameraY` and the plane centres are metres in the AR session's frame; the
+ * distance used is the horizontal one, because a wall's height is vertical.
+ */
+export function bandSpan(
+  view: Viewport,
+  pose: Pick<WorldPose, 'yaw' | 'pitch'>,
+  plane: WallPlane | null,
+  camera: readonly [number, number, number],
+  fallbackRatio: number,
+): BandSpan {
+  const fixed = (): BandSpan => {
+    const height = view.height * fallbackRatio;
+    return { top: screenOf({ bearing: pose.yaw, elevation: 0 }, view, pose).y - height / 2, height };
+  };
+  if (plane === null || !(plane.height > 0)) return fixed();
+
+  const dx = plane.center[0] - camera[0];
+  const dz = plane.center[2] - camera[2];
+  const distance = Math.hypot(dx, dz);
+  if (!(distance > 0.2)) return fixed();
+
+  const halfHeight = plane.height / 2;
+  const topEl = Math.atan((plane.center[1] + halfHeight - camera[1]) / distance);
+  const bottomEl = Math.atan((plane.center[1] - halfHeight - camera[1]) / distance);
+  const top = screenOf({ bearing: pose.yaw, elevation: topEl }, view, pose);
+  const bottom = screenOf({ bearing: pose.yaw, elevation: bottomEl }, view, pose);
+  const height = bottom.y - top.y;
+  // A wall edge-on or behind the camera projects to nothing usable.
+  if (!Number.isFinite(height) || height <= 1) return fixed();
+  return { top: top.y, height };
+}
+
+/**
+ * The plane facing a given bearing, or null. A wall is picked by which one the
+ * phone is closest to pointing at, never by which is nearest, because the wash
+ * is painted where the camera is looking.
+ */
+export function planeForBearing(
+  planes: readonly WallPlane[],
+  bearing: number,
+  camera: readonly [number, number, number],
+): WallPlane | null {
+  let best: WallPlane | null = null;
+  let bestOff = Math.PI / 3;
+  for (const plane of planes) {
+    const dx = plane.center[0] - camera[0];
+    const dz = plane.center[2] - camera[2];
+    if (dx === 0 && dz === 0) continue;
+    // Session frame: -z is forward, +x is right, and bearings run clockwise.
+    const planeBearing = wrapRad(Math.atan2(dx, -dz));
+    const off = Math.abs(signedRad(planeBearing - bearing));
+    if (off < bestOff) {
+      bestOff = off;
+      best = plane;
+    }
+  }
+  return best;
+}
+
 /**
  * The covered panels that are in front of the phone, as screen rectangles.
  *
@@ -215,11 +296,19 @@ export function coverageBands(
 }
 
 /**
- * The live pose.
+ * The live pose: the AR session's when one is running, the phone's sensors
+ * otherwise.
  *
- * Only the gyro implementation exists until C2 adds `pose.viro.ts`; when it
- * does, the selection happens here and nothing above or in `overlay/` changes.
+ * Both hooks are always called, in the same order, every render. The choice is
+ * made on whether the AR session has produced a camera transform in the last
+ * second, not on whether the native module exists, and that is deliberate: a
+ * development build whose AR session fails to start, loses tracking, or lands
+ * on a device without ARCore falls back to the sensors within a second instead
+ * of freezing on a pose that stopped updating. In Expo Go nothing ever writes
+ * to the AR store, so this is always the gyro.
  */
 export function useWorldPose(): WorldPose {
-  return useGyroPose();
+  const viro = useViroPose();
+  const gyro = useGyroPose();
+  return viro.ready && viroPoseIsLive(Date.now()) ? viro : gyro;
 }

@@ -30,7 +30,7 @@ import { Hud } from './overlay/Hud';
 import { HazardPin } from './overlay/HazardPin';
 import { ValueTag } from './overlay/ValueTag';
 import { RAD, wrapRad } from './pose';
-import type { Viewport, WorldPose } from './pose';
+import type { Viewport, WallPlane, WorldPose } from './pose';
 
 /**
  * Live labels that are themselves a hazard, so a pin can go up during the
@@ -55,6 +55,10 @@ export interface ArOverlayProps {
   readonly pose: WorldPose;
   /** 36 booleans from the capture machine. */
   readonly panels: readonly boolean[];
+  /** Walls the AR session found. Empty on the Expo Go path. */
+  readonly planes?: readonly WallPlane[];
+  /** Camera position in the AR session's frame, metres. */
+  readonly camera?: readonly [number, number, number];
   readonly coveragePct: number;
   readonly canFinish: boolean;
   readonly onFinish: () => void;
@@ -83,6 +87,8 @@ export function anchored(entries: readonly LiveEntry[]): Anchored[] {
 export function ArOverlay({
   pose,
   panels,
+  planes,
+  camera,
   coveragePct,
   canFinish,
   onFinish,
@@ -96,7 +102,7 @@ export function ArOverlay({
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-      <CoverageWash panels={panels} pose={pose} view={view} />
+      <CoverageWash panels={panels} pose={pose} view={view} planes={planes} camera={camera} />
 
       {/* Anything that costs money to insure gets a pin on it. */}
       {placed.map(({ entry, bearing }) => {
