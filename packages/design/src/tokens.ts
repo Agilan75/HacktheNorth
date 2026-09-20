@@ -45,11 +45,23 @@ export const BRAND_RED_IS_PLACEHOLDER = true;
 
 /* ------------------------------------------------------------ typography */
 
+/**
+ * The registered font families.
+ *
+ * One name per FACE, not per family: a phone cannot synthesise a weight for a
+ * custom font the way a browser can, so every weight the app uses has to be
+ * loaded and named in its own right. The Expo app registers exactly these three
+ * with `useFonts`; the console maps them through `FONT_STACKS` instead.
+ *
+ * Display text is always semibold in this system, so `display` is that face.
+ */
 export const FONT_FAMILIES = {
-  /** Display and verdict text. */
+  /** Display and verdict text: Fraunces SemiBold. */
   display: 'Fraunces',
-  /** Body text, tables, labels. */
+  /** Body text, tables, labels: Inter Regular. */
   body: 'Inter',
+  /** Body text at semibold: Inter SemiBold, a separate face. */
+  bodyStrong: 'Inter-SemiBold',
 } as const;
 
 /** Web font stacks (console). The Expo app registers the same two families. */

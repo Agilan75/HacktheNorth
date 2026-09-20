@@ -21,7 +21,6 @@ import {
   AccessibilityInfo,
   ActivityIndicator,
   Animated,
-  Platform,
   Pressable,
   ScrollView,
   Text as RNText,
@@ -46,6 +45,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   BORDER,
   COLORS,
+  FONT_FAMILIES,
+  FONT_WEIGHTS,
+  LINE_HEIGHTS,
   MIN_TOUCH_TARGET,
   RADIUS,
   SPACE,
@@ -62,11 +64,10 @@ import type { FontSizeToken, SpaceToken, VerdictToken } from '@retrofit/design';
 /* -------------------------------------------------------------------------- */
 
 /**
- * Fraunces and Inter are not bundled (no font assets, no custom native code in
- * Expo Go), and an unregistered family logs an error on iOS. So the display
- * steps use the platform serif and body steps the system font. Decision M3-2.
+ * Fraunces and Inter are registered in `app/_layout.tsx`, one name per face,
+ * and every family below comes from the tokens. There is no platform fallback
+ * and no platform branch: both phones get the same two typefaces.
  */
-const DISPLAY_FAMILY = Platform.select({ ios: 'Georgia', android: 'serif', default: undefined });
 const DISPLAY_STEPS: ReadonlySet<FontSizeToken> = new Set(['display', 'title', 'heading']);
 const CAPPED_STEPS: ReadonlySet<FontSizeToken> = new Set(['display', 'title']);
 
@@ -80,15 +81,21 @@ const TONE_COLOR: Readonly<Record<TextTone, string>> = {
   inverse: COLORS.paper,
 };
 
-/** The §13 step as an RN style, unscaled — RN applies the user's font scale. */
-export function typeStyle(variant: FontSizeToken, tone: TextTone = 'ink'): TextStyle {
+/**
+ * One step of the type scale as an RN style, unscaled — RN applies the user's
+ * font scale itself. Size and leading come from the tokens; the family is the
+ * face that carries that step's weight, because a phone cannot make a semibold
+ * out of a regular.
+ */
+export function typeStyle(variant: FontSizeToken, tone: TextTone = 'ink', strong = false): TextStyle {
   const base = textStyle(variant);
+  const display = DISPLAY_STEPS.has(variant);
   return {
+    fontFamily: display ? FONT_FAMILIES.display : strong ? FONT_FAMILIES.bodyStrong : FONT_FAMILIES.body,
     fontSize: base.fontSize,
     lineHeight: base.lineHeight,
-    fontWeight: base.fontWeight,
+    fontWeight: display || strong ? FONT_WEIGHTS.semibold : base.fontWeight,
     color: TONE_COLOR[tone],
-    ...(DISPLAY_STEPS.has(variant) && DISPLAY_FAMILY ? { fontFamily: DISPLAY_FAMILY } : {}),
   };
 }
 
@@ -121,12 +128,9 @@ export function Text({
     <RNText
       allowFontScaling
       maxFontSizeMultiplier={maxFontSizeMultiplier ?? (CAPPED_STEPS.has(variant) ? 2 : 0)}
-      style={[
-        typeStyle(variant, tone),
-        align ? { textAlign: align } : null,
-        weight === 'semibold' ? { fontWeight: '600' } : weight === 'regular' ? { fontWeight: '400' } : null,
-        style,
-      ]}
+      // `weight` picks the face, not just the numeric weight: asking for a
+      // heavier number on a regular face gets a fake bold, or nothing at all.
+      style={[typeStyle(variant, tone, weight === 'semibold'), align ? { textAlign: align } : null, style]}
       {...rest}
     />
   );
@@ -433,16 +437,9 @@ export function Brand({ size = 40, showWordmark = true, style }: BrandProps) {
         <Ionicons name="home" size={Math.round(size * 0.5)} color={COLORS.paper} />
       </LinearGradient>
       {showWordmark ? (
-        <RNText
-          style={{
-            fontFamily: DISPLAY_FAMILY,
-            fontWeight: '600',
-            fontSize: Math.round(size * 0.5),
-            color: COLORS.ink,
-          }}
-        >
+        <Text variant="heading" weight="semibold">
           Retrofit
-        </RNText>
+        </Text>
       ) : null}
     </View>
   );
@@ -550,14 +547,16 @@ export function VerdictPill({
         style,
       ]}
     >
-      <RNText
-        allowFontScaling
+      {/* The shape that carries the verdict when colour cannot: a type step,
+          on the scale, so it grows with the words beside it. */}
+      <Text
+        variant={large ? 'body' : 'small'}
         importantForAccessibility="no"
         accessibilityElementsHidden
-        style={{ color: pill.text.color, fontSize: large ? 17 : 15, lineHeight: large ? 24 : 20 }}
+        style={{ color: pill.text.color }}
       >
         {pill.mark}
-      </RNText>
+      </Text>
       <Text
         variant={large ? 'heading' : 'small'}
         weight="semibold"
@@ -622,7 +621,7 @@ export function Skeleton({ lines = 3, variant = 'body', accessibilityLabel = 'Lo
     return () => loop.stop();
   }, [pulse, reduce]);
 
-  const lineHeight = textStyle(variant, fontScale).lineHeight ?? 24;
+  const lineHeight = textStyle(variant, fontScale).lineHeight ?? LINE_HEIGHTS[variant];
   const count = Math.max(1, Math.floor(lines));
   return (
     <View
