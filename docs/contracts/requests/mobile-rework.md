@@ -47,7 +47,7 @@ engine, and the API reads it straight from the JSON file
 **Also for the record, not a request:** four tests fail on Windows independently of
 this branch — `data.test.ts` "resolves data beside src/" (expects `/` path separators),
 `fixtures/golden.test.ts` "byte-for-byte" (expects LF, gets CRLF), and `scripts/backfill.test.ts`
-(reads the gitignored `apps/api/data/backfill`), and `packages/verify/src/run-100k.test.ts`
+(reads `apps/api/data/backfill`, which was never committed: `git ls-files apps/api/data` is empty and nothing ignores it, so the 11 files it wants exist only on the machine that built them), and `packages/verify/src/run-100k.test.ts`
 "parses flags with defaults". All four fail identically on `build/retrofit` with this branch
 stashed, verified by checking the base branch out and running them there.
 

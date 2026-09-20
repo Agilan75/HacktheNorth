@@ -26,9 +26,12 @@ describe('tokens.css', () => {
   });
 
   it('carries the PRD 13 values', () => {
-    expect(tokensCss).toContain('--rf-paper: #FAF8F2;');
-    expect(tokensCss).toContain('--rf-ink: #1F1E1B;');
-    expect(tokensCss).toContain('--rf-red: #E4002B;');
+    expect(tokensCss).toContain('--rf-bone: #F4EFE6;');
+    expect(tokensCss).toContain('--rf-ink: #191919;');
+    expect(tokensCss).toContain('--rf-accent: #D97757;');
+    // The console’s own names still resolve, so no rule loses its colour.
+    expect(tokensCss).toContain('--rf-paper: #F4EFE6;');
+    expect(tokensCss).toContain('--rf-red: #B5443A;');
     expect(tokensCss).toContain('--rf-radius-card: 16px;');
     expect(tokensCss).toContain('--rf-radius-pill: 999px;');
     expect(tokensCss).toContain('--rf-min-touch-target: 44px;');
@@ -60,7 +63,7 @@ describe('base.css', () => {
 describe('VerdictPill', () => {
   it.each([
     ['FIT', 'rf-pill--fit', 'filled', 'FIT', 'Fits appetite', '●'],
-    ['REFER', 'rf-pill--refer', 'outlined', 'REFER', 'Refer to underwriter', '◐'],
+    ['REFER', 'rf-pill--refer', 'filled', 'REFER', 'Refer to underwriter', '◐'],
     ['DOES_NOT_FIT', 'rf-pill--does-not-fit', 'filled', 'DOES NOT FIT', 'Outside appetite', '○'],
   ] as const)('%s renders its word, label, mark and variant', (verdict, cls, variant, word, label, mark) => {
     const { container } = render(<VerdictPill verdict={verdict} />);
@@ -212,6 +215,8 @@ describe('Card', () => {
   });
 
   it('keeps colour tokens aligned with PRD 13', () => {
-    expect(COLORS.mutedTint).toBe('#EDEFE8');
+    expect(COLORS.muteTint).toBe('#E9E4DA');
+    // The legacy alias resolves to the same colour, so console CSS still matches.
+    expect(COLORS.mutedTint).toBe(COLORS.muteTint);
   });
 });

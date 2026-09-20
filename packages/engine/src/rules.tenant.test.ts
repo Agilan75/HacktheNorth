@@ -147,18 +147,44 @@ describe('rules/extensions.json', () => {
 describe('questions/tenant.json', () => {
   const bySource = new Map(tenantSpec.components.map((c) => [c.source, c]));
 
-  it('asks one plain-language question per tenant component, addressed by canonical path', () => {
+  /**
+   * `contentsLimit` is derived, never asked: the sweep sums what it priced and
+   * the server rounds it (apps/api/src/services/sweep.ts). It is the one
+   * component with no question, so the invariant is "a question per component
+   * except the derived ones", not one per component.
+   */
+  const DERIVED_COMPONENTS: ReadonlySet<string> = new Set(['contentsLimit']);
+
+  it('asks one plain-language question per tenant component, bar the derived ones', () => {
     expect(questions.lineOfBusiness).toBe('tenant');
-    expect(questions.questions).toHaveLength(tenantSpec.components.length);
+    const askable = tenantSpec.components.filter((c) => !DERIVED_COMPONENTS.has(c.key));
+    expect(questions.questions).toHaveLength(askable.length);
     const covered = new Set<string>();
     for (const q of questions.questions) {
       const component = bySource.get(q.field);
       expect(component, q.id).toBeDefined();
+      expect(DERIVED_COMPONENTS.has(component!.key), q.id).toBe(false);
       covered.add(q.field);
       expect(q.prompt.endsWith('?'), q.id).toBe(true);
       expect(q.accessibilityLabel.length, q.id).toBeGreaterThan(q.prompt.length / 2);
     }
-    expect(covered.size).toBe(tenantSpec.components.length);
+    expect(covered.size).toBe(askable.length);
+  });
+
+  it('marks every question observable or not, and no hazard question is asked', () => {
+    // `observable` is not part of the engine's frozen `Question` type, so the
+    // parsed questions drop it; the file itself is what carries the flag, and
+    // the API reads it from there (readObservableQuestionIds).
+    const raw = load('../questions/tenant.json') as {
+      questions: { id: string; field: string; observable?: unknown }[];
+    };
+    for (const q of raw.questions) {
+      expect(typeof q.observable, q.id).toBe('boolean');
+      // Anything a camera sweep can settle is flagged, so the VOI loop skips it.
+      if (q.field.startsWith('hazards.')) expect(q.observable, q.id).toBe(true);
+    }
+    const askable = raw.questions.filter((q) => q.observable !== true).map((q) => q.field);
+    expect(askable).toEqual(['buildings[0].yearBuilt', 'exposure.termMonths']);
   });
 
   it('answers binary hazards with yes/no and the term with exactly 4, 8 or 12 months', () => {
@@ -173,11 +199,11 @@ describe('questions/tenant.json', () => {
     expect(term?.options?.map((o) => o.value)).toEqual([...TENANT_TERMS_MONTHS]);
   });
 
-  it('offers a contents option on each side of the $100,000 refer line', () => {
-    const contents = questions.questions.find((q) => q.field === 'exposure.contentsLimit');
-    const values = (contents?.options ?? []).map((o) => o.value as number);
-    expect(values.some((v) => v <= 100000)).toBe(true);
-    expect(values.some((v) => v > 100000)).toBe(true);
+  it('puts the contents refer line at $100,000, with nothing asking about it', () => {
+    // No contents question exists to offer options on: the figure is summed
+    // from what the sweep priced. The rule boundary is still worth pinning.
+    expect(questions.questions.some((q) => q.field === 'exposure.contentsLimit')).toBe(false);
+    expect(fired(tenant, { contentsLimit: 100000 })).toEqual(['T-CONTENTS-STANDARD']);
     expect(fired(tenant, { contentsLimit: 150000 })).toEqual(['T-CONTENTS-HIGH']);
   });
 });
