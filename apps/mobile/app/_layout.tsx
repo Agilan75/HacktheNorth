@@ -1,11 +1,14 @@
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
+import type { ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { Fraunces_600SemiBold } from '@expo-google-fonts/fraunces';
 import { Inter_400Regular, Inter_600SemiBold } from '@expo-google-fonts/inter';
 import { COLORS, FONT_FAMILIES } from '@retrofit/design';
+
+import { Button, Notice, Screen, Text } from '@/ui';
 
 /**
  * Six routes. `/` is the camera, opened on launch, and it is also the sweep:
@@ -25,6 +28,33 @@ import { COLORS, FONT_FAMILIES } from '@retrofit/design';
 
 // Rejecting here only means the splash was already gone; it is never fatal.
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+/**
+ * Anything that throws while a screen renders lands here. expo-router picks
+ * this up by name, and without it a render error leaves the window painted in
+ * nothing at all — the black screen, with no way back and nothing to read.
+ *
+ * The message is kept on screen rather than swallowed: it is the only place
+ * the reason for a blank screen is ever visible on a device.
+ */
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  return (
+    <Screen
+      title="That screen stopped"
+      footer={
+        <>
+          <Button label="Try again" onPress={() => void retry()} />
+          <Button label="Start a new scan" variant="secondary" onPress={() => router.replace('/')} />
+        </>
+      }
+    >
+      <Notice tone="error">The screen could not be drawn. Your scan is safe.</Notice>
+      <Text variant="small" tone="muted">
+        {error.message}
+      </Text>
+    </Screen>
+  );
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
