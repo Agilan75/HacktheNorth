@@ -1,0 +1,18 @@
+{
+  "name": "@retrofit/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Wire DTOs, zod schemas, route table, LLM IO types, shared formatters.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@retrofit/engine": "*",
+    "zod": "4.6.5"
+  }
+}

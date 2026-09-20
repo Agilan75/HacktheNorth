@@ -1,0 +1,19 @@
+{
+  "startedAt": "2026-09-19T15:52:09.876Z",
+  "finishedAt": "2026-09-19T16:38:04.459Z",
+  "config": {
+    "total": 10000000,
+    "seed": 20260919,
+    "workers": 6,
+    "chunkSize": 10000,
+    "maxDisagreements": 0,
+    "outDir": "/Users/calebchincalebchin/hackthenorth/packages/verify/out"
+  },
+  "completed": 10000000,
+  "invariantViolations": 0,
+  "disagreements": 0,
+  "errors": 0,
+  "casesPerSecond": 3630.500562341317,
+  "firstViolations": [],
+  "firstDisagreements": []
+}

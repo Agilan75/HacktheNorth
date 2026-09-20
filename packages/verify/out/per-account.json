@@ -1,0 +1,1639 @@
+{
+  "generatedAt": "2026-09-19T19:30:25.951Z",
+  "sources": {
+    "facts": "packages/verify/src/scripts/real-inputs.ts",
+    "naive": "packages/verify/src/naive/index.ts",
+    "layerC": "packages/verify/out/layer-c.json"
+  },
+  "summary": {
+    "total": 38,
+    "naiveAgreedAll": 38,
+    "secondOpinionAnswered": 38,
+    "secondOpinionAgreed": 38
+  },
+  "accounts": {
+    "SUB-2024-00065": {
+      "caseId": "SUB-2024-00065",
+      "asOf": "2024-05-25",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 52.99999999999999,
+        "knockoutFactorIds": [
+          "building_age",
+          "construction_type",
+          "primary_risk_state"
+        ],
+        "decidingFactorId": "primary_risk_state"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 52.99999999999999,
+        "knockoutFactorIds": [
+          "building_age",
+          "construction_type",
+          "primary_risk_state"
+        ],
+        "decidingFactorId": "primary_risk_state",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "primary_risk_state",
+        "reasoning": "The primary risk state is TX, which falls under 'All other states' in the Not Acceptable column of the guideline table. The guideline specifies that 'If any factor is Not Acceptable, the verdict is DOES_NOT_FIT' and 'The deciding factor is the first Not Acceptable factor in table order (top to bottom).'",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 52.99999999999999,
+          "knockoutFactorIds": [
+            "building_age",
+            "construction_type",
+            "primary_risk_state"
+          ],
+          "decidingFactorId": "primary_risk_state"
+        }
+      }
+    },
+    "SUB-2024-00076": {
+      "caseId": "SUB-2024-00076",
+      "asOf": "2024-05-02",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 63.99999999999999,
+        "knockoutFactorIds": [
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 63.99999999999999,
+        "knockoutFactorIds": [
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "primary_risk_state",
+        "reasoning": "The submission's primary risk state is TN, which falls under \"All other states\" and is listed as Not Acceptable in the guideline. The guideline specifies that \"If any factor is Not Acceptable, the verdict is DOES_NOT_FIT\" and \"The deciding factor is the first Not Acceptable factor in table order (top to bottom).\" As primary_risk_state is the first Not Acceptable factor in table order, the submission receives a DOES_NOT_FIT verdict.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 63.99999999999999,
+          "knockoutFactorIds": [
+            "primary_risk_state",
+            "total_premium"
+          ],
+          "decidingFactorId": "primary_risk_state"
+        }
+      }
+    },
+    "SUB-2024-00090": {
+      "caseId": "SUB-2024-00090",
+      "asOf": "2024-08-14",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 75,
+        "knockoutFactorIds": [
+          "building_age",
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 75,
+        "knockoutFactorIds": [
+          "building_age",
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "total_premium",
+        "reasoning": "The quoted total premium of $188,400 falls into the Not Acceptable range defined as \"Under $50K or over $175K\". The guideline specifies that \"If any factor is Not Acceptable, the verdict is DOES_NOT_FIT\" and \"The deciding factor is the first Not Acceptable factor in table order (top to bottom).\"",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 75,
+          "knockoutFactorIds": [
+            "building_age",
+            "total_premium"
+          ],
+          "decidingFactorId": "total_premium"
+        }
+      }
+    },
+    "SUB-2025-00001": {
+      "caseId": "SUB-2025-00001",
+      "asOf": "2025-09-06",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 59,
+        "knockoutFactorIds": [
+          "building_age",
+          "construction_type",
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 59,
+        "knockoutFactorIds": [
+          "building_age",
+          "construction_type",
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "total_premium",
+        "reasoning": "The guideline lists Total premium as Not Acceptable for \"Under $50K or over $175K\". Because the total premium is $619,900, it exceeds $175K and is Not Acceptable. Per rule 1, \"If any factor is Not Acceptable, the verdict is DOES_NOT_FIT. The deciding factor is the first Not Acceptable factor in table order (top to bottom).\"",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 59,
+          "knockoutFactorIds": [
+            "building_age",
+            "construction_type",
+            "total_premium"
+          ],
+          "decidingFactorId": "total_premium"
+        }
+      }
+    },
+    "SUB-2025-00004": {
+      "caseId": "SUB-2025-00004",
+      "asOf": "2025-06-06",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 53.99999999999999,
+        "knockoutFactorIds": [
+          "building_age",
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 53.99999999999999,
+        "knockoutFactorIds": [
+          "building_age",
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "primary_risk_state",
+        "reasoning": "The submission's primary risk state is MA, which falls under \"All other states\" listed as Not Acceptable in the guideline table. Rule 1 states, \"If any factor is Not Acceptable, the verdict is DOES_NOT_FIT. The deciding factor is the first Not Acceptable factor in table order (top to bottom).\" Because primary_risk_state is the first Not Acceptable factor encountered in table order, the submission is DOES_NOT_FIT.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 53.99999999999999,
+          "knockoutFactorIds": [
+            "building_age",
+            "primary_risk_state",
+            "total_premium"
+          ],
+          "decidingFactorId": "primary_risk_state"
+        }
+      }
+    },
+    "SUB-2025-00033": {
+      "caseId": "SUB-2025-00033",
+      "asOf": "2025-03-28",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 60,
+        "knockoutFactorIds": [
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 60,
+        "knockoutFactorIds": [
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "primary_risk_state",
+        "reasoning": "The primary risk state for this submission is TX, which falls into the 'All other states' category and is Not Acceptable according to the guideline. Per the rule: 'If any factor is Not Acceptable, the verdict is DOES_NOT_FIT. The deciding factor is the first Not Acceptable factor in table order (top to bottom).'",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 60,
+          "knockoutFactorIds": [
+            "primary_risk_state",
+            "total_premium"
+          ],
+          "decidingFactorId": "primary_risk_state"
+        }
+      }
+    },
+    "SUB-2025-00042": {
+      "caseId": "SUB-2025-00042",
+      "asOf": "2024-10-07",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 77.99999999999999,
+        "knockoutFactorIds": [
+          "building_age"
+        ],
+        "decidingFactorId": "building_age"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 77.99999999999999,
+        "knockoutFactorIds": [
+          "building_age"
+        ],
+        "decidingFactorId": "building_age",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "building_age",
+        "reasoning": "The submission does not fit because more than 50% of the total insured value is in older structures. The guideline interpretation states that building age is \"Not Acceptable when more than 50% of TIV is in buildings built before 1990.\" With 64.6% of the TIV in buildings built before 1990, the building age factor fails the guideline requirement.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 77.99999999999999,
+          "knockoutFactorIds": [
+            "building_age"
+          ],
+          "decidingFactorId": "building_age"
+        }
+      }
+    },
+    "SUB-2025-00052": {
+      "caseId": "SUB-2025-00052",
+      "asOf": "2025-04-25",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 69,
+        "knockoutFactorIds": [
+          "building_age",
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 69,
+        "knockoutFactorIds": [
+          "building_age",
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "total_premium",
+        "reasoning": "The total premium of $471,700 is classified as Not Acceptable under the guideline specification of \"Under $50K or over $175K\". Rule 1 states that \"If any factor is Not Acceptable, the verdict is DOES_NOT_FIT. The deciding factor is the first Not Acceptable factor in table order (top to bottom).\" Total premium is the first factor in table order that is Not Acceptable.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 69,
+          "knockoutFactorIds": [
+            "building_age",
+            "total_premium"
+          ],
+          "decidingFactorId": "total_premium"
+        }
+      }
+    },
+    "SUB-2025-00054": {
+      "caseId": "SUB-2025-00054",
+      "asOf": "2025-07-17",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 60,
+        "knockoutFactorIds": [
+          "building_age",
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 60,
+        "knockoutFactorIds": [
+          "building_age",
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "primary_risk_state",
+        "reasoning": "The submission receives a verdict of DOES_NOT_FIT because the primary risk state is MA, which falls under 'All other states' and is Not Acceptable. The guideline defines Primary risk state as Acceptable for 'OH, PA, MD, CO, CA, FL, NC, SC, GA, VA, UT' and Not Acceptable for 'All other states'. Under the guidelines, 'If any factor is Not Acceptable, the verdict is DOES_NOT_FIT' with the deciding factor being the first Not Acceptable factor in table order.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 60,
+          "knockoutFactorIds": [
+            "building_age",
+            "primary_risk_state",
+            "total_premium"
+          ],
+          "decidingFactorId": "primary_risk_state"
+        }
+      }
+    },
+    "SUB-2025-00061": {
+      "caseId": "SUB-2025-00061",
+      "asOf": "2025-05-26",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 69,
+        "knockoutFactorIds": [
+          "building_age",
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 69,
+        "knockoutFactorIds": [
+          "building_age",
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "total_premium",
+        "reasoning": "The quoted total premium of $411,000 is Not Acceptable under the guideline rule for Total premium, which lists 'Under $50K or over $175K' as Not Acceptable. The guidelines state, 'If any factor is Not Acceptable, the verdict is DOES_NOT_FIT. The deciding factor is the first Not Acceptable factor in table order (top to bottom).'",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 69,
+          "knockoutFactorIds": [
+            "building_age",
+            "total_premium"
+          ],
+          "decidingFactorId": "total_premium"
+        }
+      }
+    },
+    "SUB-2025-00066": {
+      "caseId": "SUB-2025-00066",
+      "asOf": "2025-05-27",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 34,
+        "knockoutFactorIds": [
+          "building_age",
+          "construction_type",
+          "primary_risk_state",
+          "submission_type",
+          "total_premium"
+        ],
+        "decidingFactorId": "submission_type"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 34,
+        "knockoutFactorIds": [
+          "building_age",
+          "construction_type",
+          "primary_risk_state",
+          "submission_type",
+          "total_premium"
+        ],
+        "decidingFactorId": "submission_type",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "submission_type",
+        "reasoning": "The submission type is Renewal business, which is listed as Not Acceptable in the guideline table. Rule 1 specifies, \"If any factor is Not Acceptable, the verdict is DOES_NOT_FIT. The deciding factor is the first Not Acceptable factor in table order (top to bottom).\"",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 34,
+          "knockoutFactorIds": [
+            "building_age",
+            "construction_type",
+            "primary_risk_state",
+            "submission_type",
+            "total_premium"
+          ],
+          "decidingFactorId": "submission_type"
+        }
+      }
+    },
+    "SUB-2025-00070": {
+      "caseId": "SUB-2025-00070",
+      "asOf": "2025-07-09",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 81,
+        "knockoutFactorIds": [
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 81,
+        "knockoutFactorIds": [
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "total_premium",
+        "reasoning": "The submission's quoted total premium of $321,300 falls into the Not Acceptable category defined as 'Under $50K or over $175K'. The guideline specifies that 'If any factor is Not Acceptable, the verdict is DOES_NOT_FIT.' Following table order, total_premium is the first Not Acceptable factor on the submission.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 81,
+          "knockoutFactorIds": [
+            "total_premium"
+          ],
+          "decidingFactorId": "total_premium"
+        }
+      }
+    },
+    "SUB-2025-00074": {
+      "caseId": "SUB-2025-00074",
+      "asOf": "2025-04-29",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 69,
+        "knockoutFactorIds": [
+          "primary_risk_state"
+        ],
+        "decidingFactorId": "primary_risk_state"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 69,
+        "knockoutFactorIds": [
+          "primary_risk_state"
+        ],
+        "decidingFactorId": "primary_risk_state",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "primary_risk_state",
+        "reasoning": "The submission's primary risk state is NJ, which falls under \"All other states\" and is designated as Not Acceptable in the guideline row \"Primary risk state | OH, PA, MD, CO, CA, FL, NC, SC, GA, VA, UT | OH, PA, MD, CO, CA, FL | All other states\". Rule 1 states, \"If any factor is Not Acceptable, the verdict is DOES_NOT_FIT,\" making primary_risk_state the first Not Acceptable factor in table order.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 69,
+          "knockoutFactorIds": [
+            "primary_risk_state"
+          ],
+          "decidingFactorId": "primary_risk_state"
+        }
+      }
+    },
+    "SUB-2025-00077": {
+      "caseId": "SUB-2025-00077",
+      "asOf": "2025-04-12",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 53.99999999999999,
+        "knockoutFactorIds": [
+          "primary_risk_state",
+          "submission_type",
+          "total_premium"
+        ],
+        "decidingFactorId": "submission_type"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 53.99999999999999,
+        "knockoutFactorIds": [
+          "primary_risk_state",
+          "submission_type",
+          "total_premium"
+        ],
+        "decidingFactorId": "submission_type",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "submission_type",
+        "reasoning": "The submission type is Renewal business, which is listed as Not Acceptable in the guideline table under Submission type (\"Renewal business\"). Rule 1 states, \"If any factor is Not Acceptable, the verdict is DOES_NOT_FIT.\" As Submission type is the first Not Acceptable factor in table order, it is the deciding factor.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 53.99999999999999,
+          "knockoutFactorIds": [
+            "primary_risk_state",
+            "submission_type",
+            "total_premium"
+          ],
+          "decidingFactorId": "submission_type"
+        }
+      }
+    },
+    "SUB-2025-00083": {
+      "caseId": "SUB-2025-00083",
+      "asOf": "2025-04-25",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 69,
+        "knockoutFactorIds": [
+          "building_age",
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 69,
+        "knockoutFactorIds": [
+          "building_age",
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "total_premium",
+        "reasoning": "The total premium of $266,700 falls into the Not Acceptable range defined by the guideline as 'Under $50K or over $175K'. Per rule 1, 'If any factor is Not Acceptable, the verdict is DOES_NOT_FIT. The deciding factor is the first Not Acceptable factor in table order (top to bottom).' Total premium is the first Not Acceptable factor encountered in table order.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 69,
+          "knockoutFactorIds": [
+            "building_age",
+            "total_premium"
+          ],
+          "decidingFactorId": "total_premium"
+        }
+      }
+    },
+    "SUB-2025-00091": {
+      "caseId": "SUB-2025-00091",
+      "asOf": "2025-08-04",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 64.99999999999999,
+        "knockoutFactorIds": [
+          "building_age",
+          "submission_type",
+          "total_premium"
+        ],
+        "decidingFactorId": "submission_type"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 64.99999999999999,
+        "knockoutFactorIds": [
+          "building_age",
+          "submission_type",
+          "total_premium"
+        ],
+        "decidingFactorId": "submission_type",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "submission_type",
+        "reasoning": "The submission type is Renewal business, which is listed as Not Acceptable in the guidelines table. Rule 1 dictates that 'If any factor is Not Acceptable, the verdict is DOES_NOT_FIT' and 'The deciding factor is the first Not Acceptable factor in table order (top to bottom).'",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 64.99999999999999,
+          "knockoutFactorIds": [
+            "building_age",
+            "submission_type",
+            "total_premium"
+          ],
+          "decidingFactorId": "submission_type"
+        }
+      }
+    },
+    "SUB-2025-00092": {
+      "caseId": "SUB-2025-00092",
+      "asOf": "2025-09-05",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 60,
+        "knockoutFactorIds": [
+          "building_age",
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 60,
+        "knockoutFactorIds": [
+          "building_age",
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "primary_risk_state",
+        "reasoning": "The primary risk state for this submission is NJ, which falls under 'All other states' and is listed as Not Acceptable. The guideline states for Primary risk state: 'Acceptable: OH, PA, MD, CO, CA, FL, NC, SC, GA, VA, UT | Not Acceptable: All other states'. According to Rule 1, if any factor is Not Acceptable, the verdict is DOES_NOT_FIT with the deciding factor being the first Not Acceptable factor in table order.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 60,
+          "knockoutFactorIds": [
+            "building_age",
+            "primary_risk_state",
+            "total_premium"
+          ],
+          "decidingFactorId": "primary_risk_state"
+        }
+      }
+    },
+    "SUB-2025-00115": {
+      "caseId": "SUB-2025-00115",
+      "asOf": "2025-08-15",
+      "engine": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business"
+      },
+      "naive": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "REFER",
+        "decidingFactor": "line_of_business",
+        "reasoning": "Because multiple factors are missing, the verdict is REFER per rule 2: \"Otherwise, if the fact for any factor is unknown, the verdict is REFER (missing information).\" Since Line of Business is the only factor with a known fact (\"Property\"), it is selected as the deciding factor. Per the guidelines, \"the deciding factor is the weakest factor whose fact is known\" when the verdict is not DOES_NOT_FIT.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "REFER",
+          "appetiteScore": 15,
+          "knockoutFactorIds": [],
+          "decidingFactorId": "line_of_business"
+        }
+      }
+    },
+    "SUB-2025-00126": {
+      "caseId": "SUB-2025-00126",
+      "asOf": "2025-08-02",
+      "engine": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business"
+      },
+      "naive": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "REFER",
+        "decidingFactor": "line_of_business",
+        "reasoning": "According to the guideline's decision rules, 'if the fact for any factor is unknown, the verdict is REFER (missing information).' Because facts for most factors are unknown, the submission is referred. Since the verdict is not DOES_NOT_FIT, line_of_business is selected as the deciding factor because it is the only factor with a known fact.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "REFER",
+          "appetiteScore": 15,
+          "knockoutFactorIds": [],
+          "decidingFactorId": "line_of_business"
+        }
+      }
+    },
+    "SUB-2025-00132": {
+      "caseId": "SUB-2025-00132",
+      "asOf": "2025-08-15",
+      "engine": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business"
+      },
+      "naive": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "REFER",
+        "decidingFactor": "line_of_business",
+        "reasoning": "The verdict is REFER because facts for multiple factors are unknown, adhering to the rule: \"Otherwise, if the fact for any factor is unknown, the verdict is REFER (missing information).\" Because line_of_business is the only factor with a known fact, it is selected as the deciding factor.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "REFER",
+          "appetiteScore": 15,
+          "knockoutFactorIds": [],
+          "decidingFactorId": "line_of_business"
+        }
+      }
+    },
+    "SUB-2025-00134": {
+      "caseId": "SUB-2025-00134",
+      "asOf": "2025-08-31",
+      "engine": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business"
+      },
+      "naive": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "REFER",
+        "decidingFactor": "line_of_business",
+        "reasoning": "The verdict is REFER because facts for several factors are unknown, triggering the guideline rule: \"Otherwise, if the fact for any factor is unknown, the verdict is REFER (missing information).\" Since Line of business is the only factor with a known fact, it is selected as the deciding factor per the rule: \"When the verdict is not DOES_NOT_FIT, the deciding factor is the weakest factor whose fact is known\".",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "REFER",
+          "appetiteScore": 15,
+          "knockoutFactorIds": [],
+          "decidingFactorId": "line_of_business"
+        }
+      }
+    },
+    "SUB-2025-00138": {
+      "caseId": "SUB-2025-00138",
+      "asOf": "2025-08-19",
+      "engine": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business"
+      },
+      "naive": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "REFER",
+        "decidingFactor": "line_of_business",
+        "reasoning": "Because facts for several factors are unknown, the submission receives a verdict of REFER under rule 2: 'Otherwise, if the fact for any factor is unknown, the verdict is REFER (missing information).' Line of business is the only factor with a known fact, making it the deciding factor per the guideline rule specifying 'the weakest factor whose fact is known'.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "REFER",
+          "appetiteScore": 15,
+          "knockoutFactorIds": [],
+          "decidingFactorId": "line_of_business"
+        }
+      }
+    },
+    "SUB-2025-00143": {
+      "caseId": "SUB-2025-00143",
+      "asOf": "2025-08-19",
+      "engine": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business"
+      },
+      "naive": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "REFER",
+        "decidingFactor": "line_of_business",
+        "reasoning": "The verdict is REFER because multiple factors have unknown facts, triggering the guideline rule: \"Otherwise, if the fact for any factor is unknown, the verdict is REFER (missing information).\" Since line_of_business is the only factor with a known fact, it is selected per the rule: \"When the verdict is not DOES_NOT_FIT, the deciding factor is the weakest factor whose fact is known\".",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "REFER",
+          "appetiteScore": 15,
+          "knockoutFactorIds": [],
+          "decidingFactorId": "line_of_business"
+        }
+      }
+    },
+    "SUB-2026-00007": {
+      "caseId": "SUB-2026-00007",
+      "asOf": "2026-01-04",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 70,
+        "knockoutFactorIds": [
+          "construction_type",
+          "submission_type"
+        ],
+        "decidingFactorId": "submission_type"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 70,
+        "knockoutFactorIds": [
+          "construction_type",
+          "submission_type"
+        ],
+        "decidingFactorId": "submission_type",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "submission_type",
+        "reasoning": "The submission type is Renewal business, which is listed as Not Acceptable under the guideline table (\"Submission type | New business | (blank) | Renewal business\"). Rule 1 specifies that \"if any factor is Not Acceptable, the verdict is DOES_NOT_FIT\" with the deciding factor being the first Not Acceptable factor in table order.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 70,
+          "knockoutFactorIds": [
+            "construction_type",
+            "submission_type"
+          ],
+          "decidingFactorId": "submission_type"
+        }
+      }
+    },
+    "SUB-2026-00014": {
+      "caseId": "SUB-2026-00014",
+      "asOf": "2025-10-22",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 75,
+        "knockoutFactorIds": [
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 75,
+        "knockoutFactorIds": [
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "total_premium",
+        "reasoning": "The quoted total premium of $703,500 is Not Acceptable according to the guideline, which lists \"Under $50K or over $175K\" as Not Acceptable for Total premium. Guideline rule 1 states, \"If any factor is Not Acceptable, the verdict is DOES_NOT_FIT.\" As the first Not Acceptable factor in table order, total_premium is the deciding factor.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 75,
+          "knockoutFactorIds": [
+            "total_premium"
+          ],
+          "decidingFactorId": "total_premium"
+        }
+      }
+    },
+    "SUB-2026-00025": {
+      "caseId": "SUB-2026-00025",
+      "asOf": "2026-04-22",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 66,
+        "knockoutFactorIds": [
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 66,
+        "knockoutFactorIds": [
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "primary_risk_state",
+        "reasoning": "The primary risk state is IL, which falls under 'All other states' and is listed as Not Acceptable. According to the guideline, 'If any factor is Not Acceptable, the verdict is DOES_NOT_FIT. The deciding factor is the first Not Acceptable factor in table order (top to bottom).'",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 66,
+          "knockoutFactorIds": [
+            "primary_risk_state",
+            "total_premium"
+          ],
+          "decidingFactorId": "primary_risk_state"
+        }
+      }
+    },
+    "SUB-2026-00028": {
+      "caseId": "SUB-2026-00028",
+      "asOf": "2026-04-11",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 71.00000000000001,
+        "knockoutFactorIds": [
+          "construction_type",
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 71.00000000000001,
+        "knockoutFactorIds": [
+          "construction_type",
+          "total_premium"
+        ],
+        "decidingFactorId": "total_premium",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "total_premium",
+        "reasoning": "The submission's total premium of $177,500 falls into the Not Acceptable category of \"Under $50K or over $175K\". Per the guideline, \"If any factor is Not Acceptable, the verdict is DOES_NOT_FIT.\" The first Not Acceptable factor in table order is total_premium.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 71.00000000000001,
+          "knockoutFactorIds": [
+            "construction_type",
+            "total_premium"
+          ],
+          "decidingFactorId": "total_premium"
+        }
+      }
+    },
+    "SUB-2026-00031": {
+      "caseId": "SUB-2026-00031",
+      "asOf": "2025-11-18",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 69,
+        "knockoutFactorIds": [
+          "primary_risk_state",
+          "submission_type"
+        ],
+        "decidingFactorId": "submission_type"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 69,
+        "knockoutFactorIds": [
+          "primary_risk_state",
+          "submission_type"
+        ],
+        "decidingFactorId": "submission_type",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "submission_type",
+        "reasoning": "The submission type is Renewal business, which is listed as Not Acceptable in the guideline table ('Submission type | New business | (blank) | Renewal business'). According to the guidelines, 'If any factor is Not Acceptable, the verdict is DOES_NOT_FIT' and 'The deciding factor is the first Not Acceptable factor in table order (top to bottom).' Since Submission type is the first factor in table order and is Not Acceptable, the submission does not fit.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 69,
+          "knockoutFactorIds": [
+            "primary_risk_state",
+            "submission_type"
+          ],
+          "decidingFactorId": "submission_type"
+        }
+      }
+    },
+    "SUB-2026-00038": {
+      "caseId": "SUB-2026-00038",
+      "asOf": "2026-05-09",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 84,
+        "knockoutFactorIds": [
+          "submission_type"
+        ],
+        "decidingFactorId": "submission_type"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 84,
+        "knockoutFactorIds": [
+          "submission_type"
+        ],
+        "decidingFactorId": "submission_type",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "submission_type",
+        "reasoning": "The submission is for 'Renewal business', which is classified under Submission type as 'Not Acceptable'. The guideline states, 'If any factor is Not Acceptable, the verdict is DOES_NOT_FIT. The deciding factor is the first Not Acceptable factor in table order (top to bottom).'",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 84,
+          "knockoutFactorIds": [
+            "submission_type"
+          ],
+          "decidingFactorId": "submission_type"
+        }
+      }
+    },
+    "SUB-2026-00043": {
+      "caseId": "SUB-2026-00043",
+      "asOf": "2025-10-09",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 68,
+        "knockoutFactorIds": [
+          "building_age",
+          "submission_type"
+        ],
+        "decidingFactorId": "submission_type"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 68,
+        "knockoutFactorIds": [
+          "building_age",
+          "submission_type"
+        ],
+        "decidingFactorId": "submission_type",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "submission_type",
+        "reasoning": "The submission type is Renewal business, which is listed as Not Acceptable in the underwriting guideline table. Rule 1 states, 'If any factor is Not Acceptable, the verdict is DOES_NOT_FIT. The deciding factor is the first Not Acceptable factor in table order (top to bottom).'",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 68,
+          "knockoutFactorIds": [
+            "building_age",
+            "submission_type"
+          ],
+          "decidingFactorId": "submission_type"
+        }
+      }
+    },
+    "SUB-2026-00047": {
+      "caseId": "SUB-2026-00047",
+      "asOf": "2025-11-18",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 50,
+        "knockoutFactorIds": [
+          "construction_type",
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 50,
+        "knockoutFactorIds": [
+          "construction_type",
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "primary_risk_state",
+        "reasoning": "The primary risk state is TN, which falls into 'All other states' and is classified as Not Acceptable by the guideline. Rule 1 states, 'If any factor is Not Acceptable, the verdict is DOES_NOT_FIT. The deciding factor is the first Not Acceptable factor in table order (top to bottom).' As primary_risk_state is the first Not Acceptable factor in table order, it determines the verdict.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 50,
+          "knockoutFactorIds": [
+            "construction_type",
+            "primary_risk_state",
+            "total_premium"
+          ],
+          "decidingFactorId": "primary_risk_state"
+        }
+      }
+    },
+    "SUB-2026-00081": {
+      "caseId": "SUB-2026-00081",
+      "asOf": "2025-12-13",
+      "engine": {
+        "verdict": "FIT",
+        "appetiteScore": 87.99999999999999,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "tiv"
+      },
+      "naive": {
+        "verdict": "FIT",
+        "appetiteScore": 87.99999999999999,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "tiv",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "FIT",
+        "decidingFactor": "tiv",
+        "reasoning": "The submission meets all criteria and contains no referral triggers, resulting in a verdict of FIT. Total Insured Value is the deciding factor as its value of $18,492,000 meets the Acceptable criteria of \"Up to $150M\" rather than the Target range of \"$50M-$100M\", making it one of the weakest factors alongside Total premium, with TIV winning the tie-breaker order.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "FIT",
+          "appetiteScore": 87.99999999999999,
+          "knockoutFactorIds": [],
+          "decidingFactorId": "tiv"
+        }
+      }
+    },
+    "SUB-2026-00098": {
+      "caseId": "SUB-2026-00098",
+      "asOf": "2025-10-07",
+      "engine": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 60,
+        "knockoutFactorIds": [
+          "building_age",
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state"
+      },
+      "naive": {
+        "verdict": "DOES_NOT_FIT",
+        "appetiteScore": 60,
+        "knockoutFactorIds": [
+          "building_age",
+          "primary_risk_state",
+          "total_premium"
+        ],
+        "decidingFactorId": "primary_risk_state",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "DOES_NOT_FIT",
+        "decidingFactor": "primary_risk_state",
+        "reasoning": "The primary risk state for this submission is TN, which falls into 'All other states' and is defined as Not Acceptable under the guideline table. Rule 1 states, 'If any factor is Not Acceptable, the verdict is DOES_NOT_FIT. The deciding factor is the first Not Acceptable factor in table order (top to bottom).' Because primary risk state is the first Not Acceptable factor encountered in table order, the submission does not fit.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "DOES_NOT_FIT",
+          "appetiteScore": 60,
+          "knockoutFactorIds": [
+            "building_age",
+            "primary_risk_state",
+            "total_premium"
+          ],
+          "decidingFactorId": "primary_risk_state"
+        }
+      }
+    },
+    "SUB-2026-00118": {
+      "caseId": "SUB-2026-00118",
+      "asOf": "2025-11-15",
+      "engine": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business"
+      },
+      "naive": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "REFER",
+        "decidingFactor": "line_of_business",
+        "reasoning": "The guideline states, 'Otherwise, if the fact for any factor is unknown, the verdict is REFER (missing information).' Because facts for submission type, primary risk state, TIV, total premium, building age, construction type, and loss value are unknown, the verdict is REFER. Line of business is the only factor whose fact is known, making it the deciding factor.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "REFER",
+          "appetiteScore": 15,
+          "knockoutFactorIds": [],
+          "decidingFactorId": "line_of_business"
+        }
+      }
+    },
+    "SUB-2026-00131": {
+      "caseId": "SUB-2026-00131",
+      "asOf": "2025-10-31",
+      "engine": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business"
+      },
+      "naive": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "REFER",
+        "decidingFactor": "line_of_business",
+        "reasoning": "Because multiple factors are missing information, the submission is referred under the rule stating that 'if the fact for any factor is unknown, the verdict is REFER (missing information).' Since line_of_business is the only factor whose fact is known, it is selected as the deciding factor. Line of business meets the Acceptable criteria for Property.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "REFER",
+          "appetiteScore": 15,
+          "knockoutFactorIds": [],
+          "decidingFactorId": "line_of_business"
+        }
+      }
+    },
+    "SUB-2026-00133": {
+      "caseId": "SUB-2026-00133",
+      "asOf": "2025-12-14",
+      "engine": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business"
+      },
+      "naive": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "REFER",
+        "decidingFactor": "line_of_business",
+        "reasoning": "The submission is referred because multiple factor facts are missing, following the rule: \"Otherwise, if the fact for any factor is unknown, the verdict is REFER (missing information).\" Since line of business is the only factor with a known fact (Property), it is chosen as the deciding factor per the rule: \"When the verdict is not DOES_NOT_FIT, the deciding factor is the weakest factor whose fact is known\". Line of business meets the guideline's Acceptable criteria.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "REFER",
+          "appetiteScore": 15,
+          "knockoutFactorIds": [],
+          "decidingFactorId": "line_of_business"
+        }
+      }
+    },
+    "SUB-2026-00141": {
+      "caseId": "SUB-2026-00141",
+      "asOf": "2025-11-25",
+      "engine": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business"
+      },
+      "naive": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "REFER",
+        "decidingFactor": "line_of_business",
+        "reasoning": "Several required factors such as submission_type, primary_risk_state, and TIV are unknown, so the submission is referred per the rule: \"Otherwise, if the fact for any factor is unknown, the verdict is REFER (missing information).\" Since line_of_business is the only factor with a known fact, it is selected as the deciding factor.",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "REFER",
+          "appetiteScore": 15,
+          "knockoutFactorIds": [],
+          "decidingFactorId": "line_of_business"
+        }
+      }
+    },
+    "SUB-2026-00147": {
+      "caseId": "SUB-2026-00147",
+      "asOf": "2025-10-01",
+      "engine": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business"
+      },
+      "naive": {
+        "verdict": "REFER",
+        "appetiteScore": 15,
+        "knockoutFactorIds": [],
+        "decidingFactorId": "line_of_business",
+        "agrees": {
+          "verdict": true,
+          "appetiteScore": true,
+          "knockouts": true,
+          "decidingFactor": true,
+          "all": true
+        }
+      },
+      "secondOpinion": {
+        "verdict": "REFER",
+        "decidingFactor": "line_of_business",
+        "reasoning": "The submission receives a verdict of REFER because multiple required facts are missing, applying the rule: \"Otherwise, if the fact for any factor is unknown, the verdict is REFER (missing information).\" Line of business is the only factor with a known fact, making it the deciding factor as \"the deciding factor is the weakest factor whose fact is known\".",
+        "agreed": true,
+        "decidingFactorAgreed": true,
+        "engine": {
+          "verdict": "REFER",
+          "appetiteScore": 15,
+          "knockoutFactorIds": [],
+          "decidingFactorId": "line_of_business"
+        }
+      }
+    }
+  }
+}

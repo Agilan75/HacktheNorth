@@ -1,0 +1,188 @@
+{
+  "propertyCasesRun": 10000000,
+  "differentialCasesRun": 10000000,
+  "disagreements": 0,
+  "llmCasesRun": 1332,
+  "llmAgreementRate": 0.9992492492492493,
+  "llmAgreementCi95": [
+    0.9957596698938925,
+    0.9998674617628701
+  ],
+  "extractionFieldAccuracy": null,
+  "generatedAt": "2026-09-19T16:38:04.459Z",
+  "startedAt": "2026-09-19T15:52:09.876Z",
+  "requested": 10000000,
+  "seed": 20260919,
+  "invariantViolations": 0,
+  "errors": 0,
+  "casesPerSecond": 3630.500562341317,
+  "layerC": {
+    "total": 1332,
+    "agreed": 1331,
+    "agreement": {
+      "point": 0.9992492492492493,
+      "low": 0.9957596698938925,
+      "high": 0.9998674617628701,
+      "n": 1332,
+      "confidence": 0.95
+    },
+    "byStratum": [
+      {
+        "stratum": "real_property",
+        "total": 38,
+        "agreed": 38
+      },
+      {
+        "stratum": "contradiction_open",
+        "total": 40,
+        "agreed": 40
+      },
+      {
+        "stratum": "state_tie_break",
+        "total": 60,
+        "agreed": 60
+      },
+      {
+        "stratum": "construction_fire_resistive_decides",
+        "total": 80,
+        "agreed": 80
+      },
+      {
+        "stratum": "age_refer_unknown_tiv_pre1990",
+        "total": 60,
+        "agreed": 60
+      },
+      {
+        "stratum": "age_pre1990_exact_half",
+        "total": 80,
+        "agreed": 80
+      },
+      {
+        "stratum": "age_pre1990_just_over_half",
+        "total": 60,
+        "agreed": 60
+      },
+      {
+        "stratum": "age_post2010_exact_half",
+        "total": 60,
+        "agreed": 60
+      },
+      {
+        "stratum": "construction_exact_half",
+        "total": 80,
+        "agreed": 79
+      },
+      {
+        "stratum": "construction_just_under_half",
+        "total": 60,
+        "agreed": 60
+      },
+      {
+        "stratum": "tiv_at_150m",
+        "total": 70,
+        "agreed": 70
+      },
+      {
+        "stratum": "tiv_just_over_150m",
+        "total": 60,
+        "agreed": 60
+      },
+      {
+        "stratum": "tiv_at_100m",
+        "total": 50,
+        "agreed": 50
+      },
+      {
+        "stratum": "tiv_at_50m",
+        "total": 50,
+        "agreed": 50
+      },
+      {
+        "stratum": "premium_just_under_50k",
+        "total": 60,
+        "agreed": 60
+      },
+      {
+        "stratum": "premium_at_50k",
+        "total": 60,
+        "agreed": 60
+      },
+      {
+        "stratum": "premium_at_75k",
+        "total": 50,
+        "agreed": 50
+      },
+      {
+        "stratum": "premium_at_100k",
+        "total": 50,
+        "agreed": 50
+      },
+      {
+        "stratum": "premium_at_175k",
+        "total": 60,
+        "agreed": 60
+      },
+      {
+        "stratum": "premium_just_over_175k",
+        "total": 60,
+        "agreed": 60
+      },
+      {
+        "stratum": "loss_at_100k",
+        "total": 70,
+        "agreed": 70
+      },
+      {
+        "stratum": "loss_just_over_100k",
+        "total": 29,
+        "agreed": 29
+      },
+      {
+        "stratum": "loss_zero_known",
+        "total": 5,
+        "agreed": 5
+      },
+      {
+        "stratum": "age_refer_minority_pre1990",
+        "total": 7,
+        "agreed": 7
+      },
+      {
+        "stratum": "state_multi",
+        "total": 9,
+        "agreed": 9
+      },
+      {
+        "stratum": "state_acceptable_tier",
+        "total": 4,
+        "agreed": 4
+      },
+      {
+        "stratum": "submission_not_new",
+        "total": 1,
+        "agreed": 1
+      },
+      {
+        "stratum": "line_not_property",
+        "total": 1,
+        "agreed": 1
+      },
+      {
+        "stratum": "missing_component",
+        "total": 5,
+        "agreed": 5
+      },
+      {
+        "stratum": "ordinary",
+        "total": 13,
+        "agreed": 13
+      }
+    ],
+    "disagreementCaseIds": [
+      "V03:947746280:34"
+    ]
+  },
+  "layerCUnanswered": 706,
+  "layerCRealCases": 38,
+  "extraction": null
+}

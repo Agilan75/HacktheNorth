@@ -1,0 +1,107 @@
+{
+  "lineOfBusiness": "commercial_property",
+  "version": "1.0.0-fit",
+  "baseRate": 0.3459,
+  "construction": {
+    "Wood Frame": 1.147,
+    "Frame": 1.0732,
+    "Joisted Masonry": 1.0732,
+    "Non-Combustible": 1.0732,
+    "Steel Frame": 0.9728,
+    "Masonry Non-Combustible": 0.9728,
+    "Modified Fire Resistive": 0.9728,
+    "Fire Resistive": 0.9728
+  },
+  "age": [
+    {
+      "key": "built_pre_1950",
+      "upTo": 1949,
+      "factor": 1.2863
+    },
+    {
+      "key": "built_1950_1969",
+      "upTo": 1969,
+      "factor": 1.0798
+    },
+    {
+      "key": "built_1970_1989",
+      "upTo": 1989,
+      "factor": 1.0518
+    },
+    {
+      "key": "built_1990_2009",
+      "upTo": 2009,
+      "factor": 1.0518
+    },
+    {
+      "key": "built_2010_plus",
+      "upTo": null,
+      "factor": 1.005
+    }
+  ],
+  "protectionClass": [
+    {
+      "key": "pc_1_3",
+      "upTo": 3,
+      "factor": 1.0655
+    },
+    {
+      "key": "pc_4_6",
+      "upTo": 6,
+      "factor": 1.1414
+    },
+    {
+      "key": "pc_7_8",
+      "upTo": 8,
+      "factor": 1.1671
+    },
+    {
+      "key": "pc_9",
+      "upTo": 9,
+      "factor": 1.255
+    },
+    {
+      "key": "pc_10",
+      "upTo": null,
+      "factor": 1.255
+    }
+  ],
+  "sprinkler": {
+    "sprinklered": 0.891,
+    "unsprinklered": 0.954
+  },
+  "lossHistory": [
+    {
+      "key": "loss_none",
+      "upTo": 0,
+      "factor": 0.9499
+    },
+    {
+      "key": "loss_to_25k",
+      "upTo": 25000,
+      "factor": 1
+    },
+    {
+      "key": "loss_to_100k",
+      "upTo": 100000,
+      "factor": 1.1
+    },
+    {
+      "key": "loss_to_250k",
+      "upTo": 250000,
+      "factor": 1.25
+    },
+    {
+      "key": "loss_over_250k",
+      "upTo": null,
+      "factor": 1.45
+    }
+  ],
+  "credibilityK": 5,
+  "fitError": {
+    "mape": 0.27605527355342274,
+    "r2": 0.7201815200903101,
+    "n": 27
+  },
+  "fittedAt": "2026-09-19T14:05:01.294Z"
+}

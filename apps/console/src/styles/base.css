@@ -1,0 +1,407 @@
+/*
+ * Base element styles and atom classes (PRD 13). Unit C02.
+ * Paper background, Ink text, Inter body / Fraunces display, 4pt rhythm,
+ * 1px Muted-tint borders, no shadows anywhere, 44px minimum interactive targets.
+ * Every value comes from a --rf-* token in tokens.css.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  box-shadow: none;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--rf-paper);
+  color: var(--rf-ink);
+  font-family: var(--rf-font-body);
+  font-size: var(--rf-size-body);
+  line-height: var(--rf-leading-body);
+  font-weight: var(--rf-weight-regular);
+  -webkit-font-smoothing: antialiased;
+  font-variant-numeric: tabular-nums;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  margin: 0 0 var(--rf-space-md);
+  font-family: var(--rf-font-display);
+  font-weight: var(--rf-weight-semibold);
+  color: var(--rf-ink);
+}
+h1 { font-size: var(--rf-size-display); line-height: var(--rf-leading-display); }
+h2 { font-size: var(--rf-size-title); line-height: var(--rf-leading-title); }
+h3 { font-size: var(--rf-size-heading); line-height: var(--rf-leading-heading); }
+h4 { font-size: var(--rf-size-body); line-height: var(--rf-leading-body); }
+
+p { margin: 0 0 var(--rf-space-md); }
+
+small { font-size: var(--rf-size-small); line-height: var(--rf-leading-small); }
+
+a {
+  color: var(--rf-red-deep);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+hr {
+  border: 0;
+  border-top: var(--rf-border-width) solid var(--rf-border-color);
+  margin: var(--rf-space-lg) 0;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+th,
+td {
+  padding: var(--rf-space-sm) var(--rf-space-md);
+  border-bottom: var(--rf-border-width) solid var(--rf-border-color);
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  font-weight: var(--rf-weight-semibold);
+  color: var(--rf-muted-deep);
+}
+tr[data-clickable='true'] {
+  transition: background-color 0.12s ease;
+}
+tr[data-clickable='true']:hover,
+tr[data-clickable='true']:focus-visible {
+  background: var(--rf-muted-tint);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button,
+[role='button'],
+a.rf-button,
+select,
+input:not([type='checkbox']):not([type='radio']) {
+  min-height: var(--rf-min-touch-target);
+}
+
+button,
+[role='button'],
+a.rf-button {
+  min-width: var(--rf-min-touch-target);
+  padding: 0 var(--rf-space-lg);
+  border: var(--rf-border-width) solid var(--rf-ink);
+  border-radius: var(--rf-radius-pill);
+  background: var(--rf-paper);
+  cursor: pointer;
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+button:disabled {
+  cursor: not-allowed;
+  color: var(--rf-muted-deep);
+  border-color: var(--rf-muted-tint);
+}
+button:not(:disabled):hover,
+a.rf-button:hover {
+  background: var(--rf-muted-tint);
+}
+
+/* Primary CTA (Approve, Extract fields): the one accent-filled button on a
+   page, reserved for the action the underwriter is most likely to take next.
+   Blue, not Red, so it never reads as a verdict (PRD 13). */
+.rf-button--primary {
+  border-color: var(--rf-blue-deep);
+  background: var(--rf-blue);
+  color: var(--rf-paper);
+}
+.rf-button--primary:not(:disabled):hover {
+  background: var(--rf-blue-deep);
+}
+.rf-button--primary:disabled {
+  background: var(--rf-paper);
+}
+
+input,
+select,
+textarea {
+  padding: var(--rf-space-sm) var(--rf-space-md);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-space-sm);
+  background: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--rf-ink);
+  outline-offset: 2px;
+}
+
+/*
+ * Visually hidden, read by screen readers. The standard 1px clip pattern; the
+ * max-width/max-height pin the box so it never widens the page. Put it on a
+ * block or inline element, never on a <table> (a table cannot shrink below its
+ * content), and give every horizontal scroll box position: relative so an
+ * absolutely placed sr-only span inside it is clipped with the rest.
+ */
+.rf-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  max-width: 1px !important;
+  max-height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* --------------------------------------------------------------- Nav */
+
+.rf-nav-link {
+  transition: background-color 0.12s ease;
+}
+.rf-nav-link:hover {
+  background: var(--rf-muted-tint);
+}
+
+/* ------------------------------------------------------------ Card */
+
+.rf-card {
+  background: var(--rf-paper);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+  padding: var(--rf-space-xl);
+  box-shadow: var(--rf-shadow-none);
+  scroll-margin-top: var(--rf-space-xl);
+}
+.rf-card__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--rf-space-md);
+  margin-bottom: var(--rf-space-lg);
+}
+.rf-card__title {
+  margin: 0;
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-heading);
+  line-height: var(--rf-leading-heading);
+  font-weight: var(--rf-weight-semibold);
+}
+.rf-card__aside {
+  flex-shrink: 0;
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+  color: var(--rf-muted-deep);
+}
+
+/* ---------------------------------------------------- VerdictPill */
+
+.rf-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rf-space-xs);
+  padding: var(--rf-space-xs) var(--rf-space-md);
+  border: var(--rf-border-width) solid transparent;
+  border-radius: var(--rf-radius-pill);
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+  font-weight: var(--rf-weight-semibold);
+  white-space: nowrap;
+}
+.rf-pill__mark { font-size: var(--rf-size-micro); }
+.rf-pill__detail {
+  font-family: var(--rf-font-body);
+  font-weight: var(--rf-weight-regular);
+}
+.rf-pill--fit {
+  background: var(--rf-red);
+  border-color: var(--rf-red);
+  color: var(--rf-paper);
+}
+.rf-pill--refer {
+  background: transparent;
+  border-color: var(--rf-red);
+  color: var(--rf-red-deep);
+}
+.rf-pill--does-not-fit {
+  background: var(--rf-ink);
+  border-color: var(--rf-ink);
+  color: var(--rf-paper);
+}
+
+/* ---------------------------------------------------------- Badge */
+
+.rf-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--rf-space-sm);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-pill);
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+  font-weight: var(--rf-weight-medium);
+  white-space: nowrap;
+}
+.rf-badge--neutral { background: var(--rf-muted-tint); color: var(--rf-ink); }
+.rf-badge--attention {
+  background: var(--rf-red-tint);
+  border-color: var(--rf-red-tint);
+  color: var(--rf-red-deep);
+}
+.rf-badge--quiet { background: transparent; color: var(--rf-muted-deep); }
+.rf-badge--positive {
+  background: var(--rf-green-tint);
+  border-color: var(--rf-green-tint);
+  color: var(--rf-green-deep);
+}
+.rf-badge--info {
+  background: var(--rf-blue-tint);
+  border-color: var(--rf-blue-tint);
+  color: var(--rf-blue-deep);
+}
+
+/* -------------------------------------------------- CitationQuote */
+
+.rf-citation {
+  margin: 0;
+  padding: var(--rf-space-sm) 0 var(--rf-space-sm) var(--rf-space-md);
+  border-left: 2px solid var(--rf-muted-tint);
+}
+.rf-citation__quote {
+  margin: 0 0 var(--rf-space-xs);
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-body);
+  line-height: var(--rf-leading-body);
+  font-style: italic;
+}
+.rf-citation__source {
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+  color: var(--rf-muted-deep);
+}
+.rf-citation--compact { padding: 0 0 0 var(--rf-space-sm); }
+.rf-citation--compact .rf-citation__quote {
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+
+/* ------------------------------------------------------- Skeleton */
+
+.rf-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-sm);
+}
+.rf-skeleton__line {
+  display: block;
+  height: var(--rf-space-md);
+  border-radius: var(--rf-radius-pill);
+  background: var(--rf-muted-tint);
+  animation: rf-skeleton-pulse 1.4s ease-in-out infinite;
+}
+@keyframes rf-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rf-skeleton__line { animation: none; }
+}
+
+/* ------------------------------------- Layout hardening (phone width) */
+
+/* Page padding: 24px, tightening to 16px on phones. */
+.rf-main { padding: var(--rf-space-xl); }
+
+/* A horizontal scroll box for a wide table: the table scrolls inside it, the page never does. */
+.rf-scroll-x {
+  position: relative;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Flex and grid children default to min-width:auto and would grow to fit a wide table. */
+.rf-card,
+.rf-card__body,
+.rf-card__header,
+.rf-card__title {
+  min-width: 0;
+}
+.rf-card__header { flex-wrap: wrap; }
+.rf-card__aside {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Long unbroken words (paths, ids) break only when they would overflow; never changes desktop layout. */
+body { overflow-wrap: break-word; }
+/* Long unbroken identifiers (rollup.pctTivAcceptableConstruction) wrap instead of widening the page. */
+code { overflow-wrap: anywhere; }
+table code { overflow-wrap: normal; }
+
+input,
+select,
+textarea { max-width: 100%; }
+
+/*
+ * Inline links get 4px of vertical padding so the hit area is at least 24px tall
+ * (WCAG 2.5.8) without changing line height. Buttons and nav links set their own 44px.
+ */
+a { padding-block: 4px; }
+
+/* Submission page: breadcrumb and in-page panel index. */
+.submission-index ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-xs) var(--rf-space-sm);
+  margin: 0 0 var(--rf-space-lg);
+  padding: 0;
+  list-style: none;
+}
+.submission-index a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--rf-min-touch-target);
+  padding: 0 var(--rf-space-md);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-pill);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+  color: var(--rf-ink);
+  text-decoration: none;
+}
+.submission-index a:hover { border-color: var(--rf-muted); text-decoration: underline; }
+
+@media (max-width: 600px) {
+  .rf-main { padding: var(--rf-space-lg); }
+  .rf-card { padding: var(--rf-space-lg); }
+  .rf-pill { white-space: normal; flex-wrap: wrap; }
+  /* 14 stacked 44px chips would push the page body a full screen down; 36px keeps it compact and still well above 24px. */
+  .submission-index a { min-height: 36px; }
+}
+
+a.rf-button {
+  display: inline-flex;
+  align-items: center;
+  color: var(--rf-ink);
+  text-decoration: none;
+}

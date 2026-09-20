@@ -1,0 +1,40 @@
+{
+  "name": "retrofit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Retrofit — one deterministic risk engine serving a commercial-property underwriting console and a tenant quoting phone app.",
+  "engines": {
+    "node": ">=24"
+  },
+  "workspaces": [
+    "packages/engine",
+    "packages/federato",
+    "packages/contracts",
+    "packages/design",
+    "packages/verify",
+    "apps/api",
+    "apps/console",
+    "apps/mobile"
+  ],
+  "scripts": {
+    "dev:api": "node --env-file-if-exists=.env --import tsx --watch apps/api/src/index.ts",
+    "dev:console": "npm run dev --workspace @retrofit/console",
+    "dev:mobile": "npm run start --workspace @retrofit/mobile",
+    "build:console": "npm run build --workspace @retrofit/console",
+    "seed": "node --env-file-if-exists=.env --import tsx apps/api/src/scripts/seed.ts",
+    "federato:snapshot": "node --env-file-if-exists=.env --import tsx packages/federato/src/scripts/snapshot.ts",
+    "rating:fit": "node --env-file-if-exists=.env --import tsx packages/engine/src/scripts/fit.ts",
+    "verify": "node --env-file-if-exists=.env --import tsx packages/verify/src/cli.ts",
+    "verify:llm": "node --env-file-if-exists=.env --import tsx packages/verify/src/cli-llm.ts",
+    "test": "vitest run",
+    "test:live": "RUN_LIVE=1 vitest run",
+    "typecheck": "tsc -b"
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "vitest": "3.2.7"
+  }
+}

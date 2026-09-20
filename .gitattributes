@@ -1,0 +1,13 @@
+# Line endings.
+#
+# `core.autocrlf=true` is the Windows default, and it converts on checkout. That
+# is fine for source, and wrong for the handful of files whose exact bytes are
+# the thing under test: two suites read a file back and compare it to a string
+# the code generates with "\n", so on Windows they compared CRLF against LF and
+# failed for a reason that had nothing to do with the code.
+#
+# Pinned to LF, so those comparisons mean the same thing on every machine.
+
+apps/console/src/styles/tokens.css   text eol=lf
+packages/engine/rating/commercial.json text eol=lf
+packages/engine/rating/tenant.json     text eol=lf

@@ -1,0 +1,9 @@
+# The console build needs the workspace manifests and packages/* sources only.
+docs/
+prototype/
+packages/verify/out/
+**/*.pdf
+apps/api/data/
+**/*.db
+.env
+.env.*
