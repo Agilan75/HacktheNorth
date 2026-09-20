@@ -3,25 +3,31 @@
  * still panning, so a price shows up in about a second instead of after Finish.
  *
  *  - `identifyFrame`: one frame -> the furniture and appliances in it, with the
- *    brand and model when visible. Haiku 4.5, no thinking, one small image.
- *  - `lookupPrice`: one branded item -> a sourced US retail price. Haiku runs one
- *    web search; the dollar figures are read by code from the quoted source
- *    text (citations), filtered against the table price, and the median is
- *    taken. The model never states the number that is used.
+ *    brand and model when visible. Goes through the routed `LlmProvider`, so it
+ *    runs on whichever vision model the API is configured with (Gemini).
+ *  - `lookupPrice`: one branded item -> a sourced US retail price. Needs the
+ *    Anthropic web-search tool; when no Anthropic client is configured, the
+ *    lookup answers at once with the table price and no sources, and the phone
+ *    keeps showing the ballpark. When it runs, the dollar figures are read by
+ *    code from the quoted source text (citations), filtered against the table
+ *    price, and the median is taken. The model never states the number used.
  *
  * The ballpark from `table.ts` is always returned first, so the lookup only
  * ever refines a number the user already sees.
  */
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod';
+import type { LlmProvider, ResponseSchemaNode } from '../llm/types';
 import { PRICE_LABELS, PRICE_TABLE, isPriceLabel, tablePrice } from './table';
 import type { PriceLabel } from './table';
 
-export const IDENTIFY_MODEL = 'claude-haiku-4-5';
 export const LOOKUP_MODEL = 'claude-haiku-4-5';
-const IDENTIFY_TIMEOUT_MS = 8_000;
 const LOOKUP_TIMEOUT_MS = 15_000;
 const MAX_ITEMS_PER_FRAME = 6;
+/** Below this the model is guessing; a guessed sofa is worse than no sofa on a quote. */
+const MIN_IDENTIFY_CONFIDENCE = 0.5;
+/** Labels the model may return. `other` is deliberately absent: unnamed things are dropped, not priced. */
+const IDENTIFY_LABELS = PRICE_LABELS.filter((l) => l !== 'other');
 /** A sourced figure outside [LOW, HIGH] x the table price is an accessory, a part or a typo. */
 const PLAUSIBLE_LOW = 0.15;
 const PLAUSIBLE_HIGH = 8;
@@ -69,46 +75,49 @@ export interface LookupRequest {
 /* Identify                                                                   */
 /* -------------------------------------------------------------------------- */
 
+/** Lenient on purpose: one odd row must not cost the whole frame. Code filters below. */
 const identifyOutput = z.object({
   items: z
     .array(
       z.object({
         label: z.string(),
-        name: z.string(),
-        brand: z.string().nullable(),
-        model: z.string().nullable(),
+        name: z.string().optional().default(''),
+        brand: z.string().nullable().optional().default(null),
+        model: z.string().nullable().optional().default(null),
         confidence: z.number(),
       }),
     )
     .max(20),
 });
+type IdentifyRaw = z.infer<typeof identifyOutput>;
 
-const IDENTIFY_SCHEMA = {
-  type: 'object',
+const IDENTIFY_RESPONSE: ResponseSchemaNode = {
+  type: 'OBJECT',
   properties: {
     items: {
-      type: 'array',
+      type: 'ARRAY',
       items: {
-        type: 'object',
+        type: 'OBJECT',
         properties: {
-          label: { type: 'string', enum: [...PRICE_LABELS] },
-          name: { type: 'string', description: 'Short plain description, under 8 words.' },
-          brand: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-          model: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-          confidence: { type: 'number', description: '0 to 1.' },
+          label: { type: 'STRING', enum: IDENTIFY_LABELS },
+          name: { type: 'STRING', description: 'Short plain description, under 8 words.' },
+          brand: { type: 'STRING', nullable: true },
+          model: { type: 'STRING', nullable: true },
+          confidence: { type: 'NUMBER', minimum: 0, maximum: 1 },
         },
         required: ['label', 'name', 'brand', 'model', 'confidence'],
-        additionalProperties: false,
+        propertyOrdering: ['label', 'name', 'brand', 'model', 'confidence'],
       },
     },
   },
   required: ['items'],
-  additionalProperties: false,
-} as const;
+  propertyOrdering: ['items'],
+};
 
 const IDENTIFY_SYSTEM =
   'You list the furniture, appliances and electronics clearly visible in one photo of a room. ' +
   'Skip walls, fixtures, small clutter and anything cut off so badly it cannot be named. ' +
+  'If something does not fit one of the allowed labels, leave it out entirely; never force a label. ' +
   `At most ${MAX_ITEMS_PER_FRAME} items, largest or most valuable first. ` +
   'Give a brand or model only when it is readable or unmistakable from the design (a logo, a badge, an iconic shape); otherwise null. ' +
   'Never guess a price.';
@@ -122,35 +131,26 @@ export function itemKey(label: PriceLabel, brand: string | null, model: string |
   return [label, norm(brand), norm(model)].join('|');
 }
 
-export async function identifyFrame(client: PricingClient, imageBase64: string): Promise<readonly IdentifiedItem[]> {
-  const response = await client.messages.create(
-    {
-      model: IDENTIFY_MODEL,
-      max_tokens: 800,
-      temperature: 0,
-      system: IDENTIFY_SYSTEM,
-      output_config: { format: { type: 'json_schema', schema: IDENTIFY_SCHEMA } },
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64 } },
-            { type: 'text', text: 'List the items.' },
-          ],
-        },
-      ],
-    },
-    { timeout: IDENTIFY_TIMEOUT_MS, maxRetries: 0 },
-  );
-  if (response.stop_reason === 'refusal') return [];
-  const text = response.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('');
-  const parsed = identifyOutput.safeParse(JSON.parse(text));
-  if (!parsed.success) return [];
+export async function identifyFrame(llm: LlmProvider, imageBase64: string): Promise<readonly IdentifiedItem[]> {
+  const result = await llm.generateJson<IdentifyRaw>({
+    callName: 'identify',
+    prompt: 'List the items.',
+    parts: [{ kind: 'image', mimeType: 'image/jpeg', dataBase64: imageBase64 }],
+    schema: { zod: identifyOutput as unknown as z.ZodType<IdentifyRaw>, response: IDENTIFY_RESPONSE },
+    systemInstruction: IDENTIFY_SYSTEM,
+    temperature: 0,
+  });
+  if (result.degraded) return [];
 
   const out: IdentifiedItem[] = [];
   const seen = new Set<string>();
-  for (const raw of parsed.data.items) {
-    const label: PriceLabel = isPriceLabel(raw.label) ? raw.label : 'other';
+  for (const raw of result.data.items) {
+    // Anything the model could not name with a real label, or was not sure of,
+    // is dropped: it would otherwise show as a "$100 other item" on the quote.
+    if (!isPriceLabel(raw.label) || raw.label === 'other') continue;
+    const confidence = Math.min(1, Math.max(0, raw.confidence));
+    if (confidence < MIN_IDENTIFY_CONFIDENCE) continue;
+    const label: PriceLabel = raw.label;
     const brand = raw.brand?.trim() || null;
     const model = raw.model?.trim() || null;
     const key = itemKey(label, brand, model);
@@ -161,7 +161,7 @@ export async function identifyFrame(client: PricingClient, imageBase64: string):
       name: raw.name.trim().slice(0, 80) || PRICE_TABLE[label].name,
       brand,
       model,
-      confidence: Math.min(1, Math.max(0, raw.confidence)),
+      confidence,
       tablePrice: tablePrice(label),
       key,
     });
@@ -226,16 +226,25 @@ export interface Pricer {
   lookup(req: LookupRequest): Promise<LookupResult>;
 }
 
+export interface PricerDeps {
+  /** Identifies items in a frame. The routed provider: Gemini unless another vision model is configured. */
+  readonly llm: LlmProvider;
+  /** Sourced price lookups need Anthropic's web search. Absent, lookups return the table price. */
+  readonly anthropic?: PricingClient;
+}
+
 /**
  * The service the route uses. Lookups are cached per item key and shared while
  * in flight, so the same TV seen in five frames costs one search.
  */
-export function createPricer(client: PricingClient, nowMs: () => number): Pricer {
+export function createPricer(deps: PricerDeps, nowMs: () => number): Pricer {
   const cache = new Map<string, CacheEntry>();
+  const { llm, anthropic } = deps;
 
   async function search(req: LookupRequest, key: string): Promise<LookupResult> {
     const table = tablePrice(req.label);
-    const response = await client.messages.create(
+    if (anthropic === undefined) return { key, price: null, tablePrice: table, sources: [], cached: false };
+    const response = await anthropic.messages.create(
       {
         model: LOOKUP_MODEL,
         max_tokens: 1024,
@@ -275,7 +284,7 @@ export function createPricer(client: PricingClient, nowMs: () => number): Pricer
   }
 
   return {
-    identify: (imageBase64) => identifyFrame(client, imageBase64),
+    identify: (imageBase64) => identifyFrame(llm, imageBase64),
     lookup(req) {
       const key = itemKey(req.label, req.brand, req.model);
       const hit = cache.get(key);

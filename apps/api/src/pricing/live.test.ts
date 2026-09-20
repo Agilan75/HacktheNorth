@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import type { ApiEnv } from '../app';
+import { createFakeLlm } from '../llm/fake-provider';
 import { createPriceRoutes } from '../routes/price';
 import { createPricer, dollarsIn, itemKey, priceFromSources } from './live';
 import type { PricingClient } from './live';
@@ -46,25 +47,34 @@ describe('priceFromSources', () => {
 });
 
 describe('identify', () => {
-  it('maps unknown labels to other, dedupes, and attaches the table price', async () => {
-    const { client, calls } = fakeClient(() => [
-      text(
-        JSON.stringify({
+  it('drops unknown, "other" and low-confidence items, dedupes, and attaches the table price', async () => {
+    const llm = createFakeLlm({
+      overrides: {
+        identify: {
           items: [
             { label: 'tv', name: 'wall TV', brand: 'Samsung', model: 'QN65Q80C', confidence: 0.9 },
             { label: 'tv', name: 'same TV', brand: 'samsung', model: 'QN65Q80C', confidence: 0.8 },
-            { label: 'spaceship', name: 'odd thing', brand: null, model: null, confidence: 0.4 },
+            { label: 'spaceship', name: 'odd thing', brand: null, model: null, confidence: 0.9 },
+            { label: 'other', name: 'some object', brand: null, model: null, confidence: 0.9 },
+            { label: 'sofa', name: 'maybe a sofa', brand: null, model: null, confidence: 0.3 },
+            { label: 'lamp', name: 'floor lamp', brand: null, model: null, confidence: 0.6 },
           ],
-        }),
-      ),
-    ]);
-    const items = await createPricer(client, () => 0).identify('x'.repeat(200));
+        },
+      },
+    });
+    const items = await createPricer({ llm }, () => 0).identify('x'.repeat(200));
     expect(items.map((i) => [i.label, i.tablePrice])).toEqual([
       ['tv', 600],
-      ['other', 100],
+      ['lamp', 80],
     ]);
     expect(items[0]!.key).toBe(itemKey('tv', 'Samsung', 'QN65Q80C'));
-    expect(calls[0]!.model).toBe('claude-haiku-4-5');
+    const call = llm.callsFor('identify')[0]!;
+    expect(call.partKinds).toEqual(['image']);
+  });
+
+  it('returns nothing when the provider degraded to its default', async () => {
+    const llm = createFakeLlm({ overrides: { identify: { items: [] } }, degraded: true });
+    expect(await createPricer({ llm }, () => 0).identify('x'.repeat(200))).toEqual([]);
   });
 });
 
@@ -77,7 +87,7 @@ describe('lookup', () => {
         { url: 'https://shop-b.example/tv', quote: 'Sale price $999.99. Wall mount $39.99' },
       ]),
     ]);
-    const pricer = createPricer(client, () => 0);
+    const pricer = createPricer({ llm: createFakeLlm(), anthropic: client }, () => 0);
     const req = { label: 'tv' as const, name: 'wall TV', brand: 'Samsung', model: 'QN65Q80C' };
     const first = await pricer.lookup(req);
     expect(first.price).toBe(1049);
@@ -86,13 +96,19 @@ describe('lookup', () => {
     expect(second.cached).toBe(true);
     expect(calls).toHaveLength(1);
   });
+
+  it('answers with the table price and no sources when there is no Anthropic client', async () => {
+    const pricer = createPricer({ llm: createFakeLlm() }, () => 0);
+    const out = await pricer.lookup({ label: 'tv', name: 'wall TV', brand: 'Samsung', model: 'QN65Q80C' });
+    expect(out).toMatchObject({ price: null, tablePrice: 600, sources: [] });
+  });
 });
 
 describe('routes', () => {
   it('validates and serves identify', async () => {
-    const { client } = fakeClient(() => [text(JSON.stringify({ items: [] }))]);
+    const llm = createFakeLlm({ overrides: { identify: { items: [] } } });
     const app = new Hono<ApiEnv>();
-    createPriceRoutes(createPricer(client, () => 0))(app, {} as never);
+    createPriceRoutes(createPricer({ llm }, () => 0))(app, { llm } as never);
     const bad = await app.request('/price/identify', { method: 'POST', body: '{}', headers: { 'content-type': 'application/json' } });
     expect(bad.status).toBe(422);
     const ok = await app.request('/price/identify', {
