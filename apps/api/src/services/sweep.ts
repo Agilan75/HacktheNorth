@@ -787,6 +787,12 @@ async function runQualityGate(deps: Deps, row: SweepRow): Promise<SweepRow> {
   const frames: SweepFrameDto[] = [];
   const quality: (number | null)[] = [];
   let previous: ImageMetrics | undefined;
+  /**
+   * The best frame that decoded but graded under the bar, with its bytes. A
+   * short or hand-held sweep can score every frame low; rather than strand the
+   * scan, the best of them is reinstated below and the sweep carries on.
+   */
+  let fallback: { at: number; bytes: Uint8Array; quality: number } | null = null;
 
   for (const frame of row.frames) {
     if (frame.imageRef === null) {
@@ -808,6 +814,9 @@ async function runQualityGate(deps: Deps, row: SweepRow): Promise<SweepRow> {
     previous = metrics;
     quality.push(verdict.quality);
     if (!verdict.pass) {
+      if (fallback === null || verdict.quality > fallback.quality) {
+        fallback = { at: frames.length, bytes, quality: verdict.quality };
+      }
       frames.push({
         ...frame,
         quality: verdict.quality,
@@ -825,6 +834,23 @@ async function runQualityGate(deps: Deps, row: SweepRow): Promise<SweepRow> {
       dropReason: null,
       imageRef: `data:image/jpeg;base64,${stored}`,
     });
+  }
+
+  // Nothing cleared the bar: reinstate the best frame rather than end the scan
+  // there. A soft photo still reads well enough to observe, and the verdict
+  // carries the note that the room was seen poorly.
+  if (!frames.some((f) => !f.dropped) && fallback !== null) {
+    const at = fallback.at;
+    const weak = frames[at];
+    if (weak !== undefined) {
+      const stored = await normalizeImage(fallback.bytes);
+      frames[at] = {
+        ...weak,
+        dropped: false,
+        dropReason: null,
+        imageRef: `data:image/jpeg;base64,${stored}`,
+      };
+    }
   }
 
   const kept = frames.filter((f) => !f.dropped);
@@ -921,7 +947,12 @@ async function runObserve(deps: Deps, row: SweepRow): Promise<SweepRow> {
     const why = reasons.get(f.index) ?? 'not usable';
     return { ...f, dropped: true, dropReason: `model: ${why}`.slice(0, 200) };
   });
-  const usableFrames = frames.filter((f) => !f.dropped);
+  // The model read none of them. Rather than end the scan there, keep whatever
+  // the quality gate passed: the later stages handle an empty observation set,
+  // and the verdict says plainly that the room was seen poorly.
+  const readable = frames.filter((f) => !f.dropped);
+  const survivors = readable.length > 0 ? frames : row.frames;
+  const usableFrames = survivors.filter((f) => !f.dropped);
   const coverage = sweepCoverage(usableFrames.map((f) => f.bearingDeg), FRAME_FOV_DEG);
 
   if (usableFrames.length === 0) {
@@ -961,7 +992,7 @@ async function runObserve(deps: Deps, row: SweepRow): Promise<SweepRow> {
   }
 
   return update(deps, row.id, {
-    frames,
+    frames: survivors,
     coverage,
     observations: [...sightings, ...markers, ...carried],
     stage: 'observing',

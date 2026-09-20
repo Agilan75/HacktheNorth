@@ -626,6 +626,7 @@ function SendView({
         <Notice tone="info">{send.message}</Notice>
         <Text tone="muted">Photos are held on this phone. Sending resumes by itself.</Text>
         <Button label="Send now" variant="secondary" onPress={onRetryNow} />
+        <Button label="Scan again" variant="secondary" onPress={onScanAgain} />
       </Screen>
     );
   }

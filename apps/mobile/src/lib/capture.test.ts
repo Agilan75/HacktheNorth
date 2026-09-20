@@ -187,31 +187,31 @@ describe('coverage fill', () => {
   });
 });
 
-describe('the 75% threshold', () => {
-  it('26 panels is not enough, 27 is exactly 75%', () => {
-    expect(meetsFinishCoverage(panelsWith(range(0, 26)))).toBe(false);
-    expect(meetsFinishCoverage(panelsWith(range(0, 27)))).toBe(true);
-    expect(coveragePct(panelsWith(range(0, 27)))).toBe(75);
-    expect(coveragePct(panelsWith(range(0, 26)))).toBeCloseTo(72.22, 2);
+describe('the 25% threshold', () => {
+  it('8 panels is not enough, 9 is exactly 25%', () => {
+    expect(meetsFinishCoverage(panelsWith(range(0, 8)))).toBe(false);
+    expect(meetsFinishCoverage(panelsWith(range(0, 9)))).toBe(true);
+    expect(coveragePct(panelsWith(range(0, 9)))).toBe(25);
+    expect(coveragePct(panelsWith(range(0, 8)))).toBeCloseTo(22.22, 2);
   });
 
-  it('finish only works at >= 75% with at least one frame', () => {
+  it('finish only works at >= 25% with at least one frame', () => {
     const base = { ...started(), bearingDeg: 0, startHeadingDeg: 0 };
     const frame = { index: 0, bearingDeg: 0, requestedAtMs: 0, capturedAtMs: 0, ref: null };
-    const at26: CaptureState = { ...base, panels: panelsWith(range(0, 26)), frames: [frame] };
-    const at27: CaptureState = { ...base, panels: panelsWith(range(0, 27)), frames: [frame] };
-    const noFrames: CaptureState = { ...at27, frames: [] };
+    const at8: CaptureState = { ...base, panels: panelsWith(range(0, 8)), frames: [frame] };
+    const at9: CaptureState = { ...base, panels: panelsWith(range(0, 9)), frames: [frame] };
+    const noFrames: CaptureState = { ...at9, frames: [] };
 
-    expect(canFinish(at26)).toBe(false);
-    expect(captureReducer(at26, { type: 'finish' }).phase).toBe('sweeping');
+    expect(canFinish(at8)).toBe(false);
+    expect(captureReducer(at8, { type: 'finish' }).phase).toBe('sweeping');
     expect(canFinish(noFrames)).toBe(false);
-    expect(canFinish(at27)).toBe(true);
-    expect(captureReducer(at27, { type: 'finish' }).phase).toBe('finished');
-    expect(summarize(at27).coveragePctDisplay).toBe(75);
-    expect(summarize(at26).coveragePctDisplay).toBe(72);
+    expect(canFinish(at9)).toBe(true);
+    expect(captureReducer(at9, { type: 'finish' }).phase).toBe('finished');
+    expect(summarize(at9).coveragePctDisplay).toBe(25);
+    expect(summarize(at8).coveragePctDisplay).toBe(22);
   });
 
-  it('a real sweep of 270° reaches Finish; 250° does not', () => {
+  it('a real sweep of 80° reaches Finish; 70° does not', () => {
     const sweep = (degrees: number) => {
       let s = started();
       let t = 0;
@@ -221,11 +221,11 @@ describe('the 75% threshold', () => {
       }
       return s;
     };
-    // 0..250 touches panels 0..25 = 26 panels.
-    expect(summarize(sweep(250)).canFinish).toBe(false);
-    // 0..260 touches panels 0..26 = 27 panels = 75%.
-    const done = sweep(260);
-    expect(summarize(done).coveredPanels).toBe(27);
+    // 0..70 touches panels 0..7 = 8 panels.
+    expect(summarize(sweep(70)).canFinish).toBe(false);
+    // 0..80 touches panels 0..8 = 9 panels = 25%.
+    const done = sweep(80);
+    expect(summarize(done).coveredPanels).toBe(9);
     expect(summarize(done).canFinish).toBe(true);
   });
 });

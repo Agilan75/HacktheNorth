@@ -204,10 +204,12 @@ export default function AnalyzingScreen() {
             : undefined
       }
       footer={
-        failed ? (
+        failed || load.kind === 'error' ? (
           <>
-            <Button label="Scan again" onPress={scanAgain} />
-            <Button label="Upload 3 photos instead" variant="secondary" onPress={scanAgain} />
+            {/* A stopped read is never a dead end: whatever the server did
+                reach is still worth showing, so the quote stays one tap away. */}
+            {sweep !== null ? <Button label="See the quote anyway" onPress={() => goOn(sweep)} /> : null}
+            <Button label="Scan again" variant="secondary" onPress={scanAgain} />
           </>
         ) : undefined
       }

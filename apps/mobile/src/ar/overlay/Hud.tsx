@@ -16,7 +16,7 @@ import { COLORS, MIN_TOUCH_TARGET, RADIUS, SPACE } from '@retrofit/design';
 import { Button, Text } from '@/ui';
 
 /** Coverage at which Finish unlocks. The engine's MIN_COVERAGE_PCT. */
-export const FINISH_COVERAGE_PCT = 75;
+export const FINISH_COVERAGE_PCT = 25;
 
 /** Ink at 72%, so bone text reads over any camera image. Not a second dark. */
 const SCRIM = 'rgba(25, 25, 25, 0.72)';

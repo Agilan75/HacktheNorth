@@ -300,10 +300,10 @@ describe('sweep pipeline', () => {
     expect(sweep.skippedCount).toBe(result.voi.skipped.length);
   });
 
-  it('marks the sweep failed when no frame passes the quality gate, and drops a duplicate frame', async () => {
+  it('reinstates the best frame when none passes the quality gate, and drops a duplicate frame', async () => {
     const deps = depsWith();
     const dark = await blackJpeg();
-    const failed = await createSweep(deps, {
+    const weak = await createSweep(deps, {
       roomLabel: 'Hall',
       termMonths: 4,
       frames: [
@@ -311,12 +311,16 @@ describe('sweep pipeline', () => {
         { bearingDeg: 90, capturedAt: NOW, imageBase64: dark },
       ],
     });
-    const after = await advanceSweep(deps, failed.id);
-    expect(after.stage).toBe('failed');
-    expect(after.error).toMatch(/quality/);
-    expect(after.frames.every((f) => f.dropped && f.imageRef === null)).toBe(true);
-    // A failed sweep does not advance further.
-    expect((await advanceSweep(deps, failed.id)).stage).toBe('failed');
+    // A scan whose frames all grade low is carried on with its best one rather
+    // than stopped: the read is poor, but the room still gets a price.
+    const after = await advanceSweep(deps, weak.id);
+    expect(after.stage).toBe('quality_gate');
+    expect(after.error).toBeNull();
+    const kept = after.frames.filter((f) => !f.dropped);
+    expect(kept).toHaveLength(1);
+    expect(kept[0]!.imageRef).not.toBeNull();
+    // Only the rescued frame survives; the rest keep their drop reason.
+    expect(after.frames.filter((f) => f.dropped).every((f) => f.imageRef === null)).toBe(true);
 
     const same = await frameJpeg(3);
     const dup = await createSweep(deps, {
