@@ -1,5 +1,5 @@
 /**
- * A06 live smoke for `draft-request` and `extract-reply`: one tiny Gemini call
+ * A06 live smoke for `draft-request` and `extract-reply`: one tiny Anthropic call
  * per owned call, only with RUN_LIVE=1 and a key. The offline suites live in
  * `draft-request.test.ts` and `extract-reply.test.ts` (moved at CP1,
  * docs/contracts/requests/A06.md).
@@ -11,7 +11,7 @@ import type {
   ExtractReplyInput,
 } from '@retrofit/contracts';
 import { loadEnv } from '../../env';
-import { createGeminiProvider } from '../gemini';
+import { createClaudeProvider } from '../claude';
 import { draftProblems, draftRequestCall, templateDraft } from './draft-request';
 import { extractReplyCall, quoteInSource } from './extract-reply';
 /* -------------------------------------------------------------------------- */
@@ -60,13 +60,13 @@ const extractInput = (over: Partial<ExtractReplyInput> = {}): ExtractReplyInput 
 /* -------------------------------------------------------------------------- */
 
 const env = loadEnv();
-const LIVE = env.RUN_LIVE === '1' && env.GEMINI_API_KEY !== undefined;
+const LIVE = env.RUN_LIVE === '1' && env.ANTHROPIC_API_KEY !== undefined;
 
-describe.skipIf(!LIVE)('live: A06 Gemini smoke', () => {
+describe.skipIf(!LIVE)('live: A06 Anthropic smoke', () => {
   it(
     'draft-request names the one requested field',
     async () => {
-      const provider = createGeminiProvider({ apiKey: env.GEMINI_API_KEY });
+      const provider = createClaudeProvider({ apiKey: env.ANTHROPIC_API_KEY, workspaceId: env.ANTHROPIC_WORKSPACE_ID });
       const input = draftInput({ contactName: null, brokerName: null, insuredName: null });
       const out = await draftRequestCall(provider, input);
       expect(draftProblems(out, input.fields)).toBeNull();
@@ -78,7 +78,7 @@ describe.skipIf(!LIVE)('live: A06 Gemini smoke', () => {
   it(
     'extract-reply reads one year with a verbatim quote',
     async () => {
-      const provider = createGeminiProvider({ apiKey: env.GEMINI_API_KEY });
+      const provider = createClaudeProvider({ apiKey: env.ANTHROPIC_API_KEY, workspaceId: env.ANTHROPIC_WORKSPACE_ID });
       const out = await extractReplyCall(
         provider,
         extractInput({ sourceText: 'It was built in 1978.', requestedFields: [YEAR] }),

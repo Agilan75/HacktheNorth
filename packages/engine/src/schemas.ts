@@ -216,6 +216,23 @@ export const commercialRatingTableSchema = z.object({
     unsprinklered: z.number().positive(),
   }),
   lossHistory: orderedBands,
+  /**
+   * Optional so a table written before flood existed still loads, and `minimal`
+   * is pinned to exactly 1 rather than merely positive: an account outside the
+   * mapped flood hazard must price exactly as it did before flood existed, so a
+   * table that tried to load a hidden charge onto dry accounts is rejected here
+   * rather than quietly applied.
+   */
+  flood: z
+    .object({
+      minimal: z.literal(1),
+      sfha: z.number().positive(),
+      coastal: z.number().positive(),
+    })
+    .refine((f) => f.coastal >= f.sfha, {
+      message: 'flood: the coastal load must not be cheaper than the inland SFHA load',
+    })
+    .optional(),
   credibilityK: z.number().positive(),
   fitError: fitErrorSchema.optional(),
   fittedAt: z.string().optional(),

@@ -45,6 +45,7 @@ const formStyle: CSSProperties = {
   alignItems: 'flex-end',
   gap: SPACE.md,
   padding: `${SPACE.md}px 0`,
+  borderBottom: `1px solid ${cssVar('muted-tint')}`,
   fontFamily: cssVar('font-body'),
 };
 
@@ -116,7 +117,7 @@ function SelectField({ label, allLabel, value, options, onSelect }: SelectFieldP
   );
 }
 
-/** PRD §10 /queue filters: line, verdict, state, underwriter, plus free-text search. */
+/** Queue filters: line, verdict, state, underwriter, plus free-text search. */
 export function Filters(props: FiltersProps): ReactElement {
   const { value, options, onChange } = props;
   const searchId = useId();

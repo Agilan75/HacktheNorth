@@ -1,0 +1,59 @@
+{
+  "externalId": "SUB-2025-00138",
+  "targetVerdict": "FIT",
+  "rationale": "New-business single-building risk in Tampa, FL (target state) with $52.4M TIV (target band), 2015 sprinklered masonry non-combustible (post-2010, acceptable construction), PC 2 and no losses; the $154,000 quote sits inside the $50k-$175k acceptable band, so every factor is known and none knocks out or refers.",
+  "values": [
+    {
+      "canonicalPath": "submissionType",
+      "value": "new_business"
+    },
+    {
+      "canonicalPath": "locations.*.state",
+      "value": "FL"
+    },
+    {
+      "canonicalPath": "locations.*.city",
+      "value": "Tampa"
+    },
+    {
+      "canonicalPath": "locations.*.postalCode",
+      "value": "33637"
+    },
+    {
+      "canonicalPath": "locations.*.protectionClass",
+      "value": 2
+    },
+    {
+      "canonicalPath": "buildings.*.tiv",
+      "value": 52400000
+    },
+    {
+      "canonicalPath": "buildings.*.yearBuilt",
+      "value": 2015
+    },
+    {
+      "canonicalPath": "buildings.*.constructionType",
+      "value": "masonry_non_combustible"
+    },
+    {
+      "canonicalPath": "buildings.*.sprinklered",
+      "value": true
+    },
+    {
+      "canonicalPath": "buildings.*.stories",
+      "value": 2
+    },
+    {
+      "canonicalPath": "buildings.*.occupancy",
+      "value": "Office and colocation data center (tilt-up concrete, raised-floor server hall)"
+    },
+    {
+      "canonicalPath": "pricing.quotedPremium",
+      "value": 154000
+    },
+    {
+      "canonicalPath": "rollup.fiveYearLoss",
+      "value": 0
+    }
+  ]
+}

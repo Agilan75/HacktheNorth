@@ -1,0 +1,51 @@
+{
+  "externalId": "SUB-2026-00133",
+  "targetVerdict": "REFER",
+  "rationale": "Owned 4-story sprinklered masonry office in Charlotte, NC (acceptable state, PPC 2, built 2008) at $17.2M TIV and a $52.6K quote, so every scored factor clears appetite with no knockout; prior-carrier loss runs are still outstanding, so five-year loss stays unknown, completeness sits below 100% and the engine refers instead of fitting. Quote runs about 9% under the rated premium.",
+  "values": [
+    {
+      "canonicalPath": "submissionType",
+      "value": "new_business"
+    },
+    {
+      "canonicalPath": "locations.*.state",
+      "value": "NC"
+    },
+    {
+      "canonicalPath": "locations.*.city",
+      "value": "Charlotte"
+    },
+    {
+      "canonicalPath": "locations.*.protectionClass",
+      "value": 2
+    },
+    {
+      "canonicalPath": "buildings.*.tiv",
+      "value": 17200000
+    },
+    {
+      "canonicalPath": "buildings.*.yearBuilt",
+      "value": 2008
+    },
+    {
+      "canonicalPath": "buildings.*.constructionType",
+      "value": "masonry_non_combustible"
+    },
+    {
+      "canonicalPath": "buildings.*.sprinklered",
+      "value": true
+    },
+    {
+      "canonicalPath": "buildings.*.stories",
+      "value": 4
+    },
+    {
+      "canonicalPath": "buildings.*.occupancy",
+      "value": "office - professional services (law firm)"
+    },
+    {
+      "canonicalPath": "pricing.quotedPremium",
+      "value": 52600
+    }
+  ]
+}

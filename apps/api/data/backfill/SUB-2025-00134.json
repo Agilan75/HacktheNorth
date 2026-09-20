@@ -1,0 +1,55 @@
+{
+  "externalId": "SUB-2025-00134",
+  "targetVerdict": "DOES_NOT_FIT",
+  "rationale": "The only risk location is Waco, TX, and Texas is neither a target nor an acceptable state, so primary risk state is Not Acceptable and knocks the account out. Every other factor ($31.2M TIV, $118.7K premium, 1998 joisted masonry, $46K loss) would otherwise be within appetite.",
+  "values": [
+    {
+      "canonicalPath": "submissionType",
+      "value": "new_business"
+    },
+    {
+      "canonicalPath": "locations.*.state",
+      "value": "TX"
+    },
+    {
+      "canonicalPath": "locations.*.city",
+      "value": "Waco"
+    },
+    {
+      "canonicalPath": "locations.*.protectionClass",
+      "value": 4
+    },
+    {
+      "canonicalPath": "buildings.*.tiv",
+      "value": 31200000
+    },
+    {
+      "canonicalPath": "buildings.*.yearBuilt",
+      "value": 1998
+    },
+    {
+      "canonicalPath": "buildings.*.constructionType",
+      "value": "joisted_masonry"
+    },
+    {
+      "canonicalPath": "buildings.*.sprinklered",
+      "value": false
+    },
+    {
+      "canonicalPath": "buildings.*.stories",
+      "value": 1
+    },
+    {
+      "canonicalPath": "buildings.*.occupancy",
+      "value": "Discount general merchandise store"
+    },
+    {
+      "canonicalPath": "pricing.quotedPremium",
+      "value": 118700
+    },
+    {
+      "canonicalPath": "rollup.fiveYearLoss",
+      "value": 46000
+    }
+  ]
+}

@@ -32,7 +32,7 @@ describe('startupBanner', () => {
     });
     expect(lines[0]).toBe('Retrofit API v0.1.0 listening on http://localhost:3000');
     expect(lines[1]).toMatch(/snapshot|mock/i);
-    expect(lines[2]).toMatch(/^Gemini: NOT CONFIGURED/);
+    expect(lines[2]).toMatch(/^LLM: NOT CONFIGURED/);
     expect(lines[2]).toContain('seeded sweep');
     expect(lines[3]).toBe('SQLite driver: better-sqlite3');
     expect(lines[4]).toBe('Started 2026-09-19T12:00:00.000Z');
@@ -43,7 +43,7 @@ describe('startupBanner', () => {
     setEnv(
       loadEnv({
         DATABASE_URL: ':memory:',
-        GEMINI_API_KEY: SECRET,
+        ANTHROPIC_API_KEY: SECRET,
         FEDERATO_BASE_URL: 'https://example.invalid',
         FEDERATO_CLIENT_ID: 'id-must-not-print',
         FEDERATO_CLIENT_SECRET: SECRET,
@@ -59,7 +59,7 @@ describe('startupBanner', () => {
     expect(lines[0]).toContain('v9.9.9');
     expect(lines[1]).toMatch(/live/i);
     expect(lines[1]).not.toMatch(/snapshot/i);
-    expect(lines[2]).toBe('Gemini: configured (provider fake)');
+    expect(lines[2]).toBe('LLM: configured (provider fake)');
     const all = lines.join('\n');
     expect(all).not.toContain(SECRET);
     expect(all).not.toContain('id-must-not-print');

@@ -39,3 +39,31 @@ describe('GET /verification', () => {
     expect(res.status).toBe(200);
   });
 });
+
+describe('GET /verification/field and /verification/cases/:index', () => {
+  it('serves the field summary and one byte per case', async () => {
+    const app = createApp({ deps, registrars: [registerVerificationRoutes] });
+    const summary = (await (await app.request('/verification/field')).json()) as { total: number; byVerdict: number[] };
+    expect(summary.byVerdict.reduce((a, b) => a + b, 0)).toBe(summary.total);
+    const res = await app.request('/verification/field/cases');
+    expect(res.status).toBe(200);
+    expect((await res.arrayBuffer()).byteLength).toBe(summary.total);
+    expect((await app.request('/verification/field/nope')).status).toBe(404);
+  });
+
+  it('rebuilds a case whose verdict matches its recorded byte, with the engine and the naive side agreeing', async () => {
+    const app = createApp({ deps, registrars: [registerVerificationRoutes] });
+    const bytes = new Uint8Array(await (await app.request('/verification/field/cases')).arrayBuffer());
+    for (const index of [0, 9, 4382119]) {
+      const res = await app.request(`/verification/cases/${index}`);
+      expect(res.status).toBe(200);
+      const c = (await res.json()) as { index: number; agreed: boolean; engine: { verdict: string }; invariants: { violations: string[] }[] };
+      expect(c.index).toBe(index);
+      expect(c.agreed).toBe(true);
+      expect(['FIT', 'REFER', 'DOES_NOT_FIT'][bytes[index]! & 3]).toBe(c.engine.verdict);
+      expect(c.invariants.every((i) => i.violations.length === 0)).toBe(true);
+    }
+    expect((await app.request('/verification/cases/-1')).status).toBe(404);
+    expect((await app.request('/verification/cases/abc')).status).toBe(404);
+  });
+});

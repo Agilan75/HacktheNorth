@@ -11,6 +11,8 @@ vi.mock('./pages/RulesPage.js', () => ({ RulesPage: () => _jsx("p", { children: 
 vi.mock('./pages/GlossaryPage.js', () => ({ GlossaryPage: () => _jsx("p", { children: "glossary page" }) }));
 vi.mock('./pages/AggregatePage.js', () => ({ AggregatePage: () => _jsx("p", { children: "aggregate page" }) }));
 vi.mock('./pages/VerificationPage.js', () => ({ VerificationPage: () => _jsx("p", { children: "verification page" }) }));
+vi.mock('./pages/HomePage.js', () => ({ HomePage: () => _jsx("p", { children: "home page" }) }));
+vi.mock('./pages/TourPage.js', () => ({ TourPage: () => _jsx("p", { children: "tour page" }) }));
 import { App, NAV_ITEMS, ROUTES } from './App.js';
 afterEach(cleanup);
 describe('App route table', () => {
@@ -23,11 +25,20 @@ describe('App route table', () => {
         expect(nav.getByRole('link', { name: 'Verification' })).toHaveAttribute('aria-current', 'page');
         expect(NAV_ITEMS.map((n) => n.label)).toEqual(['Queue', 'Actions', 'Rules', 'Glossary', 'Aggregate', 'Explore', 'Verification']);
     });
+    it('routes /tour outside the console chrome, and keeps it out of the header nav', () => {
+        render(_jsx(MemoryRouter, { initialEntries: ['/tour'], children: _jsx(App, {}) }));
+        expect(ROUTES.tour).toBe('/tour');
+        expect(screen.getByText('tour page')).toBeInTheDocument();
+        // No Layout: no primary nav, no adapter banner, nothing but the page.
+        expect(screen.queryByRole('navigation', { name: 'Primary' })).toBeNull();
+        expect(screen.queryByText('banner')).toBeNull();
+        expect(NAV_ITEMS.map((n) => n.to)).not.toContain(ROUTES.tour);
+    });
     it('still routes the existing pages', () => {
         render(_jsx(MemoryRouter, { initialEntries: ['/aggregate'], children: _jsx(App, {}) }));
         expect(screen.getByText('aggregate page')).toBeInTheDocument();
     });
-    it('shows a not-found page with a way back for an unknown address, and still redirects / to the queue', () => {
+    it('shows a not-found page with a way back for an unknown address, and routes / to the homepage', () => {
         render(_jsx(MemoryRouter, { initialEntries: ['/s/does-not-exist'], children: _jsx(App, {}) }));
         expect(screen.getByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
         expect(screen.getByText('/s/does-not-exist')).toBeInTheDocument();
@@ -35,7 +46,9 @@ describe('App route table', () => {
         expect(screen.queryByText('queue page')).toBeNull();
         cleanup();
         render(_jsx(MemoryRouter, { initialEntries: ['/'], children: _jsx(App, {}) }));
-        expect(screen.getByText('queue page')).toBeInTheDocument();
+        expect(screen.getByText('home page')).toBeInTheDocument();
+        expect(ROUTES.home).toBe('/');
+        expect(screen.queryByText('queue page')).toBeNull();
     });
 });
 //# sourceMappingURL=App.test.js.map

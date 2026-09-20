@@ -1,4 +1,4 @@
-import { MAX_PAGE_LIMIT, ROUTES, routePath, titleCase, withQuery } from '@retrofit/contracts';
+import { formatPercent, MAX_PAGE_LIMIT, ROUTES, routePath, titleCase, withQuery } from '@retrofit/contracts';
 /* -------------------------------------------------------------------------- */
 /* Transport                                                                  */
 /* -------------------------------------------------------------------------- */
@@ -239,7 +239,8 @@ function pricingView(price) {
     const notes = [];
     notes.push(price.basis === 'fitted' ? 'Rates fitted to the book.' : 'Rates from the rating table.');
     if (price.fitError) {
-        notes.push(`Fit error: MAPE ${price.fitError.mape}, R² ${price.fitError.r2}, n = ${price.fitError.n}.`);
+        const { mape, r2, n } = price.fitError;
+        notes.push(`Fit error: MAPE ${formatPercent(mape, { decimals: 1 })}, R² ${r2.toFixed(3)}, n = ${n}.`);
     }
     if (price.estimate)
         notes.push('Estimate: no loss data behind this number.');
@@ -247,7 +248,7 @@ function pricingView(price) {
         notes.push(`Term: ${price.termMonths} months.`);
     if (price.expectedLossDetail) {
         const d = price.expectedLossDetail;
-        notes.push(`Loss credibility ${d.credibility} (n = ${d.n}, k = ${d.k}).`);
+        notes.push(`Loss credibility ${formatPercent(d.credibility, { decimals: 0 })} (n = ${d.n}, k = ${d.k}).`);
     }
     const view = {
         quotedPremium: price.quotedPremium,
@@ -584,6 +585,12 @@ function aggregateView(dto, queue) {
         const row = byId.get(o.id);
         if (row)
             return row;
+        // R5-12: the queue has no row for this id (e.g. its own fetch failed or
+        // raced this one). `rank`, `qualityIndex` and `verdict` are unknown, not
+        // zero or REFER — those three are unread placeholders the type requires;
+        // `incomplete: true` tells the view not to render them as real values.
+        // `premiumAfter` is the *post-flip* premium and must never stand in for
+        // `predictedPremium` (the current one), which is genuinely unknown here.
         return {
             submissionId: o.id,
             rank: 0,
@@ -594,7 +601,7 @@ function aggregateView(dto, queue) {
             primaryState: null,
             appetiteScore: o.appetiteScore,
             quotedPremium: null,
-            predictedPremium: o.premiumAfter,
+            predictedPremium: null,
             adequacy: null,
             completeness: 0,
             contradictionCount: 0,
@@ -606,6 +613,7 @@ function aggregateView(dto, queue) {
             pendingAction: null,
             explanationLine: o.moveLabel,
             outOfAppetiteLine: false,
+            incomplete: true,
         };
     });
     return {
@@ -730,7 +738,7 @@ export function createApiClient(options) {
         },
         async getRules() {
             const dto = await call('rules');
-            return { rulebooks: dto.rulebooks };
+            return { rulebooks: dto.rulebooks, interpretations: dto.interpretations };
         },
         async getVerification() {
             return call('verification');

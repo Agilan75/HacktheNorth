@@ -204,6 +204,26 @@ function claimsListExpanded(data: unknown): boolean {
 }
 
 /**
+ * A FEMA National Flood Hazard Layer zone code as the ordinal the extension
+ * rulebook and the rating table read. Pure string classification: the codes are
+ * FEMA's published zone designations, and anything unrecognised is treated as
+ * outside the mapped hazard rather than guessed at, because a zone we cannot
+ * read must never silently penalise an account.
+ *
+ *  - 2: V, VE — coastal Special Flood Hazard Area with wave action.
+ *  - 1: A, AE, AO, AH, AR, A99 — SFHA without a wave hazard.
+ *  - 0: X, X500, D and anything else — outside the mapped hazard.
+ */
+export function floodZoneTier(zone: string): number {
+  const code = zone.trim().toUpperCase();
+  if (code === 'V' || code === 'VE') return 2;
+  if (code === 'A' || code === 'AE' || code === 'AO' || code === 'AH' || code === 'AR' || code === 'A99') {
+    return 1;
+  }
+  return 0;
+}
+
+/**
  * `asOf` is an ISO-8601 date. The five-year loss window is
  * (asOf - 5 years, asOf], inclusive of both endpoints as pinned in
  * INTERPRETATIONS.md I-4. The engine never reads the clock.
@@ -326,6 +346,19 @@ export function rollup(submission: CanonicalSubmission, asOf: string): Rollup {
             pcRows.length,
           ) ?? null);
 
+  /* ---- flood zone (component 11) ---------------------------------------- */
+
+  // The worst zone across every location that states one, not a TIV-weighted
+  // mean: one building inside a Special Flood Hazard Area is the exposure, and
+  // averaging it against dry buildings would report the account as safer than
+  // it is. Locations rather than buildings, because that is where the FEMA
+  // enrichment writes and where latitude and longitude live.
+  const floodTiers = submission.locations
+    .map((loc) => pick(loc.floodZone))
+    .filter((zone): zone is string => typeof zone === 'string' && zone.trim() !== '')
+    .map((zone) => floodZoneTier(zone));
+  const worstFloodZoneTier = floodTiers.length === 0 ? null : Math.max(...floodTiers);
+
   /* ---- primary state (I-1) ---------------------------------------------- */
 
   const stateTiv = new Map<string, number>();
@@ -394,6 +427,7 @@ export function rollup(submission: CanonicalSubmission, asOf: string): Rollup {
     pctTivAcceptableConstruction,
     pctTivSprinklered,
     tivWeightedProtectionClass,
+    worstFloodZoneTier,
     primaryState,
     stateShares,
     fiveYearLoss,

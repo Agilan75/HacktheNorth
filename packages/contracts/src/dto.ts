@@ -61,7 +61,16 @@ export interface PageDto {
 export type AdapterKindDto = 'live' | 'mock';
 export type RecommendationDto = 'accept' | 'review' | 'decline' | 'investigate';
 export type RequestTriggerDto = 'missing_data' | 'high_contradiction' | 'one_flip_from_fit';
-export type ActionTypeDto = 'route' | 'request' | 'reply' | 'rescore' | 'log';
+export type ActionTypeDto = 'route' | 'request' | 'reply' | 'rescore' | 'log' | 'decision';
+
+/**
+ * What an underwriter did with the engine's verdict. Recorded **beside** the
+ * verdict and never over it: the engine's answer, its deciding rule and its
+ * score stay exactly as computed, and this says what a person decided to do
+ * about them. A build whose audit trail could be edited by the person being
+ * audited would not be worth auditing.
+ */
+export type DecisionDto = 'accept' | 'decline';
 export type ActionStatusDto = 'draft' | 'approved' | 'sent' | 'replied' | 'applied' | 'failed';
 export type SweepStageDto =
   | 'received'
@@ -222,7 +231,7 @@ export interface HealthDto {
   readonly ok: true;
   readonly version: string;
   readonly adapter: AdapterKindDto;
-  /** False when `GEMINI_API_KEY` is unset: the API still starts (PRD §9.1). */
+  /** False when `ANTHROPIC_API_KEY` is unset: the API still starts (PRD §9.1). */
   readonly llmConfigured: boolean;
   readonly submissionCount: number;
   readonly startedAt: string;
@@ -458,6 +467,12 @@ export interface IngestRequestDto {
   readonly externalIds?: readonly string[];
   /** Re-run even when the external id is already stored. Idempotent otherwise. */
   readonly force?: boolean;
+  /**
+   * Answer with a `runId` at once (202) and keep working in the background,
+   * so a caller can watch the planner through `GET /ingest/runs/:runId`
+   * instead of holding a request open for the whole run.
+   */
+  readonly async?: boolean;
 }
 
 export interface IngestResponseDto {
@@ -471,6 +486,63 @@ export interface IngestResponseDto {
   readonly durationMs: number;
   readonly warnings: readonly string[];
   readonly externalIds: readonly string[];
+}
+
+/**
+ * One planner query, reported the moment it finishes. Every number here is the
+ * real one the trace recorded: nothing is estimated, and a step only appears
+ * once its query has actually come back.
+ */
+export interface IngestRunStepDto {
+  readonly id: string;
+  readonly seq: number;
+  /** `schema`, `triage`, `deep`, `no_policy`, `follow_up`, `adapt_retry`. */
+  readonly pass: string;
+  /** Why this query was run, in the planner's own words. */
+  readonly goal: string;
+  readonly rootResource: string;
+  readonly rowCount: number;
+  readonly totalAvailable: number | null;
+  readonly durationMs: number;
+  readonly outcome: string;
+  readonly adaptation: string;
+  /** The trace id this query replaced, when it is a retry. */
+  readonly adaptedFrom: string | null;
+  readonly error: string | null;
+}
+
+/** `GET /ingest/runs/:runId`. In-memory and process-local; see `ingest-progress.ts`. */
+export interface IngestRunDto {
+  readonly runId: string;
+  readonly startedAt: string;
+  readonly finishedAt: string | null;
+  readonly done: boolean;
+  /** Set when the run threw. `done` is true and `result` stays null. */
+  readonly error: string | null;
+  readonly steps: readonly IngestRunStepDto[];
+  /** The usual ingest summary, once the run has finished. */
+  readonly result: IngestResponseDto | null;
+}
+
+/** The 202 body of `POST /ingest/federato` with `{"async": true}`. */
+export interface IngestStartedDto {
+  readonly runId: string;
+  readonly startedAt: string;
+}
+
+/** `POST /submissions/:id/decision`. */
+export interface DecisionRequestDto {
+  readonly decision: DecisionDto;
+  /** The underwriter's own words. Optional, and stored verbatim. */
+  readonly reason?: string;
+}
+
+export interface DecisionResponseDto {
+  readonly id: string;
+  readonly decision: DecisionDto;
+  /** The engine's verdict at the moment the decision was taken, unchanged. */
+  readonly engineVerdict: Verdict;
+  readonly action: ActionDto;
 }
 
 export interface RunResponseDto {
@@ -519,6 +591,8 @@ export interface ActionDto {
   readonly rankBefore: number | null;
   readonly rankAfter: number | null;
   readonly note: string | null;
+  /** Set only on a `decision` action: what the underwriter chose. */
+  readonly decision?: DecisionDto | null;
   readonly createdAt: string;
 }
 

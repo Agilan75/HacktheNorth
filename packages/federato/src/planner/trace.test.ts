@@ -129,6 +129,45 @@ describe('createTraceRecorder', () => {
     expect(rec.entries()[0]?.payload.where).toEqual({ id: 'a' });
   });
 
+  it('reports each query to onQuery as it finishes, with the finished entry', () => {
+    const c = fakeClock(0);
+    const seen: { id: string; rowCount: number; durationMs: number; outcome: string }[] = [];
+    const rec = createTraceRecorder({
+      adapterKind: 'live',
+      clock: c.clock,
+      now: '2026-09-19T12:00:00.000Z',
+      onQuery: (e) => seen.push({ id: e.id, rowCount: e.rowCount, durationMs: e.durationMs, outcome: e.outcome }),
+    });
+
+    const a = rec.begin({ pass: 'triage', goal: 'g', requiredBy: [], pathChosen: PATH, payload: { resource: 'Submission' } });
+    // Nothing is reported until the query comes back.
+    expect(seen).toEqual([]);
+    c.advance(1851);
+    rec.finish(a, { rowCount: 158, totalAvailable: 158 });
+    const b = rec.begin({ pass: 'deep', goal: 'g', requiredBy: [], pathChosen: PATH, payload: { resource: 'Policy' } });
+    c.advance(4100);
+    rec.finish(b, { rowCount: 0, totalAvailable: 0 });
+
+    expect(seen).toEqual([
+      { id: 'q-000', rowCount: 158, durationMs: 1851, outcome: 'ok' },
+      { id: 'q-001', rowCount: 0, durationMs: 4100, outcome: 'empty' },
+    ]);
+  });
+
+  it('an observer that throws never breaks the run it is observing', () => {
+    const rec = createTraceRecorder({
+      adapterKind: 'mock',
+      clock: () => 0,
+      now: '2026-09-19T12:00:00.000Z',
+      onQuery: () => {
+        throw new Error('the console went away');
+      },
+    });
+    const id = rec.begin({ pass: 'triage', goal: 'g', requiredBy: [], pathChosen: PATH, payload: { resource: 'Submission' } });
+    expect(() => rec.finish(id, { rowCount: 158, totalAvailable: 158 })).not.toThrow();
+    expect(rec.entries()[0]?.rowCount).toBe(158);
+  });
+
   it('rejects unknown ids, double finishes and a bad base stamp', () => {
     const rec = createTraceRecorder({ adapterKind: 'mock', clock: () => 0, now: '2026-09-19T00:00:00.000Z' });
     expect(() => rec.finish('nope', { rowCount: 0, totalAvailable: 0 })).toThrow(/unknown trace id/);

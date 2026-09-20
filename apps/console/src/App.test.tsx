@@ -11,6 +11,8 @@ vi.mock('./pages/RulesPage.js', () => ({ RulesPage: () => <p>rules page</p> }));
 vi.mock('./pages/GlossaryPage.js', () => ({ GlossaryPage: () => <p>glossary page</p> }));
 vi.mock('./pages/AggregatePage.js', () => ({ AggregatePage: () => <p>aggregate page</p> }));
 vi.mock('./pages/VerificationPage.js', () => ({ VerificationPage: () => <p>verification page</p> }));
+vi.mock('./pages/HomePage.js', () => ({ HomePage: () => <p>home page</p> }));
+vi.mock('./pages/TourPage.js', () => ({ TourPage: () => <p>tour page</p> }));
 
 import { App, NAV_ITEMS, ROUTES } from './App.js';
 
@@ -31,6 +33,20 @@ describe('App route table', () => {
     expect(NAV_ITEMS.map((n) => n.label)).toEqual(['Queue', 'Actions', 'Rules', 'Glossary', 'Aggregate', 'Explore', 'Verification']);
   });
 
+  it('routes /tour outside the console chrome, and keeps it out of the header nav', () => {
+    render(
+      <MemoryRouter initialEntries={['/tour']}>
+        <App />
+      </MemoryRouter>,
+    );
+    expect(ROUTES.tour).toBe('/tour');
+    expect(screen.getByText('tour page')).toBeInTheDocument();
+    // No Layout: no primary nav, no adapter banner, nothing but the page.
+    expect(screen.queryByRole('navigation', { name: 'Primary' })).toBeNull();
+    expect(screen.queryByText('banner')).toBeNull();
+    expect(NAV_ITEMS.map((n) => n.to)).not.toContain(ROUTES.tour);
+  });
+
   it('still routes the existing pages', () => {
     render(
       <MemoryRouter initialEntries={['/aggregate']}>
@@ -40,7 +56,7 @@ describe('App route table', () => {
     expect(screen.getByText('aggregate page')).toBeInTheDocument();
   });
 
-  it('shows a not-found page with a way back for an unknown address, and still redirects / to the queue', () => {
+  it('shows a not-found page with a way back for an unknown address, and routes / to the homepage', () => {
     render(
       <MemoryRouter initialEntries={['/s/does-not-exist']}>
         <App />
@@ -56,6 +72,8 @@ describe('App route table', () => {
         <App />
       </MemoryRouter>,
     );
-    expect(screen.getByText('queue page')).toBeInTheDocument();
+    expect(screen.getByText('home page')).toBeInTheDocument();
+    expect(ROUTES.home).toBe('/');
+    expect(screen.queryByText('queue page')).toBeNull();
   });
 });

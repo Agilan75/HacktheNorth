@@ -1,5 +1,5 @@
 /**
- * A04 live smoke for `narrate` and `verify-fix`: exactly ONE tiny Gemini call
+ * A04 live smoke for `narrate` and `verify-fix`: exactly ONE tiny Anthropic call
  * per owned call, skipped unless RUN_LIVE=1 and a key is configured. The
  * offline suites live in `narrate.test.ts` (moved at CP1, docs/contracts/requests/A04.md).
  *
@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import type { NarrateInput, VerifyFixInput } from '@retrofit/contracts';
 import type { LlmImagePart, LlmProvider } from '../types';
-import { createGeminiProvider } from '../gemini';
+import { createClaudeProvider } from '../claude';
 import { getEnv } from '../../env';
 import { narrateCall } from './narrate';
 import { verifyFixCall } from './verify-fix';
@@ -59,9 +59,9 @@ const TINY_PNG: LlmImagePart = {
 
 function liveProvider(): LlmProvider | null {
   const env = getEnv();
-  if (env.RUN_LIVE !== '1' || env.GEMINI_API_KEY === undefined) return null;
+  if (env.RUN_LIVE !== '1' || env.ANTHROPIC_API_KEY === undefined) return null;
   try {
-    const provider = createGeminiProvider({ apiKey: env.GEMINI_API_KEY });
+    const provider = createClaudeProvider({ apiKey: env.ANTHROPIC_API_KEY, workspaceId: env.ANTHROPIC_WORKSPACE_ID });
     return provider.configured ? provider : null;
   } catch {
     // A02's provider is still a NOT_IMPLEMENTED stub.
@@ -71,7 +71,7 @@ function liveProvider(): LlmProvider | null {
 
 const live = liveProvider();
 
-describe.skipIf(live === null)('live Gemini smoke (RUN_LIVE=1)', () => {
+describe.skipIf(live === null)('live Anthropic smoke (RUN_LIVE=1)', () => {
   it('narrate: polishes or falls back, and every template number survives', async () => {
     const out = await narrateCall(live as LlmProvider, NARRATE_INPUT);
     expect(out.text).toContain('84');

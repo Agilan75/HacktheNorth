@@ -13,7 +13,13 @@ import type { NarrateInput, NarrateOutput } from '@retrofit/contracts';
 import { generateJson } from '../generate-json';
 import type { LlmProvider, LlmSchema, ResponseSchemaNode } from '../types';
 
-/** 2–3 sentences; anything this long has stopped being a polish. */
+/**
+ * 3–4 sentences; anything this long has stopped being a polish. The template
+ * gained a fourth sentence — the open-contradiction one (F12) — so the ceiling
+ * is the template's own length, not a fixed count. See `buildPrompt`, which
+ * asks for exactly as many sentences as the template has so a polish can
+ * neither drop the contradiction sentence nor pad a 3-sentence explanation.
+ */
 const MAX_TEXT_CHARS = 900;
 const MAX_SENTENCES = 4;
 const MAX_OUTPUT_TOKENS = 2048;
@@ -24,7 +30,7 @@ const RESPONSE: ResponseSchemaNode = {
     text: {
       type: 'STRING',
       description:
-        '2 to 3 sentences. Every number copied exactly as written in the template. Same recommendation.',
+        'One sentence for each sentence of the template, in the same order. Every number copied exactly as written in the template. Same recommendation.',
     },
   },
   required: ['text'],
@@ -115,7 +121,11 @@ function buildSchema(input: NarrateInput): LlmSchema<{ text: string }> {
 
 function buildPrompt(input: NarrateInput): string {
   const lines: string[] = [
-    'Rewrite this underwriting explanation in 2 to 3 clear sentences.',
+    // Pinned to the template's own length rather than a fixed count. A
+    // 4-sentence template carries the open-contradiction sentence, and asking
+    // for "2 to 3" told Gemini to drop exactly that one; asking for "3 to 4"
+    // would invite it to pad a 3-sentence explanation with a fact it invented.
+    `Rewrite this underwriting explanation in ${sentenceCount(input.template)} clear sentences, one for each sentence of the template, in the same order. Keep every sentence: do not merge two into one and do not add one.`,
     '',
     `Template: ${input.template}`,
     `Verdict: ${input.verdict}`,

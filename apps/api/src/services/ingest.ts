@@ -211,10 +211,18 @@ function emptyResponse(adapter: IngestResponseDto['adapter'], warnings: readonly
   };
 }
 
-/** Idempotent by `externalId`; `force` re-runs an account that already exists. */
+/**
+ * Idempotent by `externalId`; `force` re-runs an account that already exists.
+ *
+ * `onQuery` is an optional observer handed to the planner, called as each query
+ * finishes. `POST /ingest/federato` with `{"async": true}` passes the progress
+ * recorder here so a caller can watch the run; nothing else about the run
+ * changes, and a throw from the observer is swallowed by the trace recorder.
+ */
 export async function ingestFederato(
   deps: Deps,
   request: IngestRequestDto,
+  onQuery?: (entry: QueryTraceEntry) => void,
 ): Promise<IngestResponseDto> {
   const startedMs = deps.clock.nowMs();
   if (request.lineOfBusiness === 'tenant') {
@@ -236,6 +244,7 @@ export async function ingestFederato(
       now: nowIso,
       clock: () => deps.clock.nowMs(),
       lineOfBusiness: FEDERATO_LINE,
+      ...(onQuery === undefined ? {} : { onQuery }),
     },
   };
 

@@ -219,9 +219,35 @@ export function priceCommercial(
     lossHistoryFactor,
   );
 
+  /*
+   * Flood, once per account rather than per building, because the rollup takes
+   * the worst zone across the account's locations. This is the one factor fed
+   * by external enrichment (the OpenFEMA hazard layer), so an account whose
+   * enrichment has not run has a null tier and is charged nothing for flood —
+   * it prices exactly as it did before flood existed.
+   */
+  const floodTier = _submission.rollup?.worstFloodZoneTier ?? null;
+  const floodFactor: AppliedFactor = applied(
+    'flood',
+    floodTier === null
+      ? UNKNOWN_INPUT
+      : floodTier >= 2
+        ? 'coastal V zone'
+        : floodTier >= 1
+          ? 'FEMA special flood hazard area'
+          : 'outside the mapped flood hazard',
+    floodTier === null
+      ? null
+      : floodTier >= 2
+        ? (_table.flood?.coastal ?? null)
+        : floodTier >= 1
+          ? (_table.flood?.sfha ?? null)
+          : (_table.flood?.minimal ?? null),
+  );
+
   const subtotal = sum(perBuilding.map((b) => b.premium));
   const predictedPremium =
-    perBuilding.length === 0 ? null : money(subtotal * lossFactor.factor);
+    perBuilding.length === 0 ? null : money(subtotal * lossFactor.factor * floodFactor.factor);
 
   const quotedPremium = pickNumber(_submission.pricing.quotedPremium);
   const fitError = _table.fitError ?? null;
@@ -233,7 +259,7 @@ export function priceCommercial(
     predictedMonthlyPremium: null,
     termMonths: null,
     perBuilding,
-    factors: [lossFactor],
+    factors: [lossFactor, floodFactor],
     lossHistoryFactor,
     expectedAnnualLoss: null,
     expectedLossDetail: null,

@@ -201,6 +201,9 @@ const LEAF_TO_RULE_FIELDS: Readonly<Record<string, readonly string[]>> = {
   'buildings.protectionClass': ['tivWeightedProtectionClass'],
   'locations.state': ['stateTier', 'primaryState'],
   'locations.protectionClass': ['tivWeightedProtectionClass'],
+  // A disputed flood zone reaches the flood extension rules, so two sources
+  // disagreeing about it is material and the contradiction is HIGH.
+  'locations.floodZone': ['worstFloodZoneTier'],
   'history.dateOfLoss': ['fiveYearLoss', 'fiveYearClaimCount'],
   'history.paidIndemnity': ['fiveYearLoss'],
   'history.paidExpense': ['fiveYearLoss'],

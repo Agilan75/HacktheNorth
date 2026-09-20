@@ -99,6 +99,8 @@ const ROLLUP_CONTRIBUTORS: Readonly<
     { collection: 'buildings', field: 'protectionClass' },
     { collection: 'buildings', field: 'tiv' },
   ],
+  // Fed by the OpenFEMA hazard layer, not by the broker: nothing to ask for.
+  worstFloodZoneTier: [{ collection: 'locations', field: 'floodZone' }],
   primaryState: [
     { collection: 'locations', field: 'state' },
     { collection: 'buildings', field: 'tiv' },

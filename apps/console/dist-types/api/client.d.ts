@@ -47,6 +47,8 @@ export interface AggregateResponse {
 }
 export interface RulesResponse {
     readonly rulebooks: readonly unknown[];
+    /** Ambiguities the rulebooks resolved, deduplicated by the API. */
+    readonly interpretations?: readonly unknown[];
 }
 export interface GlossaryResponse {
     readonly entries: readonly {

@@ -1,19 +1,46 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, ReactElement } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, ReactElement, ReactNode } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 
 import { formatMoney, formatPercent, formatScore, pluralize } from '@retrofit/contracts';
 import { COLORS, cssVar, MIN_TOUCH_TARGET, RADIUS, SPACE, VERDICT_MARKS, VERDICT_STYLES } from '@retrofit/design';
 
-import { ROUTES, submissionPath } from '../App.js';
-import { useApi } from '../api/useApi.js';
+import { ROUTES, submissionPath } from '../routes.js';
+import { useApi, useApiClient } from '../api/useApi.js';
 import { Filters } from '../components/Filters.js';
 import type { FilterOptions, QueueFilterValue } from '../components/Filters.js';
-import type { QueueRowView, Verdict } from '../panels/types.js';
+import type { QueueRowView, SubmissionDetailView, Verdict } from '../panels/types.js';
+import { appetiteBands } from './appetite-bands.js';
 import { createExploreScene, webglAvailable } from './explore-scene.js';
-import type { ExploreMode, ExploreScene, HoverInfo, HubHoverInfo } from './explore-scene.js';
+import type { ExploreScene, HoverInfo, HubHoverInfo } from './explore-scene.js';
+import { bandLabel, createTerrainScene, terrainAccountOf } from './explore-terrain.js';
+import type { TerrainAccount, TerrainFootprint, TerrainHover, TerrainScene } from './explore-terrain.js';
 
-const EMPTY_FILTER: QueueFilterValue = { line: null, verdict: null, state: null, underwriter: null, search: '' };
+type Mode = 'terrain' | 'scatter' | 'network';
+
+const MODES: readonly Mode[] = ['terrain', 'scatter', 'network'];
+const MODE_LABELS: Readonly<Record<Mode, string>> = {
+  terrain: 'Appetite terrain',
+  scatter: '3D scatter',
+  network: 'Network',
+};
+
+/** One line, axes only. No methodology. */
+const COPY: Readonly<Record<Mode, string>> = {
+  terrain: 'Floor: insured value by premium. Height: appetite score.',
+  scatter: 'Appetite score, pricing adequacy, insured value. Size is premium.',
+  network: 'Submissions linked to underwriter, state, line and verdict.',
+};
+
+const VERDICTS: readonly Verdict[] = ['FIT', 'REFER', 'DOES_NOT_FIT'];
+
+function isVerdict(value: string): value is Verdict {
+  return (VERDICTS as readonly string[]).includes(value);
+}
+
+function isMode(value: string | null): value is Mode {
+  return value !== null && (MODES as readonly string[]).includes(value);
+}
 
 function distinct(values: readonly (string | null)[]): readonly string[] {
   const set = new Set<string>();
@@ -56,33 +83,68 @@ const tooltipStyle: CSSProperties = {
   color: cssVar('ink'),
 };
 
-const toggleStyle = (active: boolean): CSSProperties => ({
+/** One segmented control: shared border, no gaps, ends rounded. */
+const segmentStyle = (active: boolean, first: boolean, last: boolean): CSSProperties => ({
   minHeight: MIN_TOUCH_TARGET,
-  padding: `0 ${SPACE.lg}px`,
-  borderRadius: RADIUS.pill,
-  border: `1px solid ${active ? cssVar('ink') : cssVar('muted-tint')}`,
+  padding: `0 ${SPACE.md}px`,
+  border: `1px solid ${cssVar('muted-tint')}`,
+  borderLeftWidth: first ? 1 : 0,
+  borderTopLeftRadius: first ? RADIUS.pill : 0,
+  borderBottomLeftRadius: first ? RADIUS.pill : 0,
+  borderTopRightRadius: last ? RADIUS.pill : 0,
+  borderBottomRightRadius: last ? RADIUS.pill : 0,
   background: active ? cssVar('ink') : 'transparent',
   color: active ? cssVar('paper') : cssVar('ink'),
   font: 'inherit',
+  fontSize: cssVar('size-small'),
   cursor: 'pointer',
 });
 
-function Swatch({ verdict }: { readonly verdict: Verdict }): ReactElement {
+const quietButtonStyle: CSSProperties = {
+  minHeight: MIN_TOUCH_TARGET,
+  padding: `0 ${SPACE.md}px`,
+  borderRadius: RADIUS.pill,
+  border: `1px solid ${cssVar('muted-tint')}`,
+  background: 'transparent',
+  color: cssVar('ink'),
+  font: 'inherit',
+  fontSize: cssVar('size-small'),
+  cursor: 'pointer',
+};
+
+const asideTextStyle: CSSProperties = {
+  color: cssVar('muted-deep'),
+  fontSize: cssVar('size-micro'),
+  lineHeight: cssVar('leading-micro'),
+};
+
+function LegendItem({ swatch, label }: { readonly swatch: ReactNode; readonly label: string }): ReactElement {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE.xs, whiteSpace: 'nowrap' }}>
+      {swatch}
+      {label}
+    </span>
+  );
+}
+
+function VerdictKey({ verdict }: { readonly verdict: Verdict }): ReactElement {
   const s = VERDICT_STYLES[verdict];
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE.xs }}>
-      <span
-        aria-hidden
-        style={{
-          width: 12,
-          height: 12,
-          borderRadius: '50%',
-          background: verdict === 'REFER' ? COLORS.redTint : s.fill,
-          border: `1.5px solid ${s.border}`,
-        }}
-      />
-      {VERDICT_MARKS[verdict]} {s.label}
-    </span>
+    <LegendItem
+      swatch={
+        <span
+          aria-hidden
+          style={{
+            width: 12,
+            height: 12,
+            borderRadius: '50%',
+            background: verdict === 'REFER' ? COLORS.redTint : s.fill,
+            border: `1.5px solid ${s.border}`,
+          }}
+        />
+      }
+      label={`${VERDICT_MARKS[verdict]} ${s.label}`}
+    />
   );
 }
 
@@ -104,7 +166,6 @@ function RowTip({ info }: { readonly info: HoverInfo }): ReactElement {
       <div style={{ color: cssVar('muted-deep') }}>
         {[r.primaryState, r.assignedUnderwriter].filter(Boolean).join(' · ') || 'No state or underwriter'}
       </div>
-      <div style={{ color: cssVar('muted-deep'), marginTop: SPACE.xs }}>Click to open</div>
     </>
   );
 }
@@ -116,23 +177,130 @@ function HubTip({ info }: { readonly info: HubHoverInfo }): ReactElement {
       <div style={{ color: cssVar('muted-deep') }}>
         {info.hubKind} · {pluralize(info.count, 'submission')}
       </div>
-      <div style={{ color: cssVar('muted-deep'), marginTop: SPACE.xs }}>Click to highlight</div>
     </>
   );
 }
 
-/** /explore: the book in 3D. A scatter of appetite × adequacy × TIV, or a network of who, where and what. */
+function TerrainTip({ info }: { readonly info: TerrainHover }): ReactElement {
+  if (info.cell !== undefined) {
+    const { tivBand, premiumBand, score, verdict } = info.cell;
+    return (
+      <>
+        <strong>Appetite {Math.round(score)}/100 here</strong>
+        <div>
+          {VERDICT_MARKS[verdict]} {VERDICT_STYLES[verdict].label}
+        </div>
+        <div>
+          TIV {bandLabel(tivBand)} · {tivBand.ruleId}
+        </div>
+        <div>
+          Premium {bandLabel(premiumBand)} · {premiumBand.ruleId}
+        </div>
+      </>
+    );
+  }
+  const f = info.footprint;
+  return (
+    <>
+      <strong style={{ fontFamily: cssVar('font-display'), fontSize: 15 }}>{f?.insuredName}</strong>
+      <div>
+        {f === undefined ? null : (
+          <>
+            {VERDICT_MARKS[f.verdict]} {VERDICT_STYLES[f.verdict].label}
+          </>
+        )}
+      </div>
+      <div>TIV {f?.tiv == null ? 'unknown' : formatMoney(f.tiv)}</div>
+      <div>Premium {f?.premium == null ? 'none yet' : formatMoney(f.premium)}</div>
+      {f?.otherLine === true ? (
+        <div style={{ color: cssVar('muted-deep') }}>Scored on another line: these bands never applied to it.</div>
+      ) : null}
+      {f?.reason != null && f.reason !== '' ? (
+        <div style={{ marginTop: SPACE.xs }}>{f.reason.length > 190 ? `${f.reason.slice(0, 190)}…` : f.reason}</div>
+      ) : null}
+    </>
+  );
+}
+
+/** /explore: the book in 3D — the appetite terrain, a scatter, or a network of who, where and what. */
 export function ExplorePage(): ReactElement {
   const queue = useApi((client) => client.getQueue(), []);
+  const rules = useApi((client) => client.getRules(), []);
+  const client = useApiClient();
   const navigate = useNavigate();
   const titleId = useId();
+  const filtersId = useId();
   const hostRef = useRef<HTMLDivElement | null>(null);
   const sceneRef = useRef<ExploreScene | null>(null);
-  const [mode, setMode] = useState<ExploreMode>('scatter');
-  const [includeOther, setIncludeOther] = useState(false);
-  const [filter, setFilter] = useState<QueueFilterValue>(EMPTY_FILTER);
+  const terrainRef = useRef<TerrainScene | null>(null);
+  const [params, setParams] = useSearchParams();
   const [hover, setHover] = useState<HoverInfo | HubHoverInfo | null>(null);
+  const [terrainHover, setTerrainHover] = useState<TerrainHover | null>(null);
+  const [sceneReady, setSceneReady] = useState(false);
+  const [detail, setDetail] = useState<SubmissionDetailView | null>(null);
+  const [detailError, setDetailError] = useState<Error | null>(null);
   const [glOk] = useState(() => webglAvailable());
+
+  /*
+   * Every control lives in the URL, so Back from a submission restores the
+   * exact view. Filter param names match the queue page (q, line, verdict,
+   * state, underwriter) so links between the two pages carry their filters.
+   */
+  const modeParam = params.get('mode');
+  const mode: Mode = isMode(modeParam) ? modeParam : 'terrain';
+  const includeOther = params.get('other') !== '0';
+  const selectedId = params.get('account');
+  const verdictParam = params.get('verdict');
+  const filter = useMemo<QueueFilterValue>(
+    () => ({
+      line: params.get('line'),
+      verdict: verdictParam !== null && isVerdict(verdictParam) ? verdictParam : null,
+      state: params.get('state'),
+      underwriter: params.get('underwriter'),
+      search: params.get('q') ?? '',
+    }),
+    [params, verdictParam],
+  );
+
+  const patch = useCallback(
+    (next: Readonly<Record<string, string | null>>, replace = false): void => {
+      setParams(
+        (prev) => {
+          const out = new URLSearchParams(prev);
+          for (const [key, value] of Object.entries(next)) {
+            if (value === null || value === '') out.delete(key);
+            else out.set(key, value);
+          }
+          return out;
+        },
+        { replace },
+      );
+    },
+    [setParams],
+  );
+
+  const setMode = useCallback((m: Mode): void => patch({ mode: m === 'terrain' ? null : m }), [patch]);
+  const setSelectedId = useCallback((id: string): void => patch({ account: id }), [patch]);
+  const setFilter = useCallback(
+    (next: QueueFilterValue): void =>
+      patch({
+        q: next.search.trim() === '' ? null : next.search,
+        line: next.line,
+        verdict: next.verdict,
+        state: next.state,
+        underwriter: next.underwriter,
+      }),
+    [patch],
+  );
+
+  const filtersActive =
+    filter.line !== null ||
+    filter.verdict !== null ||
+    filter.state !== null ||
+    filter.underwriter !== null ||
+    filter.search.trim() !== '' ||
+    !includeOther;
+  const [filtersOpen, setFiltersOpen] = useState(filtersActive);
 
   const rows = useMemo<readonly QueueRowView[]>(() => queue.data ?? [], [queue.data]);
   const options = useMemo<FilterOptions>(
@@ -147,76 +315,301 @@ export function ExplorePage(): ReactElement {
     () => rows.filter((r) => (includeOther || !r.outOfAppetiteLine) && matches(r, filter)),
     [rows, includeOther, filter],
   );
+  const bands = useMemo(() => appetiteBands(rules.data?.rulebooks), [rules.data]);
 
-  // Latest navigate for the scene's click handler without rebuilding the scene.
-  const openRef = useRef((row: QueueRowView) => void navigate(submissionPath(row.submissionId)));
-  openRef.current = (row: QueueRowView) => void navigate(submissionPath(row.submissionId));
+  /*
+   * The terrain shows the whole book: accounts with a TIV and a premium stand
+   * on the floor, the rest wait in the tray beside it. `includeOther` drops the
+   * rows scored on another line of business, which is most of that tray.
+   */
+  const terrainRows = useMemo(
+    () => rows.filter((r) => (includeOther || !r.outOfAppetiteLine) && matches(r, filter)),
+    [rows, includeOther, filter],
+  );
+  const standable = useMemo(
+    () => terrainRows.filter((r) => r.totalTiv !== null && r.quotedPremium !== null),
+    [terrainRows],
+  );
+  const footprints = useMemo<readonly TerrainFootprint[]>(
+    () =>
+      terrainRows.map((r) => ({
+        submissionId: r.submissionId,
+        insuredName: r.insuredName,
+        verdict: r.verdict,
+        tiv: r.totalTiv,
+        premium: r.quotedPremium,
+        reason: r.explanationLine,
+        otherLine: r.outOfAppetiteLine,
+      })),
+    [terrainRows],
+  );
+
+  /** The account picker, grouped so 158 rows stay navigable. */
+  const groups = useMemo(() => {
+    const on = terrainRows.filter((r) => r.totalTiv !== null && r.quotedPremium !== null);
+    const off = terrainRows.filter((r) => r.totalTiv === null || r.quotedPremium === null);
+    return [
+      { label: 'Fits appetite', rows: on.filter((r) => r.verdict === 'FIT') },
+      { label: 'Refer', rows: on.filter((r) => r.verdict === 'REFER') },
+      { label: 'Outside appetite', rows: on.filter((r) => r.verdict === 'DOES_NOT_FIT') },
+      { label: 'No TIV or premium yet', rows: off },
+    ].filter((g) => g.rows.length > 0);
+  }, [terrainRows]);
+
+  // Keep a selection that is still on screen; default to the best-ranked account
+  // with a floor position. Replace, so the default never adds a history entry.
+  useEffect(() => {
+    if (terrainRows.length === 0) return;
+    if (selectedId !== null && terrainRows.some((r) => r.submissionId === selectedId)) return;
+    patch({ account: (standable[0] ?? terrainRows[0]!).submissionId }, true);
+  }, [terrainRows, standable, selectedId, patch]);
+
+  /* One detail fetch per account, cached, since the terrain needs its factor points. */
+  const cache = useRef(new Map<string, SubmissionDetailView>());
+  useEffect(() => {
+    if (selectedId === null) return undefined;
+    const cached = cache.current.get(selectedId);
+    if (cached !== undefined) {
+      setDetail(cached);
+      setDetailError(null);
+      return undefined;
+    }
+    let live = true;
+    client
+      .getSubmission(selectedId)
+      .then((d) => {
+        cache.current.set(selectedId, d);
+        if (!live) return;
+        setDetail(d);
+        setDetailError(null);
+      })
+      .catch((e: unknown) => {
+        if (live) setDetailError(e instanceof Error ? e : new Error(String(e)));
+      });
+    return () => {
+      live = false;
+    };
+  }, [selectedId, client]);
+
+  const terrainAccount = useMemo<TerrainAccount | null>(
+    () => (detail === null ? null : terrainAccountOf(detail)),
+    [detail],
+  );
+
+  // Latest handlers for the scenes' callbacks, without rebuilding a scene.
+  const openRef = useRef((id: string) => void navigate(submissionPath(id)));
+  openRef.current = (id: string) => void navigate(submissionPath(id));
+  const selectRef = useRef(setSelectedId);
+  selectRef.current = setSelectedId;
 
   useEffect(() => {
     const host = hostRef.current;
     if (host === null || !glOk) return undefined;
-    const scene = createExploreScene(host, { onHover: setHover, onOpen: (row) => openRef.current(row) });
+    setSceneReady(false);
+    if (mode === 'terrain') {
+      const scene = createTerrainScene(host, {
+        onHover: setTerrainHover,
+        onSelect: (id) => selectRef.current(id),
+        onOpen: (id) => openRef.current(id),
+      });
+      terrainRef.current = scene;
+      setSceneReady(true);
+      return () => {
+        scene.dispose();
+        terrainRef.current = null;
+      };
+    }
+    const scene = createExploreScene(host, { onHover: setHover, onOpen: (row) => openRef.current(row.submissionId) });
     sceneRef.current = scene;
+    setSceneReady(true);
     return () => {
       scene.dispose();
       sceneRef.current = null;
     };
-  }, [glOk]);
+  }, [glOk, mode]);
 
   useEffect(() => {
-    sceneRef.current?.setData(visible, mode);
-  }, [visible, mode]);
+    if (mode === 'terrain') terrainRef.current?.setData(terrainAccount, footprints, bands);
+    else sceneRef.current?.setData(visible, mode);
+  }, [mode, visible, terrainAccount, footprints, bands]);
 
   const otherCount = rows.filter((r) => r.outOfAppetiteLine).length;
+  /** The factors that knocked the selected account out, named plainly. */
+  const knockoutReason = useMemo(() => {
+    const out = (detail?.factors ?? []).filter(
+      (f) => f.knockout && f.factorId !== 'tiv' && f.factorId !== 'total_premium',
+    );
+    if (out.length === 0) return 'another factor';
+    return out.map((f) => f.label.toLowerCase()).join(' and ');
+  }, [detail]);
+  const knockedOut =
+    mode === 'terrain' && terrainAccount !== null && terrainAccount.knockedOutElsewhere ? terrainAccount : null;
+  const tip = mode === 'terrain' ? terrainHover : hover;
+
+  const status =
+    queue.loading && queue.data === null
+      ? 'Loading the book…'
+      : queue.error !== null
+        ? `Could not load the queue: ${queue.error.message}`
+        : detailError !== null && mode === 'terrain'
+          ? `Could not load that account: ${detailError.message}`
+          : mode === 'terrain'
+            ? `${standable.length} on the floor · ${terrainRows.length - standable.length} with no TIV or premium${bands.fallback ? ' · built-in band edges' : ''}`
+            : `${pluralize(visible.length, 'submission')}`;
 
   return (
     <section aria-labelledby={titleId}>
-      <h1 id={titleId}>Explore</h1>
-      <p style={{ color: cssVar('muted-deep'), maxWidth: 760 }}>
-        {mode === 'scatter'
-          ? 'Every submission placed by appetite score, pricing adequacy and total insured value. Sphere size is the quoted premium. Drag to orbit, scroll to zoom, click a sphere to open it.'
-          : 'Submissions linked to their underwriter, state, line of business and verdict. Click a hub to light up its submissions; click a sphere to open it.'}
-      </p>
+      <h1 id={titleId} style={{ marginBottom: SPACE.sm }}>
+        Explore
+      </h1>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: SPACE.sm, marginTop: SPACE.md }}>
-        <div role="group" aria-label="View" style={{ display: 'flex', gap: SPACE.xs }}>
-          <button type="button" aria-pressed={mode === 'scatter'} style={toggleStyle(mode === 'scatter')} onClick={() => setMode('scatter')}>
-            3D scatter
-          </button>
-          <button type="button" aria-pressed={mode === 'network'} style={toggleStyle(mode === 'network')} onClick={() => setMode('network')}>
-            Network
-          </button>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: SPACE.sm,
+          padding: `${SPACE.sm}px 0`,
+          borderTop: `1px solid ${cssVar('muted-tint')}`,
+          borderBottom: `1px solid ${cssVar('muted-tint')}`,
+        }}
+      >
+        <div role="group" aria-label="View" style={{ display: 'flex' }}>
+          {MODES.map((m, i) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={mode === m}
+              style={segmentStyle(mode === m, i === 0, i === MODES.length - 1)}
+              onClick={() => setMode(m)}
+            >
+              {MODE_LABELS[m]}
+            </button>
+          ))}
         </div>
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE.xs, minHeight: MIN_TOUCH_TARGET, marginLeft: SPACE.md }}>
-          <input type="checkbox" checked={includeOther} onChange={(e) => setIncludeOther(e.target.checked)} />
-          Include other lines ({otherCount})
-        </label>
-        <button type="button" style={{ ...toggleStyle(false), marginLeft: 'auto' }} onClick={() => sceneRef.current?.resetView()}>
+        <span style={{ ...asideTextStyle, flex: '1 1 200px' }}>{COPY[mode]}</span>
+        {mode === 'terrain' ? (
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE.xs, ...asideTextStyle }}>
+            Account
+            <select
+              value={selectedId ?? ''}
+              onChange={(e) => setSelectedId(e.target.value)}
+              style={{
+                minHeight: MIN_TOUCH_TARGET,
+                maxWidth: 220,
+                borderRadius: RADIUS.pill,
+                border: `1px solid ${cssVar('muted-tint')}`,
+                background: cssVar('paper'),
+                color: cssVar('ink'),
+                padding: `0 ${SPACE.sm}px`,
+                font: 'inherit',
+                fontSize: cssVar('size-small'),
+              }}
+            >
+              {groups.map((g) => (
+                <optgroup key={g.label} label={`${g.label} (${g.rows.length})`}>
+                  {g.rows.map((r) => (
+                    <option key={r.submissionId} value={r.submissionId}>
+                      {r.insuredName} · {VERDICT_STYLES[r.verdict].short} · {Math.round(r.appetiteScore)}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </label>
+        ) : null}
+        <button
+          type="button"
+          aria-expanded={filtersOpen}
+          aria-controls={filtersId}
+          style={{ ...quietButtonStyle, borderColor: filtersActive ? cssVar('ink') : cssVar('muted-tint') }}
+          onClick={() => setFiltersOpen((open) => !open)}
+        >
+          Filters{filtersActive ? ' ·' : ''}
+        </button>
+        <button
+          type="button"
+          style={quietButtonStyle}
+          onClick={() => (mode === 'terrain' ? terrainRef.current?.resetView() : sceneRef.current?.resetView())}
+        >
           Reset view
         </button>
       </div>
 
-      <Filters value={filter} options={options} onChange={setFilter} />
+      <div
+        id={filtersId}
+        hidden={!filtersOpen}
+        style={{ display: filtersOpen ? 'block' : 'none', borderBottom: `1px solid ${cssVar('muted-tint')}` }}
+      >
+        <Filters value={filter} options={options} onChange={setFilter} />
+        <label
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: SPACE.xs,
+            minHeight: MIN_TOUCH_TARGET,
+            paddingBottom: SPACE.sm,
+            ...asideTextStyle,
+          }}
+        >
+          <input type="checkbox" checked={includeOther} onChange={(e) => patch({ other: e.target.checked ? null : '0' })} />
+          Include other lines ({otherCount})
+        </label>
+      </div>
 
-      <p role="status" aria-live="polite" style={{ margin: `0 0 ${SPACE.sm}px` }}>
-        {queue.loading && queue.data === null
-          ? 'Loading the book…'
-          : queue.error !== null
-            ? `Could not load the queue: ${queue.error.message}`
-            : `Showing ${pluralize(visible.length, 'submission')}`}
-      </p>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: SPACE.sm,
+          alignItems: 'baseline',
+          padding: `${SPACE.xs}px 0 ${SPACE.sm}px`,
+        }}
+      >
+        <span role="status" aria-live="polite" style={asideTextStyle}>
+          {status}
+        </span>
+        {knockedOut !== null ? (
+          <span style={{ ...asideTextStyle, color: cssVar('red-deep') }}>
+            {knockedOut.insuredName} knocked out on {knockoutReason} — not plotted.
+          </span>
+        ) : null}
+      </div>
 
       {glOk ? (
         <div ref={hostRef} style={stageStyle} aria-label="3D view of the submissions. The same rows are listed on the Queue page.">
-          {hover !== null ? (
+          {sceneReady ? null : (
+            <div
+              aria-hidden
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'grid',
+                placeItems: 'center',
+                background: cssVar('paper'),
+                color: cssVar('muted-deep'),
+                fontSize: cssVar('size-micro'),
+              }}
+            >
+              Drawing…
+            </div>
+          )}
+          {tip !== null ? (
             <div
               style={{
                 ...tooltipStyle,
-                left: Math.min(hover.x + 16, (hostRef.current?.clientWidth ?? 600) - 290),
-                top: Math.max(hover.y - 12, 8),
+                left: Math.min(tip.x + 16, (hostRef.current?.clientWidth ?? 600) - 290),
+                // Keep the whole card inside the canvas, even when hovering near an edge.
+                top: Math.max(Math.min(tip.y - 12, (hostRef.current?.clientHeight ?? 600) - 230), 8),
               }}
             >
-              {hover.kind === 'row' ? <RowTip info={hover} /> : <HubTip info={hover} />}
+              {mode === 'terrain' ? (
+                <TerrainTip info={tip as TerrainHover} />
+              ) : (tip as HoverInfo | HubHoverInfo).kind === 'row' ? (
+                <RowTip info={tip as HoverInfo} />
+              ) : (
+                <HubTip info={tip as HubHoverInfo} />
+              )}
             </div>
           ) : null}
         </div>
@@ -229,20 +622,82 @@ export function ExplorePage(): ReactElement {
         </div>
       )}
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACE.lg, marginTop: SPACE.md, fontSize: cssVar('size-micro') }}>
-        <Swatch verdict="FIT" />
-        <Swatch verdict="REFER" />
-        <Swatch verdict="DOES_NOT_FIT" />
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: SPACE.xs }}>
-          <span aria-hidden style={{ width: 16, height: 8, borderRadius: 8, border: `2px solid ${COLORS.mutedDeep}` }} />
-          Ring: synthetic data (no Federato policy)
-        </span>
-        {mode === 'scatter' ? (
-          <span style={{ color: cssVar('muted-deep') }}>Red frame: 100% adequacy (quoted = predicted)</span>
-        ) : (
-          <span style={{ color: cssVar('muted-deep') }}>Octahedrons: underwriter, state, line, verdict hubs</span>
-        )}
-      </div>
+      <ul
+        aria-label="Key"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: `${SPACE.xs}px ${SPACE.md}px`,
+          listStyle: 'none',
+          margin: `${SPACE.sm}px 0 0`,
+          padding: 0,
+          fontSize: cssVar('size-micro'),
+          color: cssVar('muted-deep'),
+        }}
+      >
+        {[
+          <VerdictKey key="fit" verdict="FIT" />,
+          <VerdictKey key="refer" verdict="REFER" />,
+          <VerdictKey key="out" verdict="DOES_NOT_FIT" />,
+          ...(mode === 'terrain'
+            ? [
+                <LegendItem
+                  key="height"
+                  label="Appetite height"
+                  swatch={
+                    <span aria-hidden style={{ width: 6, height: 14, background: cssVar('muted-deep'), borderRadius: 1 }} />
+                  }
+                />,
+                <LegendItem
+                  key="arrow"
+                  label="Nearest fit"
+                  swatch={
+                    <span aria-hidden style={{ color: cssVar('ink'), fontSize: 13, lineHeight: 1 }}>
+                      ↗
+                    </span>
+                  }
+                />,
+                <LegendItem
+                  key="dots"
+                  label="Priced accounts"
+                  swatch={
+                    <span aria-hidden style={{ width: 6, height: 6, borderRadius: '50%', background: COLORS.mutedDeep }} />
+                  }
+                />,
+              ]
+            : [
+                <LegendItem
+                  key="ring"
+                  label="Synthetic data"
+                  swatch={
+                    <span aria-hidden style={{ width: 16, height: 8, borderRadius: 8, border: `2px solid ${COLORS.mutedDeep}` }} />
+                  }
+                />,
+                mode === 'scatter' ? (
+                  <LegendItem
+                    key="frame"
+                    label="100% adequacy"
+                    swatch={
+                      <span aria-hidden style={{ width: 12, height: 12, border: `1.5px solid ${cssVar('red-deep')}` }} />
+                    }
+                  />
+                ) : (
+                  <LegendItem
+                    key="hubs"
+                    label="Hubs"
+                    swatch={
+                      <span
+                        aria-hidden
+                        style={{ width: 10, height: 10, background: COLORS.mutedDeep, transform: 'rotate(45deg)' }}
+                      />
+                    }
+                  />
+                ),
+              ]),
+        ].map((entry) => (
+          <li key={entry.key}>{entry}</li>
+        ))}
+      </ul>
     </section>
   );
 }

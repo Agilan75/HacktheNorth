@@ -608,6 +608,12 @@ export interface PlannerOptions {
   readonly pageLimit?: number | undefined;
   /** Skip the step-5 high-scorer follow-up. */
   readonly skipFollowUps?: boolean | undefined;
+  /**
+   * Observer called as each query finishes, so a caller can report progress
+   * while the run is still going. It cannot change the plan or the trace, and a
+   * throw from it is swallowed.
+   */
+  readonly onQuery?: ((entry: QueryTraceEntry) => void) | undefined;
 }
 
 /* -------------------------------------------------------------------------- */

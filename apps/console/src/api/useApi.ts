@@ -15,7 +15,8 @@ const DEFAULT_API_URL = 'http://localhost:3000';
 
 let sharedClient: ApiClient | null = null;
 
-function resolveBaseUrl(): string {
+/** The API origin, for the few requests that are not JSON routes (the verification field's byte layers). */
+export function resolveBaseUrl(): string {
   let fromEnv: unknown;
   try {
     fromEnv = (import.meta as { env?: Record<string, unknown> }).env?.VITE_API_URL;

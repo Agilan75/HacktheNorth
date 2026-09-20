@@ -43,19 +43,73 @@ function detail(over = {}) {
     };
 }
 function mount(path = '/submissions/SUB-7') {
-    return render(_jsx(MemoryRouter, { initialEntries: [path], children: _jsxs(Routes, { children: [_jsx(Route, { path: "/submissions/:id", element: _jsx(SubmissionPage, {}) }), _jsx(Route, { path: "/queue", element: _jsx("p", { children: "queue" }) })] }) }));
+    const entry = typeof path === 'string' ? path : { pathname: path.pathname, state: path.state };
+    return render(_jsx(MemoryRouter, { initialEntries: [entry], children: _jsxs(Routes, { children: [_jsx(Route, { path: "/submissions/:id", element: _jsx(SubmissionPage, {}) }), _jsx(Route, { path: "/queue", element: _jsx("p", { children: "queue" }) })] }) }));
+}
+/**
+ * Surfaces the PAGE titles itself: the decision block, the facts card, the
+ * demoted <details> and the not-applicable list. A normal panel is NOT here —
+ * each one renders its own `.rf-card` with its own heading, so the page no
+ * longer wraps it in a second card with a duplicate title. Panels are asserted
+ * by their anchors via `panelOrder()`.
+ */
+function panelTitles() {
+    return [...document.querySelectorAll('.rf-card__title')].map((e) => e.textContent ?? '');
+}
+/** The panel anchors in DOM order, as single letters. */
+function panelOrder() {
+    return [...document.querySelectorAll('[id^="panel-"]')]
+        .map((e) => e.id.slice('panel-'.length))
+        .filter((id) => id.length === 1);
+}
+/** The plain section spines: level-2 headings that are not a panel title. */
+function sectionTitles() {
+    return screen.getAllByRole('heading', { level: 2 })
+        .filter((e) => !e.classList.contains('rf-card__title'))
+        .map((e) => e.textContent ?? '');
+}
+function indexNav() {
+    return screen.getByRole('navigation', { name: 'Panels on this page' });
 }
 beforeEach(() => { h.state = { data: detail(), loading: false, error: null, reload: vi.fn() }; h.client = {}; });
 afterEach(() => cleanup());
 describe('SubmissionPage', () => {
-    it('renders twelve lettered panels a-l in PRD order with anchors', () => {
+    it('leads with the decision, then groups the twelve panels under three plain sections', () => {
         mount();
         expect(h.lastId).toBe('SUB-7');
-        const headings = screen.getAllByRole('heading', { level: 2 }).map((e) => e.textContent);
-        expect(headings).toEqual(['(a) Explanation and recommendation', '(b) Score breakdown', '(c) How the agent got here', '(d) Pricing and peer benchmark', '(e) Buildings and rollup', '(f) Contradictions and interpretations', '(g) Minimal flip', '(h) Feature vector', '(i) Discovered schema', '(j) Enrichment', '(k) Actions', '(l) Attached photo or sweep']);
+        // Panels, in group order. Each supplies its own heading; the page adds none.
+        expect(panelOrder()).toEqual(['a', 'b', 'd', 'e', 'h', 'c', 'f', 'l', 'j', 'i', 'g', 'k']);
+        expect(panelTitles()).toEqual([
+            'The decision',
+            'Feature vector',
+            'Enrichment',
+            'Discovered schema',
+        ]);
+        expect(sectionTitles()).toEqual(['The numbers', 'The evidence', 'Next steps']);
+        // No PRD letter index survives in the copy.
+        expect(document.body.textContent).not.toMatch(/\([a-l]\)\s/);
+        // The anchors other pages deep-link to are unchanged.
         for (const l of 'abcdefghijkl')
             expect(document.getElementById('panel-' + l)).not.toBeNull();
-        expect(screen.getByRole('navigation', { name: 'Panels on this page' }).querySelectorAll('a')).toHaveLength(12);
+    });
+    it('demotes the low-information panels to collapsed details', () => {
+        mount();
+        for (const l of ['h', 'i', 'j']) {
+            const el = document.getElementById('panel-' + l);
+            expect(el.tagName).toBe('DETAILS');
+            expect(el).not.toHaveAttribute('open');
+        }
+        // Still rendered, so a deep link or a find-in-page still reaches the content.
+        expect(screen.getByTestId('h')).toBeTruthy();
+    });
+    it('indexes the sections, never twelve peers, and marks the one in view', () => {
+        mount();
+        const links = indexNav().querySelectorAll('a');
+        expect([...links].map((a) => a.textContent)).toEqual(['Decision', 'The numbers', 'The evidence', 'Next steps']);
+        expect(links[0]).toHaveAttribute('aria-current', 'true');
+        expect(links[1]).toHaveAttribute('href', '#section-numbers');
+        // No IntersectionObserver in jsdom: the hook feature-detects and leaves the first entry active.
+        expect(links.length).toBeLessThanOrEqual(8);
     });
     it('header numbers are the DTO values, formatted only', () => {
         mount();
@@ -64,6 +118,22 @@ describe('SubmissionPage', () => {
         expect(document.querySelector('[data-field=completeness]').textContent).toBe('88.9%');
         expect(document.querySelector('[data-field=confidence]').textContent).toBe('70%');
         expect(document.querySelector('[data-verdict=REFER]')).not.toBeNull();
+    });
+    it('the breadcrumb returns to the queue, carrying its filter state when the link brought it', () => {
+        mount();
+        expect(screen.getByRole('link', { name: 'Queue' })).toHaveAttribute('href', '/queue');
+        cleanup();
+        mount({ pathname: '/submissions/SUB-7', state: { queueSearch: 'verdict=REFER&sort=score' } });
+        expect(screen.getByRole('link', { name: 'Queue' })).toHaveAttribute('href', '/queue?verdict=REFER&sort=score');
+    });
+    it('steps through the queue order when the link carried it, and shows nothing when it did not', () => {
+        mount();
+        expect(screen.queryByRole('navigation', { name: 'Queue order' })).toBeNull();
+        cleanup();
+        mount({ pathname: '/submissions/SUB-7', state: { queue: ['SUB-1', 'SUB-7', 'SUB-9'] } });
+        const nav = screen.getByRole('navigation', { name: 'Queue order' });
+        expect(within(nav).getByRole('link', { name: /Previous/ })).toHaveAttribute('href', '/submissions/SUB-1');
+        expect(within(nav).getByRole('link', { name: /Next/ })).toHaveAttribute('href', '/submissions/SUB-9');
     });
     it('passes DTO slices to panels untouched', () => {
         mount();
@@ -172,21 +242,20 @@ const VERIFICATION = {
     naive: { verdict: 'REFER', appetiteScore: 81, knockoutFactorIds: [], decidingFactorId: 'building_age', agrees: { verdict: true, appetiteScore: true, knockouts: true, decidingFactor: true, all: true } },
     secondOpinion: null,
 };
-function h2s() {
-    return screen.getAllByRole('heading', { level: 2 }).map((e) => e.textContent);
-}
 describe('SubmissionPage for sparse accounts (FILL-console)', () => {
     it('a scored account keeps its twelve panels and shows no facts card or not-applicable list', () => {
         mount();
-        expect(h2s()).toHaveLength(12);
+        expect(panelOrder()).toHaveLength(12);
         expect(screen.queryByTestId('account-facts')).toBeNull();
         expect(screen.queryByTestId('not-applicable')).toBeNull();
         expect(document.querySelector('[data-field=lineOfBusiness]').textContent).toBe('Commercial property');
     });
-    it('a triage knockout leads with its facts and shows only the explanation, trace and actions', () => {
+    it('a triage knockout leads with its facts and shows only the decision, trace and actions', () => {
         h.state = { ...h.state, data: knockout() };
         mount('/submissions/SUB-2024-00008');
-        expect(h2s()).toEqual(['Submission facts', '(a) Explanation and recommendation', '(c) How the agent got here', '(k) Actions', 'Not applicable to this account']);
+        expect(panelOrder()).toEqual(['a', 'c', 'k']);
+        expect(panelTitles()).toEqual(['Submission facts', 'The decision', 'Not applicable to this account']);
+        expect(sectionTitles()).toEqual(['The evidence', 'Next steps']);
         expect(document.querySelector('[data-field=lineOfBusiness]').textContent).toBe('Health');
         expect(document.body.textContent).not.toMatch(/commercial[ _]property/i);
         expect(screen.getByTestId('why-not-scored').textContent).toContain('Knocked out at triage: line of business is Health.');
@@ -196,7 +265,14 @@ describe('SubmissionPage for sparse accounts (FILL-console)', () => {
         expect([...na.querySelectorAll('li')].map((l) => l.getAttribute('data-letter'))).toEqual(['b', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'l']);
         // The flip reason is the engine's own sentence.
         expect(na.querySelector('[data-letter=g]').textContent).toContain('isNewBusiness, isPropertyLine cannot be changed');
-        expect(screen.getByRole('navigation', { name: 'Panels on this page' }).querySelectorAll('a')).toHaveLength(4);
+        expect([...indexNav().querySelectorAll('a')].map((a) => a.textContent)).toEqual(['Submission facts', 'Decision', 'The evidence', 'Next steps']);
+    });
+    it('the not-applicable list is a demoted, collapsed panel with no preamble', () => {
+        h.state = { ...h.state, data: knockout() };
+        mount('/submissions/SUB-2024-00008');
+        const block = document.getElementById('panel-not-applicable');
+        expect(block.tagName).toBe('DETAILS');
+        expect(block.textContent).not.toMatch(/left out rather than shown empty/);
     });
     it('a knockout is never told to "run the action plan"', () => {
         h.state = { ...h.state, data: knockout() };
@@ -207,15 +283,17 @@ describe('SubmissionPage for sparse accounts (FILL-console)', () => {
     it('a knockout panel whose data IS present (a sweep) still shows', () => {
         h.state = { ...h.state, data: knockout({ sweep: { sweepId: 's1', roomLabel: 'Lobby', stage: 'done', coverage: 80, frameCount: 12, observations: [] } }) };
         mount('/submissions/SUB-2024-00008');
-        expect(h2s()).toContain('(l) Attached photo or sweep');
+        expect(panelOrder()).toContain('l');
         expect(screen.getByTestId('not-applicable').querySelector('[data-letter=l]')).toBeNull();
     });
     it('a no-policy account shows the score breakdown and the peer benchmark without pricing', () => {
         h.state = { ...h.state, data: noPolicyDetail() };
         mount('/submissions/SUB-2025-00115');
-        expect(h2s()).toEqual(['Submission facts', '(a) Explanation and recommendation', '(b) Score breakdown', '(c) How the agent got here', '(d) Peer benchmark', '(k) Actions', 'Not applicable to this account']);
+        expect(panelOrder()).toEqual(['a', 'b', 'd', 'c', 'k']);
+        expect(panelTitles()).toEqual(['Submission facts', 'The decision', 'Not applicable to this account']);
         expect(screen.getByTestId('why-not-scored').textContent).toContain('Federato holds no policy for this submission');
-        expect(screen.getByTestId('no-pricing')).toBeTruthy();
+        // The "nothing to price" fact survives as a title-side clause, not a paragraph.
+        expect(screen.getByTestId('no-pricing').textContent).toBe('No premium to price');
         expect(screen.queryByTestId('d-pricing')).toBeNull();
         expect(screen.getByTestId('d-peers')).toBeTruthy();
         expect(document.querySelector('[data-fact=declineReason]').textContent).toContain('Loss history');
@@ -224,13 +302,14 @@ describe('SubmissionPage for sparse accounts (FILL-console)', () => {
         mount();
         expect(screen.getByRole('button', { name: 'approve' }).getAttribute('data-rationale')).toBe('');
     });
-    it('renders Independent checks after the panels, indexed and linked to /verification', () => {
+    it('renders Independent checks inside the evidence section, linked to /verification', () => {
         h.state = { ...h.state, data: detail({ verification: VERIFICATION }) };
         mount();
-        const heads = h2s();
-        expect(heads).toHaveLength(13);
-        expect(heads[12]).toBe('Independent checks');
-        expect(screen.getByRole('navigation', { name: 'Panels on this page' }).querySelectorAll('a')).toHaveLength(13);
+        // Independent checks is the page's own card, and it follows the last panel
+        // of the evidence group.
+        expect(panelTitles()).toContain('Independent checks');
+        expect(panelOrder()).toHaveLength(12);
+        expect(document.getElementById('section-evidence').contains(document.getElementById('panel-checks'))).toBe(true);
         expect(screen.getByRole('link', { name: /How the testing works/ })).toHaveAttribute('href', '/verification');
     });
 });

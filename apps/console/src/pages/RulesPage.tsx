@@ -1,21 +1,60 @@
-import type { CSSProperties, ReactElement } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import type { CSSProperties, ReactElement, ReactNode } from 'react';
+import { useSearchParams } from 'react-router';
 
 import type { RulesResponseDto } from '@retrofit/contracts';
-import { formatPercent, pluralize, titleCase } from '@retrofit/contracts';
-import { cssVar, RADIUS, SPACE, TIER_LABELS } from '@retrofit/design';
+import { formatMoney, formatPercent, formatTiv, pluralize, titleCase } from '@retrofit/contracts';
+import { cssVar, MIN_TOUCH_TARGET, RADIUS, SPACE, TIER_LABELS } from '@retrofit/design';
 
 import { useApi } from '../api/useApi.js';
 import { Badge } from '../components/atoms/Badge.js';
 import { Card } from '../components/atoms/Card.js';
 import { CitationQuote } from '../components/atoms/CitationQuote.js';
 import { Skeleton } from '../components/atoms/Skeleton.js';
-import { Tooltip } from '../components/Tooltip.js';
 
 type RulebookDto = RulesResponseDto['rulebooks'][number];
 type RuleDto = RulebookDto['rules'][number];
 type ConditionDto = RuleDto['when'][number];
+type InterpretationDto = RulesResponseDto['interpretations'][number];
 
-/** PRD 6.6 appetite table order; any other factor follows in rulebook order. */
+/* -------------------------------------------------------------------------- */
+/* Tiers — the matrix columns                                                 */
+/* -------------------------------------------------------------------------- */
+
+const TIER_ORDER = ['target', 'acceptable', 'refer', 'not_acceptable'] as const;
+type TierKey = (typeof TIER_ORDER)[number];
+
+/** The one gloss the page needs: what each column means for an account. */
+const TIER_GLOSS: Readonly<Record<TierKey, string>> = {
+  target: 'Scores 1',
+  acceptable: 'Scores 0.6',
+  refer: 'Needs an underwriter',
+  not_acceptable: 'Knocks the account out',
+};
+
+const TIER_EDGE: Readonly<Record<TierKey, string>> = {
+  target: cssVar('green'),
+  acceptable: cssVar('muted'),
+  refer: cssVar('blue'),
+  not_acceptable: cssVar('red'),
+};
+
+const TIER_TONE: Readonly<Record<TierKey, 'positive' | 'neutral' | 'info' | 'attention'>> = {
+  target: 'positive',
+  acceptable: 'neutral',
+  refer: 'info',
+  not_acceptable: 'attention',
+};
+
+function isTier(value: string): value is TierKey {
+  return (TIER_ORDER as readonly string[]).includes(value);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Factors — the matrix rows                                                  */
+/* -------------------------------------------------------------------------- */
+
+/** PRD §6.6 appetite table order; any other factor follows in rulebook order. */
 const APPETITE_FACTOR_ORDER: readonly string[] = [
   'submission_type',
   'line_of_business',
@@ -27,6 +66,196 @@ const APPETITE_FACTOR_ORDER: readonly string[] = [
   'loss_value',
 ];
 
+const FACTOR_LABELS: Readonly<Record<string, string>> = {
+  tiv: 'TIV',
+  line_of_business: 'Line of business',
+  primary_risk_state: 'Primary risk state',
+  submission_type: 'Submission type',
+  total_premium: 'Total premium',
+  building_age: 'Building age',
+  construction_type: 'Construction type',
+  loss_value: 'Loss value',
+  sprinkler_protection: 'Sprinkler protection',
+  protection_class: 'Public protection class',
+  smoke_detection: 'Smoke detection',
+  contents_limit: 'Contents limit',
+  term: 'Policy term',
+  hazard_portable_heater: 'Portable heater',
+  hazard_heater_near_combustible: 'Heater near soft furnishings',
+  hazard_extension_cord: 'Extension cord',
+  hazard_power_bar_overload: 'Power bar',
+  hazard_candle: 'Open flame',
+  hazard_stove: 'Cooking appliance',
+  hazard_blocked_exit: 'Exit',
+  hazard_window_ac_unit: 'Window air conditioning',
+  hazard_water_heater: 'Water heater',
+  hazard_high_value_contents: 'High-value contents',
+};
+
+/** Sentence case, not Title Case: these sit beside `Building age`. */
+function factorLabel(factor: string): string {
+  const known = FACTOR_LABELS[factor];
+  if (known) return known;
+  const words = factor.replace(/^hazard_/, '').split('_');
+  const [first = '', ...rest] = words;
+  return [first.charAt(0).toUpperCase() + first.slice(1), ...rest].join(' ');
+}
+
+/* -------------------------------------------------------------------------- */
+/* Conditions → plain English                                                 */
+/* -------------------------------------------------------------------------- */
+
+type Kind = 'money' | 'tiv' | 'ratio' | 'year' | 'count' | 'plain';
+
+const FIELDS: Readonly<Record<string, { readonly label: string; readonly kind: Kind }>> = {
+  totalTiv: { label: 'Total insured value', kind: 'tiv' },
+  quotedPremium: { label: 'Quoted premium', kind: 'money' },
+  fiveYearLoss: { label: 'Losses over 5 years', kind: 'money' },
+  contentsLimit: { label: 'Contents limit', kind: 'money' },
+  pctTivPre1990: { label: 'of TIV built before 1990', kind: 'ratio' },
+  pctTivPost2010: { label: 'of TIV built after 2010', kind: 'ratio' },
+  pctTivAcceptableConstruction: { label: 'of TIV in an accepted class', kind: 'ratio' },
+  pctTivSprinklered: { label: 'of TIV sprinklered', kind: 'ratio' },
+  tivWeightedProtectionClass: { label: 'TIV-weighted', kind: 'count' },
+  buildingYearBuilt: { label: 'Year built', kind: 'year' },
+  'rollup.oldestYearBuilt': { label: 'oldest building', kind: 'year' },
+  smokeDetectorCount: { label: 'seen in the room', kind: 'count' },
+};
+
+/** Fields the engine tests as 0/1. The phrase carries the whole meaning. */
+const BOOLS: Readonly<Record<string, readonly [string, string]>> = {
+  isNewBusiness: ['New business', 'Renewal business'],
+  isPropertyLine: ['Property', 'Any other line'],
+  hazardPortableHeater: ['Portable heater in the room', 'No portable heater'],
+  hazardHeaterNearCombustible: ['Heater within 20° of fabric', 'Heater clear of fabric'],
+  hazardExtensionCord: ['Extension cord in use', 'No extension cord'],
+  hazardPowerBarOverload: ['Power bar overloaded', 'Power bar not overloaded'],
+  hazardCandle: ['Open-flame candle', 'No candle'],
+  hazardStove: ['Cooking appliance in the room', 'No cooking appliance'],
+  hazardBlockedExit: ['Exit blocked', 'Exit clear'],
+  hazardWindowAcUnit: ['Window air-conditioning unit', 'No window unit'],
+  hazardWaterHeater: ['Water heater inside the unit', 'No water heater'],
+  hazardHighValueContents: ['High-value contents on show', 'No high-value contents'],
+};
+
+function fieldSpec(field: string): { readonly label: string; readonly kind: Kind } {
+  return FIELDS[field] ?? { label: titleCase(field), kind: 'plain' };
+}
+
+function formatValue(kind: Kind, value: ConditionDto['value']): string {
+  if (typeof value !== 'number') return String(value ?? '');
+  if (kind === 'money') return formatMoney(value);
+  if (kind === 'tiv') return formatTiv(value);
+  if (kind === 'ratio') return formatPercent(value);
+  return String(value);
+}
+
+const LOWER_OPS = new Set(['gt', 'gte']);
+const UPPER_OPS = new Set(['lt', 'lte']);
+
+/** One condition on its own, as a phrase that reads under the factor name. */
+function singlePhrase(kind: Kind, condition: ConditionDto): string {
+  const v = formatValue(kind, condition.value);
+  const n = typeof condition.value === 'number' ? condition.value : null;
+  const whole = kind === 'year' || kind === 'count';
+  switch (condition.op) {
+    case 'lt':
+      if (kind === 'year') return `before ${v}`;
+      return whole && n !== null ? `${n - 1} or less` : `under ${v}`;
+    case 'lte':
+      return kind === 'year' ? `${v} or earlier` : `${v} or less`;
+    case 'gt':
+      if (kind === 'year') return `after ${v}`;
+      return whole && n !== null ? `${n + 1} or more` : `over ${v}`;
+    case 'gte':
+      return kind === 'year' ? `${v} or later` : `${v} or more`;
+    case 'eq':
+      return kind === 'count' && n === 0 ? 'None' : v;
+    case 'neq':
+      return `not ${v}`;
+    case 'in':
+      return Array.isArray(condition.value) ? condition.value.map(String).join(', ') : v;
+    case 'notin':
+      return `not ${Array.isArray(condition.value) ? condition.value.map(String).join(', ') : v}`;
+    case 'exists':
+      return 'Present';
+    case 'missing':
+      return 'Missing';
+    default:
+      return `${condition.op} ${v}`;
+  }
+}
+
+/** Two bounds on one field, collapsed into a range. */
+function rangePhrase(kind: Kind, lower: ConditionDto, upper: ConditionDto): string {
+  const whole = kind === 'year' || kind === 'count';
+  const lo = typeof lower.value === 'number' ? lower.value : null;
+  const hi = typeof upper.value === 'number' ? upper.value : null;
+  if (whole && lo !== null && hi !== null) {
+    const from = lower.op === 'gt' ? lo + 1 : lo;
+    const to = upper.op === 'lt' ? hi - 1 : hi;
+    return `${from}–${to}`;
+  }
+  const a = formatValue(kind, lower.value);
+  const b = formatValue(kind, upper.value);
+  if (lower.op === 'gte' && upper.op === 'lte') return `${a}–${b}`;
+  if (lower.op === 'gt' && upper.op === 'lte') return `over ${a}, up to ${b}`;
+  if (lower.op === 'gte' && upper.op === 'lt') return `${a} to under ${b}`;
+  return `over ${a}, under ${b}`;
+}
+
+interface Clause {
+  /** The threshold itself — the thing the eye scans across the row. */
+  readonly text: string;
+  /** What the threshold is measured on. Empty when the phrase says it already. */
+  readonly label: string;
+}
+
+/**
+ * Turn a rule's `when` list into the criteria a reader can compare across a
+ * row. Conditions on one field collapse into a single clause; a range becomes
+ * one phrase rather than two inequalities.
+ */
+function describe(rule: RuleDto): readonly Clause[] {
+  const byField = new Map<string, ConditionDto[]>();
+  for (const condition of rule.when) {
+    const list = byField.get(condition.field);
+    if (list) list.push(condition);
+    else byField.set(condition.field, [condition]);
+  }
+  if (byField.size === 0) return [{ text: 'Always', label: '' }];
+
+  const single = byField.size === 1;
+  const clauses: Clause[] = [];
+  for (const [field, conditions] of byField) {
+    // The guideline lists the states themselves; the vector tests a tier number,
+    // so the citation's own wording is the readable criterion.
+    if (field === 'stateTier') {
+      clauses.push({ text: rule.citation.quote, label: '' });
+      continue;
+    }
+    const bool = BOOLS[field];
+    const first = conditions[0];
+    if (bool && conditions.length === 1 && first && first.op === 'eq') {
+      const truthy = first.value === 1 || first.value === true || first.value === '1';
+      clauses.push({ text: truthy ? bool[0] : bool[1], label: '' });
+      continue;
+    }
+    const spec = fieldSpec(field);
+    const lower = conditions.find((c) => LOWER_OPS.has(c.op));
+    const upper = conditions.find((c) => UPPER_OPS.has(c.op));
+    const text =
+      lower && upper && conditions.length === 2
+        ? rangePhrase(spec.kind, lower, upper)
+        : conditions.map((c) => singlePhrase(spec.kind, c)).join(' and ');
+    // A percentage is meaningless without its denominator, so a ratio always
+    // names it. A sum of money or a year reads fine under the factor heading.
+    const needsLabel = spec.kind === 'ratio' || spec.kind === 'plain' || !single;
+    clauses.push({ text, label: needsLabel ? spec.label : '' });
+  }
+  return clauses;
+}
+
 const OP_TEXT: Readonly<Record<string, string>> = {
   lt: '<',
   lte: '≤',
@@ -34,11 +263,25 @@ const OP_TEXT: Readonly<Record<string, string>> = {
   gte: '≥',
   eq: '=',
   neq: '≠',
-  in: 'is one of',
-  notin: 'is not one of',
+  in: 'in',
+  notin: 'not in',
   exists: 'is present',
   missing: 'is missing',
 };
+
+/** The machine truth, kept verbatim under the plain-English phrase. */
+function rawCondition(condition: ConditionDto): string {
+  const op = OP_TEXT[condition.op] ?? condition.op;
+  if (condition.op === 'exists' || condition.op === 'missing') return `${condition.field} ${op}`;
+  const value = Array.isArray(condition.value)
+    ? condition.value.map(String).join(', ')
+    : String(condition.value ?? '');
+  return `${condition.field} ${op} ${value}`;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Narrowing the untyped response                                             */
+/* -------------------------------------------------------------------------- */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -69,7 +312,8 @@ function toRulebooks(raw: readonly unknown[]): readonly RulebookDto[] {
     if (!isRecord(item) || typeof item.id !== 'string' || !Array.isArray(item.rules)) continue;
     books.push({
       id: item.id,
-      label: typeof item.label === 'string' && item.label.length > 0 ? item.label : titleCase(item.id),
+      label:
+        typeof item.label === 'string' && item.label.length > 0 ? item.label : titleCase(item.id),
       version: typeof item.version === 'string' ? item.version : '',
       isExtension: item.isExtension === true || item.id === 'extensions',
       rules: (item.rules as readonly unknown[]).filter(isRule),
@@ -78,30 +322,36 @@ function toRulebooks(raw: readonly unknown[]): readonly RulebookDto[] {
   return books;
 }
 
-function formatConditionValue(value: ConditionDto['value']): string {
-  if (value === undefined) return '';
-  if (Array.isArray(value)) return value.map((v) => String(v)).join(', ');
-  return String(value);
+function isInterpretation(value: unknown): value is InterpretationDto {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.title === 'string' &&
+    typeof value.decision === 'string'
+  );
 }
 
-function formatCondition(condition: ConditionDto): string {
-  const op = OP_TEXT[condition.op] ?? condition.op;
-  if (condition.op === 'exists' || condition.op === 'missing') return `${condition.field} ${op}`;
-  return `${condition.field} ${op} ${formatConditionValue(condition.value)}`;
-}
+/* -------------------------------------------------------------------------- */
+/* Matrix model                                                               */
+/* -------------------------------------------------------------------------- */
 
-function tierLabel(tier: string): string {
-  return (TIER_LABELS as Readonly<Record<string, string>>)[tier] ?? titleCase(tier);
-}
-
-interface FactorGroup {
+interface FactorRow {
   readonly factor: string;
-  readonly rules: readonly RuleDto[];
   /** The factor's weight when every weighted rule agrees on one; else null. */
   readonly weight: number | null;
+  readonly cells: Readonly<Record<TierKey, readonly RuleDto[]>>;
+  readonly count: number;
 }
 
-function groupByFactor(rules: readonly RuleDto[]): readonly FactorGroup[] {
+interface Matrix {
+  readonly rows: readonly FactorRow[];
+  /** Only the tier columns this rulebook actually uses. */
+  readonly tiers: readonly TierKey[];
+  readonly maxWeight: number;
+  readonly weighted: boolean;
+}
+
+function buildMatrix(rules: readonly RuleDto[]): Matrix {
   const byFactor = new Map<string, RuleDto[]>();
   for (const rule of rules) {
     const list = byFactor.get(rule.factor);
@@ -115,12 +365,78 @@ function groupByFactor(rules: readonly RuleDto[]): readonly FactorGroup[] {
   const factors = [...byFactor.keys()];
   const firstSeen = new Map(factors.map((f, i) => [f, i] as const));
   factors.sort((a, b) => rank(a) - rank(b) || (firstSeen.get(a) ?? 0) - (firstSeen.get(b) ?? 0));
-  return factors.map((factor) => {
+
+  const used = new Set<TierKey>();
+  let maxWeight = 0;
+  const rows = factors.map((factor) => {
     const list = byFactor.get(factor) ?? [];
-    const weights = new Set(list.map((r) => r.weight).filter((w): w is number => typeof w === 'number'));
-    return { factor, rules: list, weight: weights.size === 1 ? [...weights][0]! : null };
+    const cells: Record<TierKey, RuleDto[]> = {
+      target: [],
+      acceptable: [],
+      refer: [],
+      not_acceptable: [],
+    };
+    for (const rule of list) {
+      if (!isTier(rule.tier)) continue;
+      cells[rule.tier].push(rule);
+      used.add(rule.tier);
+    }
+    const weights = new Set(
+      list.map((r) => r.weight).filter((w): w is number => typeof w === 'number'),
+    );
+    const weight = weights.size === 1 ? [...weights][0]! : null;
+    if (weight !== null && weight > maxWeight) maxWeight = weight;
+    return { factor, weight, cells, count: list.length };
   });
+
+  return {
+    rows,
+    tiers: TIER_ORDER.filter((t) => used.has(t)),
+    maxWeight,
+    weighted: maxWeight > 0,
+  };
 }
+
+/**
+ * The interpretations that bear on one factor row: an interpretation names the
+ * vector fields it `affects`, a rule names the fields it tests.
+ */
+function notesFor(
+  row: FactorRow,
+  interpretations: readonly InterpretationDto[],
+): readonly InterpretationDto[] {
+  const fields = new Set<string>();
+  for (const tier of TIER_ORDER) {
+    for (const rule of row.cells[tier]) {
+      for (const condition of rule.when) fields.add(condition.field);
+    }
+  }
+  return interpretations.filter((item) => (item.affects ?? []).some((field) => fields.has(field)));
+}
+
+/* -------------------------------------------------------------------------- */
+/* Narrow-viewport switch                                                     */
+/* -------------------------------------------------------------------------- */
+
+const STACK_BELOW = 900;
+
+/** True on a viewport too narrow for a four-column matrix. Wide in jsdom. */
+function useStacked(): boolean {
+  const [stacked, setStacked] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const query = window.matchMedia(`(max-width: ${STACK_BELOW - 1}px)`);
+    const apply = (): void => setStacked(query.matches);
+    apply();
+    query.addEventListener('change', apply);
+    return () => query.removeEventListener('change', apply);
+  }, []);
+  return stacked;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Styles                                                                     */
+/* -------------------------------------------------------------------------- */
 
 const pageStyle: CSSProperties = {
   display: 'flex',
@@ -144,40 +460,80 @@ const mutedStyle: CSSProperties = {
   lineHeight: cssVar('leading-small'),
 };
 
-const factorStyle: CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: SPACE.md,
-  marginTop: SPACE.lg,
+const microStyle: CSSProperties = {
+  color: cssVar('muted-deep'),
+  fontSize: cssVar('size-micro'),
+  lineHeight: cssVar('leading-micro'),
 };
 
-const factorHeadingStyle: CSSProperties = {
-  margin: 0,
-  display: 'flex',
-  flexWrap: 'wrap',
-  alignItems: 'baseline',
-  gap: SPACE.sm,
+const tableStyle: CSSProperties = {
+  width: '100%',
+  borderCollapse: 'collapse',
+  fontSize: cssVar('size-small'),
+  lineHeight: cssVar('leading-small'),
+  tableLayout: 'fixed',
+};
+
+const cellBase: CSSProperties = {
+  borderTop: `${cssVar('border-width')} solid ${cssVar('border-color')}`,
+  padding: SPACE.sm,
+  verticalAlign: 'top',
+  textAlign: 'left',
+  minWidth: 0,
+};
+
+/** Ruled columns, as on a printed table; the tier is named in the head, not painted down the page. */
+const columnRule: CSSProperties = {
+  borderLeft: '1px solid var(--rf-rule-faint)',
+};
+
+/** The ledger's double red rule, separating the printed table from the margin. */
+const marginRule: CSSProperties = {
+  borderLeft: `1px solid ${cssVar('red')}`,
+  boxShadow: `inset 3px 0 0 var(--rf-sheet), inset 4px 0 0 ${cssVar('red')}`,
+  paddingLeft: SPACE.lg,
+};
+
+const rowHeadStyle: CSSProperties = {
+  ...cellBase,
+  fontFamily: cssVar('font-display'),
+  color: cssVar('ink'),
+  fontWeight: 600,
   fontSize: cssVar('size-body'),
   lineHeight: cssVar('leading-body'),
-  fontWeight: 600,
+  paddingLeft: 0,
+  overflowWrap: 'anywhere',
 };
 
-const ruleListStyle: CSSProperties = {
-  listStyle: 'none',
-  margin: 0,
-  padding: 0,
-  display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fill, minmax(min(300px, 100%), 1fr))',
-  gap: SPACE.md,
+const codeStyle: CSSProperties = {
+  fontSize: cssVar('size-micro'),
+  overflowWrap: 'anywhere',
 };
 
-const ruleStyle: CSSProperties = {
+const ruleButtonStyle: CSSProperties = {
+  display: 'block',
+  width: '100%',
+  minHeight: MIN_TOUCH_TARGET,
+  textAlign: 'left',
+  background: 'transparent',
+  border: `${cssVar('border-width')} solid transparent`,
+  borderRadius: RADIUS.card,
+  padding: `${SPACE.sm}px ${SPACE.sm}px`,
+  font: 'inherit',
+  color: 'inherit',
+  cursor: 'pointer',
+};
+
+const detailStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: SPACE.sm,
-  padding: SPACE.lg,
-  border: `${cssVar('border-width')} solid ${cssVar('border-color')}`,
-  borderRadius: RADIUS.card,
+  padding: `${SPACE.md}px ${SPACE.lg}px ${SPACE.lg}px`,
+  maxWidth: 860,
+  boxSizing: 'border-box',
+  background: cssVar('paper'),
+  border: '1px solid var(--rf-rule)',
+  borderTop: `2px solid ${cssVar('ink')}`,
 };
 
 const metaStyle: CSSProperties = {
@@ -190,49 +546,117 @@ const metaStyle: CSSProperties = {
   lineHeight: cssVar('leading-small'),
 };
 
-const dtStyle: CSSProperties = { color: cssVar('muted-deep') };
-const ddStyle: CSSProperties = { margin: 0, minWidth: 0, overflowWrap: 'anywhere' };
-const codeStyle: CSSProperties = { fontSize: cssVar('size-small') };
+/* -------------------------------------------------------------------------- */
+/* Pieces                                                                     */
+/* -------------------------------------------------------------------------- */
 
-function RuleCard(props: { readonly rule: RuleDto; readonly showWeight: boolean }): ReactElement {
-  const { rule, showWeight } = props;
-  const citation = rule.citation;
+function WeightBar(props: { readonly weight: number; readonly max: number }): ReactElement {
+  const share = props.max > 0 ? Math.max(0.08, props.weight / props.max) : 0;
   return (
-    <li style={ruleStyle} aria-label={`Rule ${rule.id}`} data-rule-id={rule.id}>
+    <span style={{ display: 'block' }}>
+      <span style={{ display: 'block', fontVariantNumeric: 'tabular-nums' }}>
+        {formatPercent(props.weight)}
+      </span>
+      <span
+        aria-hidden="true"
+        style={{
+          display: 'block',
+          height: 3,
+          marginTop: 2,
+          background: 'var(--rf-rule-faint)',
+        }}
+      >
+        <span
+          style={{
+            display: 'block',
+            height: 3,
+            width: `${share * 100}%`,
+            background: cssVar('ink'),
+          }}
+        />
+      </span>
+    </span>
+  );
+}
+
+/** One criterion in a cell: the threshold, what it measures, and its rule id. */
+function Criterion(props: {
+  readonly rule: RuleDto;
+  readonly open: boolean;
+  readonly onToggle: (id: string) => void;
+}): ReactElement {
+  const { rule, open, onToggle } = props;
+  const clauses = describe(rule);
+  return (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-controls={`rule-${rule.id}`}
+      onClick={() => onToggle(rule.id)}
+      data-rule-id={rule.id}
+      style={{
+        ...ruleButtonStyle,
+        borderColor: 'transparent',
+        background: open ? cssVar('paper') : 'transparent',
+        boxShadow: open ? `inset 3px 0 0 ${cssVar('ink')}` : 'none',
+      }}
+    >
+      {clauses.map((clause, i) => (
+        <span key={`${clause.text}-${i}`} style={{ display: 'block' }}>
+          <span style={{ fontWeight: 600 }}>{clause.text}</span>
+          {clause.label ? <span style={{ ...microStyle, display: 'block' }}>{clause.label}</span> : null}
+        </span>
+      ))}
+      <span style={{ display: 'block', marginTop: SPACE.xs }}>
+        <span className="rf-rule-tab">{rule.id}</span>
+      </span>
+    </button>
+  );
+}
+
+function RuleDetail(props: { readonly rule: RuleDto }): ReactElement {
+  const { rule } = props;
+  const citation = rule.citation;
+  const tier = isTier(rule.tier) ? rule.tier : null;
+  return (
+    <div id={`rule-${rule.id}`} role="group" style={detailStyle} aria-label={`Rule ${rule.id}`}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: SPACE.sm, alignItems: 'baseline' }}>
-        <code style={{ ...codeStyle, fontWeight: 600 }}>{rule.id}</code>
-        <Badge label={tierLabel(rule.tier)} tone={rule.tier === 'not_acceptable' ? 'attention' : 'neutral'} />
-        {rule.extension === true ? <Badge label="Retrofit extension" tone="quiet" /> : null}
+        <span className="rf-rule-tab">{rule.id}</span>
+        <Badge
+          label={tier ? TIER_LABELS[tier] : titleCase(rule.tier)}
+          tone={tier ? TIER_TONE[tier] : 'neutral'}
+        />
+        {rule.extension === true ? <Badge label="Ours, not Federato’s" tone="quiet" /> : null}
       </div>
       <dl style={metaStyle}>
-        <dt style={dtStyle}>When</dt>
-        <dd style={ddStyle}>
+        <dt style={{ color: cssVar('muted-deep') }}>Tests</dt>
+        <dd style={{ margin: 0, minWidth: 0 }}>
           {rule.when.length === 0 ? (
             'Always'
           ) : (
-            <code style={codeStyle}>{rule.when.map(formatCondition).join(' AND ')}</code>
+            <code style={codeStyle}>{rule.when.map(rawCondition).join(' AND ')}</code>
           )}
         </dd>
-        {showWeight ? (
+        {typeof rule.weight === 'number' ? (
           <>
-            <dt style={dtStyle}>Weight</dt>
-            <dd style={ddStyle}>
-              {typeof rule.weight === 'number' ? formatPercent(rule.weight) : 'Not weighted'}
-            </dd>
+            <dt style={{ color: cssVar('muted-deep') }}>Weight</dt>
+            <dd style={{ margin: 0 }}>{formatPercent(rule.weight)}</dd>
           </>
         ) : null}
         {rule.ratingFactor ? (
           <>
-            <dt style={dtStyle}>Rating factor</dt>
-            <dd style={ddStyle}>
+            <dt style={{ color: cssVar('muted-deep') }}>Rating factor</dt>
+            <dd style={{ margin: 0, minWidth: 0 }}>
               <code style={codeStyle}>{rule.ratingFactor}</code>
             </dd>
           </>
         ) : null}
       </dl>
-      <CitationQuote citation={{ document: `${citation.doc} · ${citation.section}`, quote: citation.quote }} />
+      <CitationQuote
+        citation={{ document: `${citation.doc} · ${citation.section}`, quote: citation.quote }}
+      />
       {rule.interpretation ? (
-        <p style={{ margin: 0, fontSize: cssVar('size-small'), lineHeight: cssVar('leading-small') }}>
+        <p style={mutedStyle}>
           <strong>Interpretation: </strong>
           {rule.interpretation}
         </p>
@@ -243,73 +667,336 @@ function RuleCard(props: { readonly rule: RuleDto; readonly showWeight: boolean 
           {rule.fixHint}
         </p>
       ) : null}
-    </li>
+    </div>
   );
 }
 
-function FactorSection(props: {
-  readonly group: FactorGroup;
-  readonly bookId: string;
-  readonly showWeight: boolean;
-}): ReactElement {
-  const { group, bookId, showWeight } = props;
-  const headingId = `rf-rules-${bookId}-${group.factor}`.replace(/[^a-zA-Z0-9_-]+/g, '-');
+/** Red-pen notes beside the row an interpretation changes; each links to the full decision. */
+function MarginNotes(props: { readonly notes: readonly InterpretationDto[] }): ReactElement | null {
+  if (props.notes.length === 0) return null;
   return (
-    <section style={factorStyle} aria-labelledby={headingId}>
-      <h3 id={headingId} style={factorHeadingStyle}>
-        <span>{titleCase(group.factor)}</span>
-        {showWeight && group.weight !== null ? (
-          <span style={{ ...mutedStyle, fontWeight: 400 }}>Weight {formatPercent(group.weight)}</span>
-        ) : null}
-        <span style={{ ...mutedStyle, fontWeight: 400 }}>{pluralize(group.rules.length, 'rule')}</span>
-      </h3>
-      <ul style={ruleListStyle}>
-        {group.rules.map((rule) => (
-          <RuleCard key={rule.id} rule={rule} showWeight={showWeight} />
+    <>
+      {props.notes.map((note) => (
+        <a
+          key={note.id}
+          className="rf-margin-note"
+          href="#interpretations"
+          title={note.decision}
+          data-interpretation-id={note.id}
+        >
+          {note.title}
+        </a>
+      ))}
+    </>
+  );
+}
+
+function CellRules(props: {
+  readonly rules: readonly RuleDto[];
+  readonly openId: string | null;
+  readonly onToggle: (id: string) => void;
+}): ReactElement {
+  const { rules, openId, onToggle } = props;
+  if (rules.length === 0) {
+    return (
+      <span style={microStyle} aria-label="No rule">
+        —
+      </span>
+    );
+  }
+  return (
+    <>
+      {rules.map((rule) => (
+        <Criterion key={rule.id} rule={rule} open={openId === rule.id} onToggle={onToggle} />
+      ))}
+    </>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* The matrix, wide and stacked                                               */
+/* -------------------------------------------------------------------------- */
+
+function WideMatrix(props: {
+  readonly matrix: Matrix;
+  readonly caption: string;
+  readonly interpretations: readonly InterpretationDto[];
+  readonly openId: string | null;
+  readonly onToggle: (id: string) => void;
+}): ReactElement {
+  const { matrix, caption, interpretations, openId, onToggle } = props;
+  const notes = matrix.rows.map((row) => notesFor(row, interpretations));
+  const hasMargin = notes.some((list) => list.length > 0);
+  const columns = 1 + (matrix.weighted ? 1 : 0) + matrix.tiers.length + (hasMargin ? 1 : 0);
+  return (
+    <table style={tableStyle}>
+      <caption className="rf-sr-only">{caption}</caption>
+      <colgroup>
+        <col style={{ width: '18%' }} />
+        {matrix.weighted ? <col style={{ width: '9%' }} /> : null}
+        {matrix.tiers.map((tier) => (
+          <col key={tier} />
         ))}
-      </ul>
-    </section>
+        {hasMargin ? <col style={{ width: '17%' }} /> : null}
+      </colgroup>
+      <thead>
+        <tr>
+          <th scope="col" style={{ ...cellBase, borderTop: 'none', paddingLeft: 0 }}>
+            <span style={microStyle}>Factor</span>
+          </th>
+          {matrix.weighted ? (
+            <th scope="col" style={{ ...cellBase, borderTop: 'none' }}>
+              <span style={microStyle}>Weight</span>
+            </th>
+          ) : null}
+          {matrix.tiers.map((tier) => (
+            <th
+              key={tier}
+              scope="col"
+              style={{
+                ...cellBase,
+                ...columnRule,
+                borderTop: 'none',
+                borderBottom: `3px solid ${TIER_EDGE[tier]}`,
+              }}
+            >
+              <span style={{ display: 'block', fontWeight: 600 }}>{TIER_LABELS[tier]}</span>
+              <span style={{ ...microStyle, display: 'block', textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>
+                {TIER_GLOSS[tier]}
+              </span>
+            </th>
+          ))}
+          {hasMargin ? (
+            <th scope="col" style={{ ...cellBase, ...marginRule, borderTop: 'none' }}>
+              <span style={microStyle}>Margin</span>
+            </th>
+          ) : null}
+        </tr>
+      </thead>
+      <tbody>
+        {matrix.rows.map((row, rowIndex) => {
+          const open = matrix.tiers
+            .flatMap((tier) => row.cells[tier])
+            .find((rule) => rule.id === openId);
+          return (
+            <Fragment key={row.factor}>
+              <tr>
+                <th scope="row" style={rowHeadStyle}>
+                  {factorLabel(row.factor)}
+                </th>
+                {matrix.weighted ? (
+                  <td style={{ ...cellBase, fontSize: cssVar('size-small') }}>
+                    {row.weight === null ? (
+                      <span style={microStyle}>—</span>
+                    ) : (
+                      <WeightBar weight={row.weight} max={matrix.maxWeight} />
+                    )}
+                  </td>
+                ) : null}
+                {matrix.tiers.map((tier) => (
+                  <td
+                    key={tier}
+                    style={{ ...cellBase, ...columnRule, padding: SPACE.xs }}
+                  >
+                    <CellRules rules={row.cells[tier]} openId={openId} onToggle={onToggle} />
+                  </td>
+                ))}
+                {hasMargin ? (
+                  <td style={{ ...cellBase, ...marginRule, verticalAlign: 'middle' }}>
+                    <MarginNotes notes={notes[rowIndex] ?? []} />
+                  </td>
+                ) : null}
+              </tr>
+              {open ? (
+                <tr>
+                  <td
+                    colSpan={hasMargin ? columns - 1 : columns}
+                    style={{ padding: `0 ${SPACE.lg}px ${SPACE.lg}px 0`, borderBottom: 'none' }}
+                  >
+                    <RuleDetail rule={open} />
+                  </td>
+                  {/* The margin rule runs unbroken past an open rule. */}
+                  {hasMargin ? <td style={{ ...marginRule, borderBottom: 'none' }} /> : null}
+                </tr>
+              ) : null}
+            </Fragment>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function StackedMatrix(props: {
+  readonly matrix: Matrix;
+  readonly interpretations: readonly InterpretationDto[];
+  readonly openId: string | null;
+  readonly onToggle: (id: string) => void;
+}): ReactElement {
+  const { matrix, interpretations, openId, onToggle } = props;
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: SPACE.lg }}>
+      {matrix.rows.map((row) => {
+        const open = matrix.tiers
+          .flatMap((tier) => row.cells[tier])
+          .find((rule) => rule.id === openId);
+        return (
+          <section key={row.factor} aria-label={factorLabel(row.factor)}>
+            <h3
+              style={{
+                margin: 0,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'baseline',
+                gap: SPACE.sm,
+                fontSize: cssVar('size-body'),
+                lineHeight: cssVar('leading-body'),
+              }}
+            >
+              <span>{factorLabel(row.factor)}</span>
+              {matrix.weighted && row.weight !== null ? (
+                <span style={microStyle}>{formatPercent(row.weight)}</span>
+              ) : null}
+            </h3>
+            <MarginNotes notes={notesFor(row, interpretations)} />
+            {matrix.tiers.map((tier) =>
+              row.cells[tier].length === 0 ? null : (
+                <div
+                  key={tier}
+                  style={{
+                    marginTop: SPACE.sm,
+                    padding: SPACE.sm,
+                    borderLeft: `3px solid ${TIER_EDGE[tier]}`,
+                  }}
+                >
+                  <span style={{ ...microStyle, display: 'block', fontWeight: 600 }}>
+                    {TIER_LABELS[tier]}
+                  </span>
+                  <CellRules rules={row.cells[tier]} openId={openId} onToggle={onToggle} />
+                </div>
+              ),
+            )}
+            {open ? <div style={{ marginTop: SPACE.sm }}><RuleDetail rule={open} /></div> : null}
+          </section>
+        );
+      })}
+    </div>
   );
 }
 
 function RulebookCard(props: {
-  readonly id: string;
-  readonly title: string;
-  readonly version: string;
-  readonly rules: readonly RuleDto[];
-  readonly note?: ReactElement;
-  readonly showWeight: boolean;
+  readonly book: RulebookDto;
+  readonly note?: ReactNode;
+  readonly interpretations: readonly InterpretationDto[];
+  readonly stacked: boolean;
+  readonly openId: string | null;
+  readonly onToggle: (id: string) => void;
 }): ReactElement {
-  const { id, title, version, rules, note, showWeight } = props;
-  const groups = groupByFactor(rules);
-  const aside = [version ? `v${version}` : null, pluralize(rules.length, 'rule')].filter(Boolean).join(' · ');
+  const { book, note, interpretations, stacked, openId, onToggle } = props;
+  const matrix = useMemo(() => buildMatrix(book.rules), [book.rules]);
+  const aside = [book.version ? `v${book.version}` : null, pluralize(book.rules.length, 'rule')]
+    .filter(Boolean)
+    .join(' · ');
   return (
-    <Card title={title} aside={aside} anchorId={`rulebook-${id}`}>
+    <Card title={book.label} aside={aside} anchorId={`rulebook-${book.id}`}>
       {note ?? null}
-      {groups.length === 0 ? <p style={mutedStyle}>No rules in this rulebook.</p> : null}
-      {groups.map((group) => (
-        <FactorSection key={group.factor} group={group} bookId={id} showWeight={showWeight} />
-      ))}
+      {matrix.rows.length === 0 ? (
+        <p style={mutedStyle}>No rules in this rulebook.</p>
+      ) : stacked ? (
+        <StackedMatrix
+          matrix={matrix}
+          interpretations={interpretations}
+          openId={openId}
+          onToggle={onToggle}
+        />
+      ) : (
+        <div className="rf-scroll-x">
+          <WideMatrix
+            matrix={matrix}
+            caption={`${book.label}: every factor, with the criterion that puts an account in each tier.`}
+            interpretations={interpretations}
+            openId={openId}
+            onToggle={onToggle}
+          />
+        </div>
+      )}
     </Card>
   );
 }
 
+function Interpretations(props: {
+  readonly items: readonly InterpretationDto[];
+}): ReactElement | null {
+  const { items } = props;
+  if (items.length === 0) return null;
+  return (
+    <Card
+      title="Where the guidelines were ambiguous"
+      aside={pluralize(items.length, 'decision')}
+      anchorId="interpretations"
+    >
+      <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: SPACE.lg }}>
+        {items.map((item) => (
+          <div key={item.id} style={{ display: 'flex', flexDirection: 'column', gap: SPACE.xs }}>
+            <dt style={{ fontWeight: 600 }}>
+              <code style={{ ...codeStyle, marginRight: SPACE.sm }}>{item.id}</code>
+              {item.title}
+            </dt>
+            <dd style={{ margin: 0 }}>
+              <p style={{ ...mutedStyle, color: cssVar('ink') }}>{item.decision}</p>
+              {item.affects.length > 0 ? (
+                <p style={{ ...microStyle, marginTop: SPACE.xs }}>
+                  Affects <code style={codeStyle}>{item.affects.join(', ')}</code>
+                </p>
+              ) : null}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Page                                                                       */
+/* -------------------------------------------------------------------------- */
+
 /**
- * PRD 10 /rules - rule cards by factor with citation, quote, weight and interpretation; extension rules in a separate labelled group.
+ * PRD §10 /rules — the appetite guidelines as the criteria table they are:
+ * one row per factor, one column per tier, the threshold in each cell, and the
+ * rule id, raw condition, citation and interpretation behind each one.
  *
- * Stub frozen by W0-4. Unit C13 replaces this body only.
- * Route registration lives in src/App.tsx and is frozen.
+ * The open rule lives in `?rule=`, so a verdict elsewhere in the console can
+ * link straight at the criterion that decided it.
  */
 export function RulesPage(): ReactElement {
   const state = useApi((client) => client.getRules(), []);
+  const [params, setParams] = useSearchParams();
+  const stacked = useStacked();
+  const openId = params.get('rule');
+
+  const onToggle = useCallback(
+    (id: string) => {
+      const next = new URLSearchParams(params);
+      if (next.get('rule') === id) next.delete('rule');
+      else next.set('rule', id);
+      setParams(next, { replace: true });
+    },
+    [params, setParams],
+  );
+
+  // A deep link from a verdict lands on the rule, not the top of the page.
+  useEffect(() => {
+    if (openId === null || typeof document === 'undefined') return;
+    const el = document.getElementById(`rule-${openId}`);
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'center' });
+  }, [openId]);
 
   const header = (
     <header>
       <h1 style={titleStyle}>Rules</h1>
       <p style={{ ...mutedStyle, marginTop: SPACE.xs }}>
-        Every active rule, grouped by factor, with the document, section and exact quote it comes from. Weights apply
-        to the <Tooltip term="Appetite">appetite</Tooltip> score; Retrofit’s own extension rules are listed separately
-        and never change it.
+        Every criterion the engine tests, in the shape of the guideline table it came from.
       </p>
     </header>
   );
@@ -330,7 +1017,11 @@ export function RulesPage(): ReactElement {
           <p style={{ margin: 0 }}>
             The rulebooks could not be loaded{state.error ? `: ${state.error.message}` : '.'}
           </p>
-          <button type="button" onClick={state.reload} style={{ minHeight: 44, marginTop: SPACE.sm }}>
+          <button
+            type="button"
+            onClick={state.reload}
+            style={{ minHeight: MIN_TOUCH_TARGET, marginTop: SPACE.sm }}
+          >
             Try again
           </button>
         </div>
@@ -339,48 +1030,48 @@ export function RulesPage(): ReactElement {
   }
 
   const books = toRulebooks(state.data.rulebooks);
-  const primary = books.filter((b) => !b.isExtension);
-  const extensionRules: RuleDto[] = [];
-  const extensionVersions: string[] = [];
+  const interpretations = (state.data.interpretations ?? []).filter(isInterpretation);
+
+  // A rule flagged `extension` inside another rulebook still belongs with
+  // Retrofit's own rules, which never touch the appetite score.
+  const strays: RuleDto[] = [];
+  const shown: RulebookDto[] = [];
   for (const book of books) {
     if (book.isExtension) {
-      extensionRules.push(...book.rules);
-      if (book.version) extensionVersions.push(book.version);
-    } else {
-      // A rule flagged `extension` inside another rulebook still belongs with Retrofit's own rules.
-      extensionRules.push(...book.rules.filter((r) => r.extension === true));
+      shown.push(book);
+      continue;
     }
+    const own = book.rules.filter((r) => r.extension !== true);
+    strays.push(...book.rules.filter((r) => r.extension === true));
+    shown.push({ ...book, rules: own });
   }
+  const ordered = shown.map((book) =>
+    book.isExtension ? { ...book, rules: [...book.rules, ...strays] } : book,
+  );
 
   return (
     <div style={pageStyle}>
       {header}
-      {books.length === 0 ? <p>No rulebooks are active.</p> : null}
-      {primary.map((book) => (
+      {ordered.length === 0 ? <p>No rulebooks are active.</p> : null}
+      {ordered.map((book) => (
         <RulebookCard
           key={book.id}
-          id={book.id}
-          title={book.label}
-          version={book.version}
-          rules={book.rules.filter((r) => r.extension !== true)}
-          showWeight={book.rules.some((r) => typeof r.weight === 'number')}
-        />
-      ))}
-      {extensionRules.length > 0 ? (
-        <RulebookCard
-          id="extensions"
-          title="Retrofit extension rules (ours, not Federato’s)"
-          version={extensionVersions.length === 1 ? extensionVersions[0]! : ''}
-          rules={extensionRules}
-          showWeight={false}
+          book={book}
+          interpretations={interpretations}
+          stacked={stacked}
+          openId={openId}
+          onToggle={onToggle}
           note={
-            <p style={mutedStyle}>
-              These rules are Retrofit’s own, not from Federato’s appetite guidelines. They can raise REFER or a
-              contradiction and feed the premium, and they never touch the appetite score.
-            </p>
+            book.isExtension ? (
+              <p style={{ ...mutedStyle, marginBottom: SPACE.md }}>
+                Retrofit’s own rules. They can raise REFER or a contradiction and feed the premium,
+                and they never touch the appetite score.
+              </p>
+            ) : null
           }
         />
-      ) : null}
+      ))}
+      <Interpretations items={interpretations} />
     </div>
   );
 }

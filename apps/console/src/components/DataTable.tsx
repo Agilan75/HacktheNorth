@@ -28,11 +28,18 @@ export interface DataTableProps<Row> {
   readonly emptyLabel: string;
   readonly loading?: boolean;
   readonly onRowClick?: (row: Row) => void;
+  /**
+   * Controlled sort. Pass both to own the sort yourself — the queue keeps it
+   * in the URL so Back and a shared link restore it. Omit both and the table
+   * sorts itself, as every other list here does.
+   */
+  readonly sort?: SortState | null;
+  readonly onSortChange?: (next: SortState | null) => void;
 }
 
-type SortDirection = 'asc' | 'desc';
+export type SortDirection = 'asc' | 'desc';
 
-interface SortState {
+export interface SortState {
   readonly key: string;
   readonly direction: SortDirection;
 }
@@ -150,10 +157,18 @@ function nextSort(current: SortState | null, key: string): SortState | null {
  */
 export function DataTable<Row>(props: DataTableProps<Row>): ReactElement {
   const { caption, columns, rows, rowKey, emptyLabel, loading = false, onRowClick } = props;
-  const [sort, setSort] = useState<SortState | null>(null);
+  const [ownSort, setOwnSort] = useState<SortState | null>(null);
+  const controlled = props.onSortChange !== undefined;
+  const sort = controlled ? (props.sort ?? null) : ownSort;
+  const applySort = (key: string): void => {
+    const next = nextSort(sort, key);
+    if (props.onSortChange) props.onSortChange(next);
+    else setOwnSort(next);
+  };
 
   const sortedRows = useMemo<readonly Row[]>(() => {
-    if (sort === null) return rows;
+    // Controlled: the owner hands us the rows already in order.
+    if (controlled || sort === null) return rows;
     const column = columns.find((c) => c.key === sort.key);
     const sortValue = column?.sortValue;
     if (!sortValue) return rows;
@@ -162,7 +177,7 @@ export function DataTable<Row>(props: DataTableProps<Row>): ReactElement {
       .map((row, index) => ({ row, index, value: sortValue(row) }))
       .sort((a, b) => compareSortValues(a.value, b.value, sort.direction) || a.index - b.index)
       .map((entry) => entry.row);
-  }, [rows, columns, sort]);
+  }, [rows, columns, sort, controlled]);
 
   const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, row: Row): void => {
     if (!onRowClick) return;
@@ -208,6 +223,7 @@ export function DataTable<Row>(props: DataTableProps<Row>): ReactElement {
           {columns.map((column) => (
             <td
             key={column.key}
+            data-align={column.align ?? 'left'}
             style={{
               ...cellBase,
               textAlign: column.align ?? 'left',
@@ -241,7 +257,10 @@ export function DataTable<Row>(props: DataTableProps<Row>): ReactElement {
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%', maxWidth: '100%', overflowX: 'auto' }}>
+    <div
+      className="rf-ledger"
+      style={{ position: 'relative', width: '100%', maxWidth: '100%', overflowX: 'auto' }}
+    >
       <table style={tableStyle} aria-busy={loading ? 'true' : undefined}>
         <caption style={captionStyle}>
           {caption}
@@ -271,7 +290,7 @@ export function DataTable<Row>(props: DataTableProps<Row>): ReactElement {
                     <button
                       type="button"
                       style={{ ...sortButtonStyle, justifyContent: align === 'right' ? 'flex-end' : 'flex-start' }}
-                      onClick={() => setSort((current) => nextSort(current, column.key))}
+                      onClick={() => applySort(column.key)}
                     >
                       {column.header}
                       <span aria-hidden="true">

@@ -25,7 +25,7 @@ npx @railway/cli variables \
   --set DATABASE_URL=/data/retrofit.db \
   --set FEDERATO_BASE_URL=... --set FEDERATO_TOKEN_URL=... \
   --set FEDERATO_AUDIENCE=... --set FEDERATO_CLIENT_ID=... \
-  --set FEDERATO_CLIENT_SECRET=... --set GEMINI_API_KEY=...
+  --set FEDERATO_CLIENT_SECRET=... --set ANTHROPIC_API_KEY=...
 npx @railway/cli domain                # prints the public API URL
 ```
 

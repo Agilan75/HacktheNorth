@@ -689,6 +689,7 @@ function submissionB1(): CanonicalSubmission {
       pctTivAcceptableConstruction: 0.5,
       pctTivSprinklered: null,
       tivWeightedProtectionClass: null,
+    worstFloodZoneTier: null,
       primaryState: 'OH',
       stateShares: [],
       fiveYearLoss: 100_000,

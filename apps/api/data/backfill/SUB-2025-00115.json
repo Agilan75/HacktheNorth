@@ -1,0 +1,55 @@
+{
+  "externalId": "SUB-2025-00115",
+  "targetVerdict": "FIT",
+  "rationale": "Single sprinklered 2014 non-combustible machine-shop plant in Fontana, CA (target state) with $52.4M TIV (target band), $171.8K premium (acceptable band) and $18.5K of five-year loss, so every appetite factor is known and in appetite with no knockout or refer rule. The quote sits a little under the rating model, so adequacy lands near 0.9.",
+  "values": [
+    {
+      "canonicalPath": "submissionType",
+      "value": "new_business"
+    },
+    {
+      "canonicalPath": "locations.*.state",
+      "value": "CA"
+    },
+    {
+      "canonicalPath": "locations.*.city",
+      "value": "Fontana"
+    },
+    {
+      "canonicalPath": "locations.*.protectionClass",
+      "value": 3
+    },
+    {
+      "canonicalPath": "buildings.*.tiv",
+      "value": 52400000
+    },
+    {
+      "canonicalPath": "buildings.*.yearBuilt",
+      "value": 2014
+    },
+    {
+      "canonicalPath": "buildings.*.constructionType",
+      "value": "non_combustible"
+    },
+    {
+      "canonicalPath": "buildings.*.sprinklered",
+      "value": true
+    },
+    {
+      "canonicalPath": "buildings.*.stories",
+      "value": 2
+    },
+    {
+      "canonicalPath": "buildings.*.occupancy",
+      "value": "CNC machining and precision metal fabrication plant"
+    },
+    {
+      "canonicalPath": "pricing.quotedPremium",
+      "value": 171800
+    },
+    {
+      "canonicalPath": "rollup.fiveYearLoss",
+      "value": 18500
+    }
+  ]
+}

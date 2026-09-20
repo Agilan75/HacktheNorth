@@ -1,0 +1,59 @@
+{
+  "externalId": "SUB-2026-00131",
+  "targetVerdict": "FIT",
+  "rationale": "New-business medical office in Clovis, CA (target state): 2011 sprinklered non-combustible building (post-2010, acceptable construction), PC 3, $18,500 five-year loss (one water-damage claim, under $100k); $15.2M TIV and a $58,700 quote both sit in acceptable bands, so nothing knocks out or refers.",
+  "values": [
+    {
+      "canonicalPath": "submissionType",
+      "value": "new_business"
+    },
+    {
+      "canonicalPath": "locations.*.state",
+      "value": "CA"
+    },
+    {
+      "canonicalPath": "locations.*.city",
+      "value": "Clovis"
+    },
+    {
+      "canonicalPath": "locations.*.postalCode",
+      "value": "93611"
+    },
+    {
+      "canonicalPath": "locations.*.protectionClass",
+      "value": 3
+    },
+    {
+      "canonicalPath": "buildings.*.tiv",
+      "value": 15200000
+    },
+    {
+      "canonicalPath": "buildings.*.yearBuilt",
+      "value": 2011
+    },
+    {
+      "canonicalPath": "buildings.*.constructionType",
+      "value": "non_combustible"
+    },
+    {
+      "canonicalPath": "buildings.*.sprinklered",
+      "value": true
+    },
+    {
+      "canonicalPath": "buildings.*.stories",
+      "value": 2
+    },
+    {
+      "canonicalPath": "buildings.*.occupancy",
+      "value": "Physician practice medical office building with outpatient imaging"
+    },
+    {
+      "canonicalPath": "pricing.quotedPremium",
+      "value": 58700
+    },
+    {
+      "canonicalPath": "rollup.fiveYearLoss",
+      "value": 18500
+    }
+  ]
+}

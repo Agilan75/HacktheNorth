@@ -1,10 +1,11 @@
-import { Component, useCallback, useEffect, useId, useRef, useState } from 'react';
-import type { ErrorInfo, ReactElement, ReactNode } from 'react';
-import { Link, useParams } from 'react-router';
+import { Component, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { CSSProperties, ErrorInfo, ReactElement, ReactNode } from 'react';
+import { Link, useLocation, useParams } from 'react-router';
 
 import { formatPercent, formatScore } from '@retrofit/contracts';
+import { cssVar, MIN_TOUCH_TARGET, RADIUS, SPACE } from '@retrofit/design';
 
-import { ROUTES } from '../App.js';
+import { ROUTES, submissionPath } from '../routes.js';
 import { useApi, useApiClient } from '../api/useApi.js';
 import { Card } from '../components/atoms/Card.js';
 import { Skeleton } from '../components/atoms/Skeleton.js';
@@ -29,39 +30,66 @@ import { Vector } from '../panels/Vector.js';
 import type { ReplyResultView, RoutingView, SubmissionDetailView } from '../panels/types.js';
 
 /* ---------------------------------------------------------------------------
- * PRD 10 panel table. The letters and titles are the PRD's; the order is the
- * PRD's. Every panel receives slices of the DTO untouched — this page never
- * computes a number the API already returned (PRD 10, 13).
+ * The page has one primary object — the decision — and everything else is
+ * supporting material, grouped. The panel keys below are internal ids only:
+ * they are the stable anchors other pages deep-link to (`#panel-c`) and never
+ * appear in a title.
  * ------------------------------------------------------------------------- */
 
 type PanelLetter = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l';
 
+type GroupId = 'numbers' | 'evidence' | 'next';
+
+/** `quiet` renders collapsed, borderless and muted: reference material, not reading. */
+type PanelWeight = 'normal' | 'quiet';
+
 interface PanelSpec {
   readonly letter: PanelLetter;
   readonly title: string;
+  readonly group: GroupId;
+  readonly weight: PanelWeight;
 }
 
-const PANELS: readonly PanelSpec[] = [
-  { letter: 'a', title: 'Explanation and recommendation' },
-  { letter: 'b', title: 'Score breakdown' },
-  { letter: 'c', title: 'How the agent got here' },
-  { letter: 'd', title: 'Pricing and peer benchmark' },
-  { letter: 'e', title: 'Buildings and rollup' },
-  { letter: 'f', title: 'Contradictions and interpretations' },
-  { letter: 'g', title: 'Minimal flip' },
-  { letter: 'h', title: 'Feature vector' },
-  { letter: 'i', title: 'Discovered schema' },
-  { letter: 'j', title: 'Enrichment' },
-  { letter: 'k', title: 'Actions' },
-  { letter: 'l', title: 'Attached photo or sweep' },
+interface GroupSpec {
+  readonly id: GroupId;
+  readonly label: string;
+}
+
+const GROUPS: readonly GroupSpec[] = [
+  { id: 'numbers', label: 'The numbers' },
+  { id: 'evidence', label: 'The evidence' },
+  { id: 'next', label: 'Next steps' },
 ];
+
+/** Render order within a group is this order. The decision panel (a) is not in a group. */
+const PANELS: readonly PanelSpec[] = [
+  { letter: 'a', title: 'The decision', group: 'numbers', weight: 'normal' },
+  { letter: 'b', title: 'Score breakdown', group: 'numbers', weight: 'normal' },
+  { letter: 'd', title: 'Pricing and peers', group: 'numbers', weight: 'normal' },
+  { letter: 'e', title: 'Buildings', group: 'numbers', weight: 'normal' },
+  { letter: 'h', title: 'Feature vector', group: 'numbers', weight: 'quiet' },
+  { letter: 'c', title: 'Agent trace', group: 'evidence', weight: 'normal' },
+  { letter: 'f', title: 'Contradictions', group: 'evidence', weight: 'normal' },
+  { letter: 'l', title: 'Attached sweep', group: 'evidence', weight: 'normal' },
+  { letter: 'j', title: 'Enrichment', group: 'evidence', weight: 'quiet' },
+  { letter: 'i', title: 'Discovered schema', group: 'evidence', weight: 'quiet' },
+  { letter: 'g', title: 'Minimal flip', group: 'next', weight: 'normal' },
+  { letter: 'k', title: 'Actions', group: 'next', weight: 'normal' },
+];
+
+/** (a) is the decision block above the groups, so it is never a grouped panel. */
+const DECISION: PanelLetter = 'a';
+
+const PANEL_ORDER: Readonly<Record<PanelLetter, number>> = {
+  a: 0, b: 1, c: 2, d: 3, e: 4, f: 5, g: 6, h: 7, i: 8, j: 9, k: 10, l: 11,
+};
 
 function panelAnchor(letter: PanelLetter): string {
   return `panel-${letter}`;
 }
 
-function panelTitle(spec: PanelSpec): string {
-  return `(${spec.letter}) ${spec.title}`;
+function sectionAnchor(group: GroupId): string {
+  return `section-${group}`;
 }
 
 function messageOf(err: unknown): string {
@@ -70,7 +98,7 @@ function messageOf(err: unknown): string {
 }
 
 /* ---------------------------------------------------------------------------
- * One panel failing to render must never blank the other eleven.
+ * One panel failing to render must never blank the others.
  * ------------------------------------------------------------------------- */
 
 interface PanelBoundaryProps {
@@ -117,26 +145,110 @@ class PanelBoundary extends Component<PanelBoundaryProps, PanelBoundaryState> {
 }
 
 /* ---------------------------------------------------------------------------
- * Header: identity and the three headline numbers, all straight from the DTO.
+ * Where the user came from. The queue puts its filter state in the URL; a link
+ * out of it may hand us that search string and the ordered ids it was showing.
+ * Both are optional — nothing here fetches, and nothing here breaks without it.
  * ------------------------------------------------------------------------- */
+
+interface QueueOrigin {
+  /** `?verdict=REFER&…` as the queue had it, or '' — appended to the breadcrumb. */
+  readonly search: string;
+  /** The queue's row order, when the link carried it. */
+  readonly ids: readonly string[];
+}
+
+function normalizeSearch(raw: string): string {
+  const trimmed = raw.trim();
+  if (trimmed === '' || trimmed === '?') return '';
+  return trimmed.startsWith('?') ? trimmed : `?${trimmed}`;
+}
+
+function searchFromReferrer(): string {
+  try {
+    if (typeof document === 'undefined') return '';
+    const ref = document.referrer;
+    if (typeof ref !== 'string' || ref === '') return '';
+    const url = new URL(ref, typeof window === 'undefined' ? 'http://localhost/' : window.location.href);
+    return url.pathname === ROUTES.queue ? normalizeSearch(url.search) : '';
+  } catch {
+    return '';
+  }
+}
+
+function readQueueOrigin(state: unknown): QueueOrigin {
+  const bag = typeof state === 'object' && state !== null ? (state as Record<string, unknown>) : {};
+  const rawSearch =
+    typeof bag.queueSearch === 'string' ? bag.queueSearch : typeof bag.search === 'string' ? bag.search : '';
+  const search = normalizeSearch(rawSearch) || searchFromReferrer();
+  const ids = Array.isArray(bag.queue)
+    ? bag.queue.filter((value): value is string => typeof value === 'string')
+    : [];
+  return { search, ids };
+}
+
+/* ---------------------------------------------------------------------------
+ * Header: identity, the four headline numbers, queue navigation.
+ * ------------------------------------------------------------------------- */
+
+const headerRowStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: SPACE.md,
+};
+
+const stepStyle: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  minHeight: MIN_TOUCH_TARGET,
+  padding: `0 ${SPACE.md}px`,
+  border: `${cssVar('border-width')} solid ${cssVar('border-color')}`,
+  borderRadius: RADIUS.pill,
+  color: cssVar('ink'),
+  textDecoration: 'none',
+  fontSize: cssVar('size-small'),
+};
 
 interface HeaderProps {
   readonly detail: SubmissionDetailView;
   readonly headingId: string;
   readonly busy: boolean;
+  readonly origin: QueueOrigin;
+  readonly navState: unknown;
   readonly onRerun: () => void;
   readonly onEnrich: () => void;
 }
 
 function SubmissionHeader(props: HeaderProps): ReactElement {
-  const { detail, headingId, busy } = props;
+  const { detail, headingId, busy, origin, navState } = props;
+  const at = origin.ids.indexOf(detail.submissionId);
+  const prev = at > 0 ? origin.ids[at - 1] ?? null : null;
+  const next = at >= 0 && at < origin.ids.length - 1 ? origin.ids[at + 1] ?? null : null;
+
   return (
     <header className="submission-header">
-      <p className="submission-breadcrumb">
-        <Link to={ROUTES.queue}>Queue</Link>
-        {' / '}
-        <span>{detail.submissionId}</span>
-      </p>
+      <div style={headerRowStyle}>
+        <p className="submission-breadcrumb" style={{ margin: 0 }}>
+          <Link to={{ pathname: ROUTES.queue, search: origin.search }}>Queue</Link>
+          {' / '}
+          <span>{detail.submissionId}</span>
+        </p>
+        {prev !== null || next !== null ? (
+          <nav aria-label="Queue order" style={{ display: 'flex', gap: SPACE.sm }}>
+            {prev !== null ? (
+              <Link to={submissionPath(prev)} state={navState} style={stepStyle} rel="prev">
+                ← Previous
+              </Link>
+            ) : null}
+            {next !== null ? (
+              <Link to={submissionPath(next)} state={navState} style={stepStyle} rel="next">
+                Next →
+              </Link>
+            ) : null}
+          </nav>
+        ) : null}
+      </div>
       <h1 id={headingId}>{detail.insuredName}</h1>
       <div className="submission-verdict">
         <VerdictPill verdict={detail.verdict} />
@@ -152,7 +264,7 @@ function SubmissionHeader(props: HeaderProps): ReactElement {
             <Badge
               label="Synthetic data"
               tone="attention"
-              title="Federato holds no policy for this account. Its location, building, premium and loss values were hand-authored for the demo; the engine scored them."
+              title="Values hand-authored, scored by the engine"
             />
           </>
         ) : null}
@@ -179,10 +291,10 @@ function SubmissionHeader(props: HeaderProps): ReactElement {
         </div>
       </dl>
       <div className="submission-controls">
-        <button type="button" onClick={props.onRerun} disabled={busy} style={{ minHeight: 44 }}>
+        <button type="button" onClick={props.onRerun} disabled={busy} style={{ minHeight: MIN_TOUCH_TARGET }}>
           Re-run agent
         </button>
-        <button type="button" onClick={props.onEnrich} disabled={busy} style={{ minHeight: 44 }}>
+        <button type="button" onClick={props.onEnrich} disabled={busy} style={{ minHeight: MIN_TOUCH_TARGET }}>
           Run enrichment
         </button>
       </div>
@@ -192,12 +304,9 @@ function SubmissionHeader(props: HeaderProps): ReactElement {
 
 /* ---------------------------------------------------------------------------
  * Which panels apply (FILL-console D1). A fully scored account shows all
- * twelve, exactly as before. A triage knockout or a no-policy submission has
- * no policy, buildings, premium or losses behind it, so a panel built on those
- * would be a card of dashes: it is left out and listed, with the reason in
- * words, under "Not applicable to this account". A panel whose data IS present
- * (a sweep, an enrichment card, a contradiction, an available flip) always
- * shows, whatever the kind.
+ * twelve. A triage knockout or a no-policy submission has no policy, buildings,
+ * premium or losses behind it, so a panel built on those is left out and listed
+ * with its reason. A panel whose data IS present always shows.
  * ------------------------------------------------------------------------- */
 
 const ALWAYS_SHOWN: Readonly<Record<'triage_knockout' | 'no_policy', ReadonlySet<PanelLetter>>> = {
@@ -226,29 +335,27 @@ function notApplicableReason(letter: PanelLetter, detail: SubmissionDetailView):
   const knockout = detail.accountKind === 'triage_knockout';
   switch (letter) {
     case 'b':
-      return 'Line of business alone decides a triage knockout. The other seven factors need policy and building data, which is never read for a line outside appetite.';
+      return 'Line of business alone decides a knockout.';
     case 'd':
-      return 'No premium, buildings or losses were read, so there is nothing to price and no peers to compare against.';
+      return 'No premium, buildings or losses were read.';
     case 'e':
-      return knockout
-        ? 'No buildings were read: the deep query covers property policies only.'
-        : 'Federato holds no policy for this submission, so there are no buildings.';
+      return knockout ? 'The deep query covers property policies only.' : 'No policy in Federato.';
     case 'f':
-      return 'No field on this account has two conflicting sources, and no interpretation was applied.';
+      return 'No conflicting sources, no interpretation applied.';
     case 'g': {
       const reason = detail.flip.reason?.trim() ?? '';
-      return reason.length > 0 ? `No minimal flip. ${reason}` : 'No minimal flip: no move reaches FIT.';
+      return reason.length > 0 ? reason : 'No move reaches FIT.';
     }
     case 'h':
-      return 'The building, premium and loss components of the feature vector are all missing, so it adds nothing to the facts above.';
+      return 'Building, premium and loss components all missing.';
     case 'i':
-      return 'The discovered schema maps Federato’s policy and building fields; this submission has none.';
+      return 'No policy or building fields to map.';
     case 'j':
-      return 'Enrichment looks up flood zone and fire-station distance for building locations; this submission has no buildings.';
+      return 'No buildings to look up.';
     case 'l':
-      return 'No photo or sweep is attached.';
+      return 'Nothing attached.';
     default:
-      return 'Not applicable to this account.';
+      return 'Not applicable.';
   }
 }
 
@@ -264,14 +371,15 @@ function planPanels(detail: SubmissionDetailView): PanelPlan {
   const hidden: { spec: PanelSpec; reason: string }[] = [];
   for (const spec of PANELS) {
     if (always.has(spec.letter) || hasData(spec.letter, detail)) {
-      // A no-policy account has peers but nothing to price: its (d) is the benchmark alone.
+      // A no-policy account has peers but nothing to price: (d) is the benchmark alone.
       shown.push(
-        spec.letter === 'd' && detail.accountKind === 'no_policy' ? { letter: 'd', title: 'Peer benchmark' } : spec,
+        spec.letter === 'd' && detail.accountKind === 'no_policy' ? { ...spec, title: 'Peer benchmark' } : spec,
       );
     } else {
       hidden.push({ spec, reason: notApplicableReason(spec.letter, detail) });
     }
   }
+  hidden.sort((x, y) => PANEL_ORDER[x.spec.letter] - PANEL_ORDER[y.spec.letter]);
   return { shown, hidden };
 }
 
@@ -279,36 +387,136 @@ const FACTS_ANCHOR = 'panel-facts';
 const CHECKS_ANCHOR = 'panel-checks';
 const CHECKS_TITLE = 'Independent checks';
 const FACTS_TITLE = 'Submission facts';
+const NOT_APPLICABLE_ANCHOR = 'panel-not-applicable';
+const NOT_APPLICABLE_TITLE = 'Not applicable to this account';
+
+/* ---------------------------------------------------------------------------
+ * The sticky index. Two tiers so it never becomes a wall of chips: the sections
+ * always, and the panels of the section currently in view.
+ * ------------------------------------------------------------------------- */
+
+const indexStyle: CSSProperties = {
+  position: 'sticky',
+  top: 0,
+  zIndex: 2,
+  background: cssVar('paper'),
+  borderBottom: `${cssVar('border-width')} solid ${cssVar('border-color')}`,
+  padding: `${SPACE.sm}px 0`,
+  marginBottom: SPACE.lg,
+};
+
+const chipRowStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: `${SPACE.xs}px ${SPACE.sm}px`,
+  margin: 0,
+  padding: 0,
+  listStyle: 'none',
+};
+
+function chipStyle(active: boolean, quiet: boolean): CSSProperties {
+  return {
+    display: 'inline-flex',
+    alignItems: 'center',
+    minHeight: 36,
+    padding: `0 ${SPACE.md}px`,
+    border: `${cssVar('border-width')} solid ${active ? cssVar('ink') : cssVar('border-color')}`,
+    borderRadius: RADIUS.pill,
+    fontSize: quiet ? cssVar('size-micro') : cssVar('size-small'),
+    lineHeight: quiet ? cssVar('leading-micro') : cssVar('leading-small'),
+    color: quiet && !active ? cssVar('muted-deep') : cssVar('ink'),
+    background: active ? cssVar('muted-tint') : 'transparent',
+    textDecoration: 'none',
+    fontWeight: active ? 600 : 400,
+  };
+}
+
+interface IndexEntry {
+  readonly id: string;
+  readonly label: string;
+  readonly anchor: string;
+  readonly children: readonly { readonly anchor: string; readonly label: string }[];
+}
 
 function PanelIndex(props: {
-  readonly shown: readonly PanelSpec[];
-  readonly facts: boolean;
-  readonly checks: boolean;
-}): ReactElement {
+  readonly entries: readonly IndexEntry[];
+  readonly active: string;
+}): ReactElement | null {
+  const current = props.entries.find((e) => e.id === props.active) ?? props.entries[0];
+  if (current === undefined) return null;
   return (
-    <nav aria-label="Panels on this page" className="submission-index">
-      <ol>
-        {props.facts ? (
-          <li>
-            <a href={`#${FACTS_ANCHOR}`}>{FACTS_TITLE}</a>
-          </li>
-        ) : null}
-        {props.shown.map((p) => (
-          <li key={p.letter}>
-            <a href={`#${panelAnchor(p.letter)}`}>{panelTitle(p)}</a>
+    <nav aria-label="Panels on this page" className="submission-index" style={indexStyle}>
+      <ul style={chipRowStyle}>
+        {props.entries.map((entry) => (
+          <li key={entry.id}>
+            <a
+              href={`#${entry.anchor}`}
+              style={chipStyle(entry.id === current.id, false)}
+              aria-current={entry.id === current.id ? 'true' : undefined}
+            >
+              {entry.label}
+            </a>
           </li>
         ))}
-        {props.checks ? (
-          <li>
-            <a href={`#${CHECKS_ANCHOR}`}>{CHECKS_TITLE}</a>
-          </li>
-        ) : null}
-      </ol>
+      </ul>
+      {current.children.length > 0 ? (
+        <ul style={{ ...chipRowStyle, marginTop: SPACE.xs }} aria-label={`${current.label} panels`}>
+          {current.children.map((child) => (
+            <li key={child.anchor}>
+              <a href={`#${child.anchor}`} style={chipStyle(false, true)}>
+                {child.label}
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </nav>
   );
 }
 
-/** A knockout is never routed (PRD 7.6: "any account that is not knocked out"); say that, not "run the plan". */
+/**
+ * Highlights whichever indexed section is in view. `IntersectionObserver` is
+ * absent in jsdom, so the hook feature-detects and leaves the first entry
+ * active rather than shimming anything.
+ */
+function useActiveSection(anchors: readonly string[], fallback: string): string {
+  const [active, setActive] = useState(fallback);
+  const key = anchors.join('|');
+
+  useEffect(() => {
+    setActive(fallback);
+    if (typeof IntersectionObserver === 'undefined') return undefined;
+    const ids = key.split('|').filter((a) => a.length > 0);
+    const seen = new Map<string, number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          seen.set(entry.target.id, entry.isIntersecting ? entry.intersectionRatio : 0);
+        }
+        let best = '';
+        let bestRatio = 0;
+        for (const id of ids) {
+          const ratio = seen.get(id) ?? 0;
+          if (ratio > bestRatio) {
+            best = id;
+            bestRatio = ratio;
+          }
+        }
+        if (best !== '') setActive(best);
+      },
+      { rootMargin: '-72px 0px -55% 0px', threshold: [0, 0.25, 0.5, 1] },
+    );
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el !== null) observer.observe(el);
+    }
+    return () => observer.disconnect();
+  }, [key, fallback]);
+
+  return active;
+}
+
+/** A knockout is never routed (PRD 7.6); say that, not "run the plan". */
 function routingFor(detail: SubmissionDetailView): RoutingView {
   if (detail.accountKind === 'triage_knockout' && detail.routing.underwriter === null) {
     return {
@@ -325,28 +533,118 @@ const KIND_BADGE: Readonly<Record<'triage_knockout' | 'no_policy', string>> = {
 };
 
 /* ---------------------------------------------------------------------------
+ * Surfaces: the decision block, a section heading, a demoted panel.
+ * ------------------------------------------------------------------------- */
+
+const decisionStyle: CSSProperties = {
+  background: cssVar('muted-tint'),
+  border: `${cssVar('border-width')} solid ${cssVar('border-color')}`,
+  borderRadius: RADIUS.card,
+  padding: SPACE.xl,
+  scrollMarginTop: SPACE.xxl,
+};
+
+const decisionHeaderStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'baseline',
+  justifyContent: 'space-between',
+  gap: SPACE.md,
+  marginBottom: SPACE.lg,
+};
+
+const decisionTitleStyle: CSSProperties = {
+  margin: 0,
+  fontFamily: cssVar('font-display'),
+  fontSize: cssVar('size-title'),
+  lineHeight: cssVar('leading-title'),
+  fontWeight: 600,
+};
+
+const sectionStyle: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: SPACE.lg,
+  scrollMarginTop: SPACE.xxl,
+};
+
+const sectionHeadingStyle: CSSProperties = {
+  margin: 0,
+  fontFamily: cssVar('font-body'),
+  fontSize: cssVar('size-micro'),
+  lineHeight: cssVar('leading-micro'),
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+  color: cssVar('muted-deep'),
+  fontWeight: 600,
+};
+
+const quietStyle: CSSProperties = {
+  border: 'none',
+  padding: 0,
+  scrollMarginTop: SPACE.xxl,
+};
+
+const quietSummaryStyle: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  minHeight: MIN_TOUCH_TARGET,
+  cursor: 'pointer',
+  color: cssVar('muted-deep'),
+};
+
+const quietTitleStyle: CSSProperties = {
+  display: 'inline',
+  margin: 0,
+  fontFamily: cssVar('font-body'),
+  fontSize: cssVar('size-small'),
+  lineHeight: cssVar('leading-small'),
+  fontWeight: 600,
+  color: cssVar('muted-deep'),
+};
+
+function QuietPanel(props: {
+  readonly title: string;
+  readonly anchorId: string;
+  readonly children: ReactNode;
+}): ReactElement {
+  return (
+    <details id={props.anchorId} className="submission-quiet" style={quietStyle}>
+      <summary style={quietSummaryStyle}>
+        <h2 className="rf-card__title" style={quietTitleStyle}>
+          {props.title}
+        </h2>
+      </summary>
+      <div style={{ marginTop: SPACE.md }}>{props.children}</div>
+    </details>
+  );
+}
+
+/* ---------------------------------------------------------------------------
  * The page.
  * ------------------------------------------------------------------------- */
 
-type Mutation = 'rerun' | 'enrich' | 'approve' | 'reply';
+type Mutation = 'rerun' | 'enrich' | 'approve' | 'reply' | 'decide';
 
 const MUTATION_LABEL: Readonly<Record<Mutation, string>> = {
   rerun: 'Re-running the agent',
   enrich: 'Running enrichment',
   approve: 'Approving the request',
   reply: 'Reading the reply',
+  decide: 'Recording your decision',
 };
 
 /**
- * PRD 10 /submissions/:id - composes panels (a) through (l).
+ * PRD 10 /submissions/:id — the decision, then the supporting panels grouped.
  *
- * Stub frozen by W0-4. Unit C05 replaces this body only.
  * Route registration lives in src/App.tsx and is frozen.
  */
 export function SubmissionPage(): ReactElement {
   const params = useParams();
   const id = params.id ?? '';
   const headingId = useId();
+  const decisionHeadingId = `${headingId}-decision`;
+  const location = useLocation();
 
   const client = useApiClient();
   const loaded = useApi((c) => c.getSubmission(id), [id]);
@@ -382,9 +680,7 @@ export function SubmissionPage(): ReactElement {
    * Records the failure as `mutationError` (the page-level alert) and then
    * rethrows, so a caller that awaits `run` — DraftCard's approve button,
    * ReplyBox's paste-or-upload form — learns the mutation actually failed and
-   * does not treat a caught, logged error as a success (R5-11: `run` used to
-   * swallow every failure, so `onSubmitText` always resolved and ReplyBox
-   * cleared the pasted text even when nothing was extracted).
+   * does not treat a caught, logged error as a success.
    */
   const run = useCallback(
     async (kind: Mutation, work: () => Promise<void>): Promise<void> => {
@@ -428,6 +724,20 @@ export function SubmissionPage(): ReactElement {
     [client, reload, run],
   );
 
+  /**
+   * Record the underwriter's accept or decline. The engine is not re-run and
+   * the verdict does not move, so this reloads only to pick up the new row in
+   * the action log.
+   */
+  const onDecide = useCallback(
+    (decision: 'accept' | 'decline', reason: string): Promise<void> =>
+      run('decide', async () => {
+        await client.decide(id, decision, reason);
+        reload();
+      }),
+    [client, id, reload, run],
+  );
+
   const onSubmitText = useCallback(
     (text: string): Promise<void> =>
       run('reply', async () => {
@@ -448,6 +758,37 @@ export function SubmissionPage(): ReactElement {
     [client, id, reload, run],
   );
 
+  const detail = fresh ?? loaded.data;
+  const origin = useMemo(() => readQueueOrigin(location.state), [location.state]);
+
+  const plan = useMemo(() => (detail === null ? null : planPanels(detail)), [detail]);
+  const sparse = detail !== null && detail.accountKind !== 'scored';
+  const hasChecks = detail !== null && detail.verification !== null;
+
+  const entries = useMemo((): readonly IndexEntry[] => {
+    if (plan === null) return [];
+    const out: IndexEntry[] = [];
+    if (sparse) out.push({ id: FACTS_ANCHOR, label: FACTS_TITLE, anchor: FACTS_ANCHOR, children: [] });
+    if (plan.shown.some((p) => p.letter === DECISION)) {
+      out.push({ id: panelAnchor(DECISION), label: 'Decision', anchor: panelAnchor(DECISION), children: [] });
+    }
+    for (const group of GROUPS) {
+      const children = plan.shown
+        .filter((p) => p.group === group.id && p.letter !== DECISION)
+        .map((p) => ({ anchor: panelAnchor(p.letter), label: p.title }));
+      if (group.id === 'evidence' && hasChecks) {
+        children.push({ anchor: CHECKS_ANCHOR, label: CHECKS_TITLE });
+      }
+      if (children.length === 0) continue;
+      out.push({ id: sectionAnchor(group.id), label: group.label, anchor: sectionAnchor(group.id), children });
+    }
+    return out;
+  }, [plan, sparse, hasChecks]);
+
+  const anchors = useMemo(() => entries.map((e) => e.id), [entries]);
+  const fallbackAnchor = anchors[0] ?? '';
+  const active = useActiveSection(anchors, fallbackAnchor);
+
   if (id === '') {
     return (
       <section className="submission-page">
@@ -459,21 +800,19 @@ export function SubmissionPage(): ReactElement {
     );
   }
 
-  const detail = fresh ?? loaded.data;
-
-  if (detail === null) {
+  if (detail === null || plan === null) {
     if (loaded.error !== null) {
       return (
         <section className="submission-page">
           <h1>{`Submission ${id}`}</h1>
           <div role="alert" className="submission-error">
             <p>{`Could not load submission ${id}: ${loaded.error.message}`}</p>
-            <button type="button" onClick={reload} style={{ minHeight: 44 }}>
+            <button type="button" onClick={reload} style={{ minHeight: MIN_TOUCH_TARGET }}>
               Retry
             </button>
           </div>
           <p>
-            <Link to={ROUTES.queue}>Back to the queue</Link>
+            <Link to={{ pathname: ROUTES.queue, search: origin.search }}>Back to the queue</Link>
           </p>
         </section>
       );
@@ -485,6 +824,8 @@ export function SubmissionPage(): ReactElement {
       </section>
     );
   }
+
+  const noPolicy = detail.accountKind === 'no_policy';
 
   const bodies: Readonly<Record<PanelLetter, ReactNode>> = {
     a: (
@@ -502,21 +843,14 @@ export function SubmissionPage(): ReactElement {
       />
     ),
     c: <QueryTrace entries={detail.queryTrace} />,
-    d:
-      detail.accountKind === 'no_policy' ? (
-        <>
-          <p data-testid="no-pricing">
-            No premium to price: Federato holds no policy for this submission. The peers below are
-            matched on what is known.
-          </p>
-          <PeerBenchmark benchmark={detail.peers} />
-        </>
-      ) : (
-        <>
-          <Pricing pricing={detail.pricing} />
-          <PeerBenchmark benchmark={detail.peers} />
-        </>
-      ),
+    d: noPolicy ? (
+      <PeerBenchmark benchmark={detail.peers} />
+    ) : (
+      <>
+        <Pricing pricing={detail.pricing} />
+        <PeerBenchmark benchmark={detail.peers} />
+      </>
+    ),
     e: <Buildings buildings={detail.buildings} rollup={detail.rollup} />,
     f: (
       <Contradictions
@@ -536,6 +870,8 @@ export function SubmissionPage(): ReactElement {
           drafts={detail.drafts}
           log={detail.actionLog}
           onApprove={onApprove}
+          engineVerdict={detail.verdict}
+          onDecide={onDecide}
         />
         <ReplyBox
           submissionId={detail.submissionId}
@@ -550,8 +886,37 @@ export function SubmissionPage(): ReactElement {
   };
 
   const busy = pending !== null;
-  const plan = planPanels(detail);
-  const sparse = detail.accountKind !== 'scored';
+  const decisionShown = plan.shown.some((p) => p.letter === DECISION);
+  const flipAvailable = detail.flip.available;
+
+  const renderPanel = (spec: PanelSpec): ReactElement => {
+    const anchor = panelAnchor(spec.letter);
+    const body = (
+      <PanelBoundary title={spec.title} resetKey={detail}>
+        {bodies[spec.letter]}
+      </PanelBoundary>
+    );
+    if (spec.weight === 'quiet') {
+      return (
+        <QuietPanel key={spec.letter} title={spec.title} anchorId={anchor}>
+          {body}
+        </QuietPanel>
+      );
+    }
+    // No outer Card: every panel renders its own, so wrapping one in another
+    // printed the same heading twice inside two nested bordered surfaces. The
+    // anchor moves to a bare div so `#panel-b` still resolves.
+    return (
+      <div key={spec.letter} id={anchor} className="submission-panel">
+        {spec.letter === 'd' && noPolicy ? (
+          <p className="submission-panel-note" data-testid="no-pricing">
+            No premium to price
+          </p>
+        ) : null}
+        {body}
+      </div>
+    );
+  };
 
   return (
     <article className="submission-page" aria-labelledby={headingId} aria-busy={busy}>
@@ -559,6 +924,8 @@ export function SubmissionPage(): ReactElement {
         detail={detail}
         headingId={headingId}
         busy={busy}
+        origin={origin}
+        navState={location.state}
         onRerun={onRerun}
         onEnrich={onEnrich}
       />
@@ -574,7 +941,7 @@ export function SubmissionPage(): ReactElement {
       {loaded.error !== null ? (
         <div role="alert" className="submission-error">
           <p>{`Could not refresh: ${loaded.error.message}`}</p>
-          <button type="button" onClick={reload} style={{ minHeight: 44 }}>
+          <button type="button" onClick={reload} style={{ minHeight: MIN_TOUCH_TARGET }}>
             Retry
           </button>
         </div>
@@ -592,39 +959,68 @@ export function SubmissionPage(): ReactElement {
         </Card>
       ) : null}
 
-      <PanelIndex shown={plan.shown} facts={sparse} checks={detail.verification !== null} />
-
-      {plan.shown.map((spec) => (
-        <Card key={spec.letter} title={panelTitle(spec)} anchorId={panelAnchor(spec.letter)}>
-          <PanelBoundary title={panelTitle(spec)} resetKey={detail}>
-            {bodies[spec.letter]}
+      {decisionShown ? (
+        <section id={panelAnchor(DECISION)} aria-labelledby={decisionHeadingId} style={decisionStyle}>
+          <header style={decisionHeaderStyle}>
+            <h2 id={decisionHeadingId} className="rf-card__title" style={decisionTitleStyle}>
+              The decision
+            </h2>
+            {flipAvailable ? (
+              <a href={`#${panelAnchor('g')}`} style={{ fontSize: cssVar('size-small') }}>
+                One flip from FIT
+              </a>
+            ) : null}
+          </header>
+          <PanelBoundary title="The decision" resetKey={detail}>
+            {bodies.a}
           </PanelBoundary>
-        </Card>
-      ))}
-
-      {detail.verification !== null ? (
-        <Card title={CHECKS_TITLE} anchorId={CHECKS_ANCHOR}>
-          <PanelBoundary title={CHECKS_TITLE} resetKey={detail}>
-            <IndependentChecks verification={detail.verification} verificationPath={ROUTES.verification} />
-          </PanelBoundary>
-        </Card>
+        </section>
       ) : null}
 
+      <PanelIndex entries={entries} active={active} />
+
+      {GROUPS.map((group) => {
+        const items = plan.shown.filter((p) => p.group === group.id && p.letter !== DECISION);
+        const checksHere = group.id === 'evidence' && hasChecks;
+        if (items.length === 0 && !checksHere) return null;
+        const labelId = `${headingId}-${group.id}`;
+        return (
+          <section
+            key={group.id}
+            id={sectionAnchor(group.id)}
+            aria-labelledby={labelId}
+            className="submission-section"
+            style={sectionStyle}
+          >
+            <h2 id={labelId} style={sectionHeadingStyle}>
+              {group.label}
+            </h2>
+            {items.map(renderPanel)}
+            {checksHere && detail.verification !== null ? (
+              <Card title={CHECKS_TITLE} anchorId={CHECKS_ANCHOR}>
+                <PanelBoundary title={CHECKS_TITLE} resetKey={detail}>
+                  <IndependentChecks
+                    verification={detail.verification}
+                    verificationPath={ROUTES.verification}
+                  />
+                </PanelBoundary>
+              </Card>
+            ) : null}
+          </section>
+        );
+      })}
+
       {plan.hidden.length > 0 ? (
-        <Card title="Not applicable to this account" anchorId="panel-not-applicable">
-          <p>
-            These panels need a policy, buildings, premium or losses, which this submission does not
-            have, so they are left out rather than shown empty.
-          </p>
-          <ul data-testid="not-applicable">
+        <QuietPanel title={NOT_APPLICABLE_TITLE} anchorId={NOT_APPLICABLE_ANCHOR}>
+          <ul data-testid="not-applicable" style={{ margin: 0, paddingLeft: SPACE.lg }}>
             {plan.hidden.map(({ spec, reason }) => (
               <li key={spec.letter} data-letter={spec.letter}>
-                <strong>{panelTitle(spec)}</strong>
+                <strong>{spec.title}</strong>
                 {` — ${reason}`}
               </li>
             ))}
           </ul>
-        </Card>
+        </QuietPanel>
       ) : null}
     </article>
   );

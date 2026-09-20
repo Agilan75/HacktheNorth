@@ -1,11 +1,11 @@
 /**
- * A05 live smoke for `schema-assist` and `second-opinion`: ONE tiny Gemini call
+ * A05 live smoke for `schema-assist` and `second-opinion`: ONE tiny Anthropic call
  * each, RUN_LIVE=1 only. The offline suites live in `schema-assist.test.ts` and
  * `second-opinion.test.ts` (moved at CP1, docs/contracts/requests/A05.md).
  */
 import { describe, expect, it } from 'vitest';
 import { loadEnv } from '../../env';
-import { createGeminiProvider, MODELS } from '../gemini';
+import { createClaudeProvider, CLAUDE_MODEL } from '../claude';
 import { schemaAssistCall } from './schema-assist';
 import { secondOpinionCall } from './second-opinion';
 /* -------------------------------------------------------------------------- */
@@ -13,13 +13,13 @@ import { secondOpinionCall } from './second-opinion';
 /* -------------------------------------------------------------------------- */
 
 const env = loadEnv();
-const LIVE = env.RUN_LIVE === '1' && env.GEMINI_API_KEY !== undefined;
+const LIVE = env.RUN_LIVE === '1' && env.ANTHROPIC_API_KEY !== undefined;
 
-describe.skipIf(!LIVE)('live: A05 Gemini smoke', () => {
+describe.skipIf(!LIVE)('live: A05 Anthropic smoke', () => {
   it(
     'schema-assist maps an obvious key',
     async () => {
-      const provider = createGeminiProvider({ apiKey: env.GEMINI_API_KEY });
+      const provider = createClaudeProvider({ apiKey: env.ANTHROPIC_API_KEY, workspaceId: env.ANTHROPIC_WORKSPACE_ID });
       const out = await schemaAssistCall(provider, {
         unmappedKeys: [{ rawPath: 'bldg.yr_built', sampleValues: [1978, 2004] }],
         canonicalFields: [{ canonicalPath: 'buildings.yearBuilt', description: 'Year built' }],
@@ -27,7 +27,7 @@ describe.skipIf(!LIVE)('live: A05 Gemini smoke', () => {
       expect(out.mappings).toHaveLength(1);
       expect(out.mappings[0]?.canonicalPath).toBe('buildings.yearBuilt');
       expect(out.mappings[0]?.confidence).toBeGreaterThanOrEqual(0.8);
-      console.info(`[A05 live] schema-assist models=${MODELS.join('>')} out=${JSON.stringify(out)}`);
+      console.info(`[A05 live] schema-assist model=${CLAUDE_MODEL} out=${JSON.stringify(out)}`);
     },
     60_000,
   );
@@ -35,7 +35,7 @@ describe.skipIf(!LIVE)('live: A05 Gemini smoke', () => {
   it(
     'second-opinion knocks out on a one-line rule',
     async () => {
-      const provider = createGeminiProvider({ apiKey: env.GEMINI_API_KEY });
+      const provider = createClaudeProvider({ apiKey: env.ANTHROPIC_API_KEY, workspaceId: env.ANTHROPIC_WORKSPACE_ID });
       const out = await secondOpinionCall(provider, {
         guidelineText: 'Primary risk state: FL is Not Acceptable (out of appetite).',
         facts: { primaryRiskState: 'FL' },

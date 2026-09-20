@@ -14,14 +14,45 @@ Overnight unattended build, 2026-09-19. Branch `build/retrofit` (pushed; **not**
 5. **Rotate both credential sets after the event.** The Federato client secret and the Gemini key were pasted into a chat transcript (PRD 17.4).
 6. **Optional, never started — both need an account in your name:** register the `retro.fit` domain (GoDaddy Registry prize), and create a Sentry project for its DSN (Sentry prize). The Sentry hook is stubbed and wired (`apps/api/src/observability/`); it needs a DSN and about an hour.
 
+## New since the overnight build: the finale on `/tour`
+
+`/tour` ends with a section called **The brief, answered** (`#brief`), and that
+is what to show a judge.
+
+1. **It runs the agent live.** One button re-plans, re-queries and re-scores all
+   158 submissions against the live Federato API, and each planner query appears
+   as it lands with the row count and duration the trace recorded — about 9 s on
+   the deployed API. If the run cannot start or does not finish in 45 s the strip
+   falls back to replaying the stored trace behind a permanent amber
+   `REPLAY — a stored run, not a live one` banner. It never says LIVE unless a
+   live run actually reported.
+2. **Four rows, one per requirement**, quoted from
+   `docs/federato/STUDENT_PROJECT_GUIDELINES.pdf` and answered with the real
+   console panels — the 8-factor table with its verbatim PDF quotes, the query
+   trace with its rejected alternatives, all 158 ranked with every explanation
+   in full and a verdict filter, and the rank-1 explanation laid out in the
+   brief's own `Policy #42: SCORE 87/100` shape.
+3. **A ledger** of every criterion the brief names, graded against the code, and
+   then the caveats in plainer words than the table — because a ledger of
+   nothing but passes is a marketing document.
+
+Three gaps from the overnight build are closed: flood enrichment now moves the
+price and the rank, an underwriter can accept or decline, and every conflicted
+account names its conflict in its own explanation. What is still honestly short
+is in the README's "What does not meet the bar" and in the section's own list.
+
+**One thing you must run:** the `Rollup` type grew a field
+(`worstFloodZoneTier`), so `npm run verify` needs re-running to re-establish the
+10M invariant and differential claim. `npm test` (2,036 tests) already passes.
+
 ## What's built
 
 All four prize targets have working code. Phase 1 is complete and verified; phase 2 (the phone app) is built but not device-tested.
 
 | PRD 15 definition of done | State | Evidence |
 | --- | --- | --- |
-| `npm test` passes, including 100K property + differential cases | **Met** | 1,805 / 1,805 tests, 143 files; `tsc -b` 0 errors |
-| `npm run verify` completes 10 million with zero unexplained failures | **Met** | 10,000,000 of 10,000,000 — 0 invariant violations, 0 disagreements, 0 errors (46 min, 6 workers) |
+| `npm test` passes, including 100K property + differential cases | **Met** | 2,036 / 2,036 tests, 163 files; every package typechecks |
+| `npm run verify` completes 10 million with zero unexplained failures | **Being re-run** | It was 10,000,000 of 10,000,000 — 0 invariant violations, 0 disagreements, 0 errors (46 min, 6 workers). The `Rollup` type has since grown `worstFloodZoneTier`, so that result is stale until the re-run finishes. |
 | `npm run seed` against the live API stores all 158 with results and query traces | **Met** | 158 stored, 158 scored, 158 traced; live adapter, 4 queries in 9.2 s |
 | Console shows the ranked queue and, per account, explanation, factor breakdown with citations, query trace, pricing, flip | **Met** | All 12 panels (a)–(l); every route renders in a real browser with 0 console errors |
 | `VERIFICATION.md` with layer-C agreement and the disagreement list | **Met** | 1,331 / 1,332 (99.9%, 95% CI 99.6–100.0%); all 38 real accounts agree; the one disagreement explained |
@@ -43,7 +74,7 @@ All four prize targets have working code. Phase 1 is complete and verified; phas
 | **Reply-extraction accuracy: not measured** | It ran after the Gemini credits ran out, so every call failed; the 41% it produced was discarded. Extraction now runs on Claude Sonnet 5 and works live (4 fields from one reply: 3 accepted, 1 hedged value sent to confirm), but the 30-reply accuracy check has not been re-run. |
 | **706 layer-C cases unanswered** | Same 402. Resumes from cache after a top-up. |
 | **No real account has a minimal flip** | 23 of 26 declined accounts fail on something the insured can't change (building age, state, renewal); the other 3 fail only on premium but need more than the two-move cap. The engine states the reason, which is what the demo shows. |
-| **Enrichment is display-only** | Flood zone and fire-station distance are fetched and shown but feed no score or price. Overpass was also mostly down (2 of 27). |
+| **Enrichment: flood now decides; fire-station still does not** | Flood zone reaches the engine: `rollup.worstFloodZoneTier` (FEMA NFHL) is read by `X-FLOOD-SFHA` / `X-FLOOD-COASTAL` and by a flood load in the rating table, so a fetched zone refers an account and raises its premium. It repriced 13 accounts and moved 19 of 27 on rank or price. Fire-station distance is still display-only, and Overpass was mostly down anyway (2 of 27). The flood load itself is a stated judgement, not a fit — only 3 real policies sit in a zone. |
 | **3D coverage dome cut** | Its libraries were never installed and nobody could verify a 3D render in Expo Go. The 2D Skia ring ships instead (the PRD's named fallback). |
 | **schema-assist not enabled in ingest** | The synonym table and graph search already place every needed field on this dataset. |
 | **Sentry, domain** | Need accounts in your name. |

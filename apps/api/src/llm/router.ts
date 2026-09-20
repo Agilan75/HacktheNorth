@@ -38,9 +38,10 @@ export function createRoutedLlm(options: RoutedLlmOptions): LlmProvider {
 
 /** The app's LLM, built the same way by the server, the seed and verify:llm. */
 export function createAppLlm(keys: {
-  readonly geminiApiKey: string | undefined;
   readonly anthropicApiKey: string | undefined;
   readonly anthropicWorkspaceId?: string | undefined;
+  /** Legacy, unwired: nothing in the app passes this any more. Tests may. */
+  readonly geminiApiKey?: string | undefined;
 }): LlmProvider {
   const claude = createClaudeProvider({ apiKey: keys.anthropicApiKey, workspaceId: keys.anthropicWorkspaceId });
   const gemini = createGeminiProvider({ apiKey: keys.geminiApiKey });

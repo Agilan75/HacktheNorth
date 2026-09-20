@@ -29,6 +29,7 @@ describe('Layout', () => {
     expect(links[0]).toHaveAttribute('href', '/queue');
     expect(within(primary).getByRole('link', { name: 'Rules' })).toHaveAttribute('aria-current', 'page');
     expect(within(primary).getByRole('link', { name: 'Queue' })).not.toHaveAttribute('aria-current');
+    expect(within(header).getByRole('link', { name: 'Retrofit — home' })).toHaveAttribute('href', '/');
     expect(within(screen.getByRole('main')).getByText('Page body')).toBeInTheDocument();
   });
 

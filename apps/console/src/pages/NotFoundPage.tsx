@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { Link, useLocation } from 'react-router';
 
-import { ROUTES } from '../App.js';
+import { ROUTES } from '../routes.js';
 
 /** Catch-all route: an unknown address says so instead of silently showing the queue. */
 export function NotFoundPage(): ReactElement {

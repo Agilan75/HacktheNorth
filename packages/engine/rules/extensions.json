@@ -2,7 +2,7 @@
   "id": "extensions",
   "lineOfBusiness": "commercial_property",
   "version": "1.0.0",
-  "source": "Retrofit extension rules (Retrofit's own, PRD 6.6). Not in APPETITE_GUIDELINES.pdf: they can raise REFER or a contradiction and feed the premium, and they never touch the appetite score.",
+  "source": "Retrofit extension rules (Retrofit's own, PRD 6.6). Not in APPETITE_GUIDELINES.pdf: they can raise REFER or a contradiction and feed the premium, and they never touch the appetite score. The flood-zone rules are the one place external enrichment reaches a decision: `worstFloodZoneTier` is fed by the OpenFEMA National Flood Hazard Layer, so a fetched zone can move an account to REFER and change its predicted premium.",
   "weights": {},
   "rules": [
     {
@@ -99,19 +99,66 @@
       },
       "ratingFactor": "protectionClass",
       "extension": true
+    },
+    {
+      "id": "X-FLOOD-MINIMAL",
+      "lineOfBusiness": "commercial_property",
+      "factor": "flood_zone",
+      "tier": "target",
+      "when": [{ "field": "worstFloodZoneTier", "op": "lt", "value": 1 }],
+      "citation": {
+        "doc": "Retrofit extension rules",
+        "section": "Flood zone",
+        "quote": "Retrofit's own rule: every location outside the mapped Special Flood Hazard Area (FEMA zone X, X500 or D) is target and earns the base flood rate."
+      },
+      "ratingFactor": "flood.minimal",
+      "extension": true
+    },
+    {
+      "id": "X-FLOOD-SFHA",
+      "lineOfBusiness": "commercial_property",
+      "factor": "flood_zone",
+      "tier": "refer",
+      "when": [
+        { "field": "worstFloodZoneTier", "op": "gte", "value": 1 },
+        { "field": "worstFloodZoneTier", "op": "lt", "value": 2 }
+      ],
+      "citation": {
+        "doc": "Retrofit extension rules",
+        "section": "Flood zone",
+        "quote": "Retrofit's own rule: any location inside a FEMA Special Flood Hazard Area (zone A, AE, AO, AH, AR or A99) is referred to an underwriter and rated for flood."
+      },
+      "fixHint": "Flood is an underwriting decision, not something the insured can move: the building cannot leave the flood plain. A referral asks for an elevation certificate and a flood sublimit.",
+      "ratingFactor": "flood.sfha",
+      "extension": true
+    },
+    {
+      "id": "X-FLOOD-COASTAL",
+      "lineOfBusiness": "commercial_property",
+      "factor": "flood_zone",
+      "tier": "refer",
+      "when": [{ "field": "worstFloodZoneTier", "op": "gte", "value": 2 }],
+      "citation": {
+        "doc": "Retrofit extension rules",
+        "section": "Flood zone",
+        "quote": "Retrofit's own rule: a location in a coastal high-hazard zone with wave action (FEMA zone V or VE) is referred to an underwriter and rated at the coastal flood load."
+      },
+      "fixHint": "Flood is an underwriting decision, not something the insured can move: the building cannot leave the coastal V zone. A referral asks for an elevation certificate and a flood sublimit.",
+      "ratingFactor": "flood.coastal",
+      "extension": true
     }
   ],
   "interpretations": [
     {
       "id": "X-OURS",
       "title": "Extension rules are Retrofit's, not Federato's",
-      "decision": "Sprinkler and protection-class rules are labelled as Retrofit's own everywhere. They can raise REFER or a contradiction and feed the premium; they carry no weight and never change the appetite score.",
+      "decision": "Sprinkler, protection-class and flood-zone rules are labelled as Retrofit's own everywhere. They can raise REFER or a contradiction and feed the premium; they carry no weight and never change the appetite score.",
       "citation": {
         "doc": "docs/PRD.md",
         "section": "6.6 Rulebooks",
         "quote": "They can raise REFER or a contradiction and feed the premium, and they never touch the appetite score, so the score stays defensible against Federato's document."
       },
-      "affects": ["pctTivSprinklered", "tivWeightedProtectionClass"]
+      "affects": ["pctTivSprinklered", "tivWeightedProtectionClass", "worstFloodZoneTier"]
     }
   ]
 }

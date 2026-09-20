@@ -5,6 +5,8 @@ export interface AsyncState<T> {
     readonly error: Error | null;
     readonly reload: () => void;
 }
+/** The API origin, for the few requests that are not JSON routes (the verification field's byte layers). */
+export declare function resolveBaseUrl(): string;
 /**
  * One client for the whole console, built from `VITE_API_URL` (never a
  * secret). Module-level so every page shares it without a provider, since

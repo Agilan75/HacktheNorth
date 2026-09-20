@@ -258,7 +258,7 @@ describe('verify:llm CLI', () => {
     const unconfigured: LlmProvider = { ...createFakeLlm(), name: 'gemini', configured: false };
     setCliLlmDeps({ llm: unconfigured, log: (l) => lines.push(l) });
     expect(await main(['--out-dir', join(dir, 'out')])).toBe(2);
-    expect(lines.join('\n')).toMatch(/GEMINI_API_KEY is not set/);
+    expect(lines.join('\n')).toMatch(/ANTHROPIC_API_KEY is not set/);
     expect(await main(['--bogus'])).toBe(2);
     expect(await main(['--concurrency', '0'])).toBe(2);
   });

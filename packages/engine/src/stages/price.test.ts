@@ -63,6 +63,7 @@ function rollupOf(over: Partial<Rollup>): Rollup {
     pctTivAcceptableConstruction: null,
     pctTivSprinklered: null,
     tivWeightedProtectionClass: null,
+    worstFloodZoneTier: null,
     primaryState: null,
     stateShares: [],
     fiveYearLoss: null,
@@ -246,6 +247,65 @@ describe('priceCommercial', () => {
       name: 'protectionClass',
       input: 'class 8',
       factor: 1.2,
+    });
+  });
+
+  /*
+   * Flood is the one rating input fed from outside the submission (the OpenFEMA
+   * hazard layer), so these pin the thing the bonus criterion turns on: an
+   * enriched account is repriced, and an un-enriched or dry one is not.
+   */
+  describe('flood load', () => {
+    const FLOODED: CommercialRatingTable = {
+      ...COMMERCIAL,
+      flood: { minimal: 1, sfha: 1.15, coastal: 1.35 },
+    };
+    const withTier = (worstFloodZoneTier: number | null): CanonicalSubmission => ({
+      ...TWO_BUILDINGS,
+      rollup: rollupOf({ ...TWO_BUILDINGS.rollup, worstFloodZoneTier }),
+    });
+    const dry = priceCommercial(EMPTY_VECTOR, EMPTY_SPEC, FLOODED, withTier(0));
+
+    it('charges nothing for flood outside the mapped hazard, to the cent', () => {
+      // Pinned, not approximated: a dry account must price EXACTLY as it did
+      // before flood existed, or the fitted error no longer describes it.
+      const noFlood = priceCommercial(EMPTY_VECTOR, EMPTY_SPEC, COMMERCIAL, TWO_BUILDINGS);
+      expect(dry.predictedPremium).toBe(noFlood.predictedPremium);
+      expect(dry.factors.find((f) => f.name === 'flood')).toEqual({
+        name: 'flood',
+        input: 'outside the mapped flood hazard',
+        factor: 1,
+      });
+    });
+
+    it('loads an inland flood zone by 15% and a coastal one by 35%', () => {
+      const sfha = priceCommercial(EMPTY_VECTOR, EMPTY_SPEC, FLOODED, withTier(1));
+      const coastal = priceCommercial(EMPTY_VECTOR, EMPTY_SPEC, FLOODED, withTier(2));
+      const base = dry.predictedPremium as number;
+
+      expect(sfha.predictedPremium).toBeCloseTo(base * 1.15, 6);
+      expect(coastal.predictedPremium).toBeCloseTo(base * 1.35, 6);
+      expect(sfha.factors.find((f) => f.name === 'flood')).toEqual({
+        name: 'flood',
+        input: 'FEMA special flood hazard area',
+        factor: 1.15,
+      });
+      expect(coastal.factors.find((f) => f.name === 'flood')?.input).toBe('coastal V zone');
+      // A dearer premium against the same quote is a worse adequacy, which is
+      // how the enrichment reaches the ranked order.
+      expect(sfha.adequacy as number).toBeLessThan(dry.adequacy as number);
+    });
+
+    it('charges nothing when FEMA has not answered, rather than assuming the worst', () => {
+      const unknown = priceCommercial(EMPTY_VECTOR, EMPTY_SPEC, FLOODED, withTier(null));
+      expect(unknown.predictedPremium).toBe(dry.predictedPremium);
+      expect(unknown.factors.find((f) => f.name === 'flood')?.factor).toBe(1);
+    });
+
+    it('charges nothing from a rating table written before flood existed', () => {
+      const old = priceCommercial(EMPTY_VECTOR, EMPTY_SPEC, COMMERCIAL, withTier(2));
+      expect(old.predictedPremium).toBe(dry.predictedPremium);
+      expect(old.factors.find((f) => f.name === 'flood')?.factor).toBe(1);
     });
   });
 

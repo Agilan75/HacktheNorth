@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,6 +15,7 @@ vi.mock('../api/useApi.js', () => ({
     throw new Error('not used');
   },
 }));
+
 
 import { AggregatePage } from './AggregatePage.js';
 
@@ -56,6 +57,13 @@ function tileValue(testId: string): string {
   return within(screen.getByTestId(testId)).getByRole('definition').textContent ?? '';
 }
 
+/** The one-flip DataTable no longer carries a per-row test id; find it by insured name. */
+function flipCells(id: string): (string | null)[] {
+  const row = screen.getByRole('link', { name: `Open Insured ${id}` }).closest('tr');
+  if (row === null) throw new Error(`no row for ${id}`);
+  return within(row).getAllByRole('cell').map((c) => c.textContent);
+}
+
 afterEach(cleanup);
 
 describe('AggregatePage with the C14 fields', () => {
@@ -79,7 +87,7 @@ describe('AggregatePage with the C14 fields', () => {
 
   it('one-flip list shows the specific move, score after and premium after', () => {
     mount(RICH);
-    const cells = within(screen.getByTestId('flip-c')).getAllByRole('cell').map((c) => c.textContent);
+    const cells = flipCells('c');
     expect(cells).toContain('Raise TIV to $150,000,000');
     expect(cells).toContain('84');
     expect(cells).toContain('$205,000');
@@ -96,7 +104,7 @@ describe('AggregatePage verification link (FILL-console)', () => {
 
   it('keeps the link when no run exists yet', () => {
     mount(BASE);
-    expect(screen.getByTestId('verification-empty')).toBeInTheDocument();
+    expect(screen.getByTestId('verification-empty')).toHaveTextContent('No verification run yet.');
     expect(screen.getByTestId('verification-link')).toHaveAttribute('href', '/verification');
   });
 });
@@ -109,7 +117,7 @@ describe('AggregatePage without the C14 fields (fallback)', () => {
     expect(tileValue('tile-adequacy')).toContain('97%');
     expect(screen.queryByTestId('adequacy-underpriced')).toBeNull();
     expect(screen.getAllByText('Total Premium').length).toBeGreaterThan(0);
-    const cells = within(screen.getByTestId('flip-c')).getAllByRole('cell').map((c) => c.textContent);
+    const cells = flipCells('c');
     expect(cells).toContain('Queue explanation sentence.');
     expect(cells).toContain('—');
   });
@@ -119,10 +127,53 @@ describe('AggregatePage one-flip row not present in the queue (R5-12)', () => {
   it('never invents a verdict or a predicted premium for a row the queue never returned', () => {
     const row = flipRow('z', { predictedPremium: null, incomplete: true });
     mount({ ...BASE, oneFlipAway: [row] });
-    const table = screen.getByTestId('flip-z');
-    expect(within(table).queryByText('DOES NOT FIT')).toBeNull();
-    expect(within(table).getByText('Not in current queue')).toBeInTheDocument();
-    const cells = within(table).getAllByRole('cell').map((c) => c.textContent);
+    const tr = screen.getByRole('link', { name: 'Open Insured z' }).closest('tr') as HTMLElement;
+    expect(within(tr).queryByText('DOES NOT FIT')).toBeNull();
+    expect(within(tr).getByText('Not in current queue')).toBeInTheDocument();
+    const cells = within(tr).getAllByRole('cell').map((c) => c.textContent);
     expect(cells).toContain('—'); // Predicted premium: unknown, not the post-flip figure.
+  });
+});
+
+describe('AggregatePage navigation (redesign)', () => {
+  it('links the headline verdict tile and the verdict chart rows to the filtered queue', () => {
+    mount(RICH);
+    expect(within(screen.getByTestId('tile-fit')).getByRole('link')).toHaveAttribute('href', '/queue?verdict=FIT');
+    expect(screen.getByTestId('verdict-links-FIT')).toHaveAttribute('href', '/queue?verdict=FIT');
+    expect(screen.getByTestId('verdict-links-DOES_NOT_FIT')).toHaveAttribute('href', '/queue?verdict=DOES_NOT_FIT');
+  });
+
+  it('links each knockout factor row to the queue', () => {
+    mount(RICH);
+    expect(screen.getByTestId('knockout-links-total_premium')).toHaveAttribute(
+      'href',
+      `/queue?${new URLSearchParams({ q: 'Total premium (guide label)' }).toString()}`,
+    );
+  });
+
+  it('caps the one-flip table and discloses the rest', () => {
+    const rows = Array.from({ length: 12 }, (_, i) => flipRow(`f${i}`));
+    mount({ ...BASE, oneFlipAway: rows });
+    expect(screen.queryByRole('link', { name: 'Open Insured f11' })).toBeNull();
+    fireEvent.click(screen.getByTestId('flip-show-all'));
+    expect(screen.getByRole('link', { name: 'Open Insured f11' })).toBeInTheDocument();
+  });
+
+  it('sorts the one-flip table by score after, descending', () => {
+    mount({
+      ...BASE,
+      oneFlipAway: [flipRow('low'), flipRow('high')],
+      oneFlipMoves: {
+        low: { moveLabel: 'Low move', scoreAfter: 71, premiumAfter: 1000 },
+        high: { moveLabel: 'High move', scoreAfter: 92, premiumAfter: 2000 },
+      },
+    });
+    const names = screen.getAllByRole('link', { name: /^Open Insured/ }).map((l) => l.textContent);
+    expect(names).toEqual(['Insured high', 'Insured low']);
+  });
+
+  it('the verification link is short', () => {
+    mount(RICH);
+    expect(screen.getByTestId('verification-link').textContent).toBe('Verification');
   });
 });

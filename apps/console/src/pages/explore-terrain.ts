@@ -32,6 +32,10 @@ export interface TerrainFootprint {
   readonly verdict: Verdict;
   readonly tiv: number | null;
   readonly premium: number | null;
+  /** The engine's own sentence for this account, shown on hover: why it lands where it does. */
+  readonly reason?: string | null;
+  /** True for a row scored on another line of business (cyber, auto, ...), which these bands never applied to. */
+  readonly otherLine?: boolean;
 }
 
 /** Everything the terrain needs about the account it is drawn for. */
@@ -134,6 +138,11 @@ function cellColor(verdict: Verdict): string {
   return verdict === 'FIT' ? COLORS.red : verdict === 'REFER' ? COLORS.redTint : COLORS.ink;
 }
 
+/** A footprint carries its own verdict, so the floor shows where the fits and the refusals actually stand. */
+function dotColor(f: TerrainFootprint): string {
+  return f.verdict === 'FIT' ? COLORS.red : f.verdict === 'REFER' ? COLORS.redDeep : COLORS.mutedDeep;
+}
+
 /* -------------------------------------------------------------------------- */
 /* Scene                                                                      */
 /* -------------------------------------------------------------------------- */
@@ -177,8 +186,8 @@ export function createTerrainScene(host: HTMLElement, callbacks: TerrainCallback
   let hovered: Pickable | null = null;
 
   const home = (): void => {
-    camera.position.set(110, 92, 132);
-    controls.target.set(0, Y_TOP / 3, 0);
+    camera.position.set(150, 140, 186);
+    controls.target.set(24, Y_TOP * 0.38, 0);
     controls.update();
   };
   home();
@@ -251,7 +260,11 @@ export function createTerrainScene(host: HTMLElement, callbacks: TerrainCallback
             roughness: 0.82,
             metalness: 0,
             transparent: true,
-            opacity: verdict === 'DOES_NOT_FIT' ? 0.82 : 1,
+            // Knocked-out ground still has a score, but no premium can be written there:
+            // it is drawn as ghost ground so the ground that fits stays readable.
+            // Knocked-out ground still has a score, but no account can be written there.
+            // It is drawn as an open cage at that height, so it never hides the ground that fits.
+            opacity: verdict === 'DOES_NOT_FIT' ? 0.07 : 1,
           }),
         );
         mesh.position.set((x0 + x1) / 2, height / 2, (z0 + z1) / 2);
@@ -259,7 +272,11 @@ export function createTerrainScene(host: HTMLElement, callbacks: TerrainCallback
         // A wire edge keeps each step legible where two terraces share a height.
         const edges = new THREE.LineSegments(
           new THREE.EdgesGeometry(geometry),
-          new THREE.LineBasicMaterial({ color: verdict === 'DOES_NOT_FIT' ? COLORS.muted : COLORS.redDeep, transparent: true, opacity: 0.45 }),
+          new THREE.LineBasicMaterial({
+            color: verdict === 'DOES_NOT_FIT' ? COLORS.muted : COLORS.redDeep,
+            transparent: true,
+            opacity: verdict === 'DOES_NOT_FIT' ? 0.5 : 0.5,
+          }),
         );
         edges.position.copy(mesh.position);
         edges.raycast = () => undefined;
@@ -267,7 +284,12 @@ export function createTerrainScene(host: HTMLElement, callbacks: TerrainCallback
         pickables.push({ mesh, cell: { tivBand, premiumBand, score, verdict } });
 
         // Score on top of each terrace, so the height is readable without guessing.
-        addLabel(`${Math.round(score)}`, new THREE.Vector3((x0 + x1) / 2, height + 2.5, (z0 + z1) / 2), 20, COLORS.ink);
+        addLabel(
+          `${Math.round(score)}`,
+          new THREE.Vector3((x0 + x1) / 2, height + 2.5, (z0 + z1) / 2),
+          20,
+          verdict === 'DOES_NOT_FIT' ? COLORS.muted : COLORS.ink,
+        );
       }
     }
 
@@ -287,14 +309,18 @@ export function createTerrainScene(host: HTMLElement, callbacks: TerrainCallback
     addLabel('Total insured value →', new THREE.Vector3(0, 0.5, HALF + 22), 30, COLORS.ink);
     addLabel('Quoted premium →', new THREE.Vector3(-HALF - 30, 0.5, 0), 30, COLORS.ink);
 
-    /* Every other account's footprint, flat on the floor. */
+    /* Every account that has a TIV and a premium stands on the floor. */
+    const offMap: TerrainFootprint[] = [];
     for (const f of footprints) {
-      if (f.tiv === null || f.premium === null) continue;
+      if (f.tiv === null || f.premium === null) {
+        offMap.push(f);
+        continue;
+      }
       const selected = f.submissionId === account.submissionId;
       const dot = new THREE.Mesh(
         new THREE.CircleGeometry(selected ? 1.6 : 1.1, 20),
         new THREE.MeshBasicMaterial({
-          color: selected ? COLORS.red : COLORS.mutedDeep,
+          color: selected ? COLORS.red : dotColor(f),
           transparent: true,
           opacity: selected ? 1 : 0.65,
         }),
@@ -305,6 +331,45 @@ export function createTerrainScene(host: HTMLElement, callbacks: TerrainCallback
       pickables.push({ mesh: dot, footprint: f });
     }
 
+    /*
+     * Accounts with no TIV or no quoted premium have no place on this floor, so
+     * they wait in a tray beside it rather than being dropped. Most are the rows
+     * scored on another line of business, which these bands never applied to.
+     */
+    const trayPositions = new Map<string, THREE.Vector3>();
+    if (offMap.length > 0) {
+      // A grid to the right of the terrain, clear of every axis label.
+      const perRow = 10;
+      const gap = 3.6;
+      const originX = HALF + 26;
+      const originZ = -HALF + 6;
+      offMap.forEach((f, i) => {
+        const at = new THREE.Vector3(originX + (i % perRow) * gap, 0.15, originZ + Math.floor(i / perRow) * gap);
+        trayPositions.set(f.submissionId, at);
+        const selected = f.submissionId === account.submissionId;
+        const dot = new THREE.Mesh(
+          new THREE.CircleGeometry(selected ? 1.5 : 1, 16),
+          new THREE.MeshBasicMaterial({
+            color: selected ? COLORS.red : dotColor(f),
+            transparent: true,
+            opacity: selected ? 1 : 0.5,
+          }),
+        );
+        dot.rotation.x = -Math.PI / 2;
+        dot.position.copy(at);
+        content.add(dot);
+        pickables.push({ mesh: dot, footprint: f });
+      });
+      const otherLines = offMap.filter((f) => f.otherLine === true).length;
+      const detail = otherLines === 0 ? '' : ` · ${otherLines} on another line of business`;
+      addLabel(
+        `Off the floor: no TIV or quoted premium (${offMap.length})${detail}`,
+        new THREE.Vector3(originX + 16, 0.5, originZ - 9),
+        26,
+        COLORS.mutedDeep,
+      );
+    }
+
     /* The selected account's pin, standing on its own terrace. */
     if (account.tiv !== null && account.premium !== null) {
       const tivBand = bandAt(bands.tiv, account.tiv);
@@ -313,10 +378,10 @@ export function createTerrainScene(host: HTMLElement, callbacks: TerrainCallback
       const z = zOf(account.premium);
       const top =
         tivBand !== null && premiumBand !== null ? yOf(cellScore(account, tivBand, premiumBand)) : yOf(account.appetiteScore);
-      const stalkTop = top + 10;
+      const stalkTop = top + 16;
       content.add(line([new THREE.Vector3(x, top, z), new THREE.Vector3(x, stalkTop, z)], COLORS.ink, 0.8));
       const cap = new THREE.Mesh(
-        new THREE.SphereGeometry(2.1, 24, 16),
+        new THREE.SphereGeometry(2.8, 24, 16),
         new THREE.MeshStandardMaterial({
           color: account.verdict === 'REFER' ? COLORS.redTint : VERDICT_STYLES[account.verdict].fill,
           roughness: 0.5,
@@ -327,7 +392,7 @@ export function createTerrainScene(host: HTMLElement, callbacks: TerrainCallback
       pickables.push({ mesh: cap, isPin: true, footprint: account });
       addLabel(
         `${account.insuredName} · ${Math.round(account.appetiteScore)}`,
-        new THREE.Vector3(x, stalkTop + 5, z),
+        new THREE.Vector3(x, stalkTop + 6, z),
         26,
         COLORS.ink,
       );
@@ -357,8 +422,29 @@ export function createTerrainScene(host: HTMLElement, callbacks: TerrainCallback
         const changes: string[] = [];
         if (tivBand?.tier !== 'target') changes.push(`TIV ${bandLabel(targetTiv)}`);
         if (premiumBand?.tier !== 'target') changes.push(`premium ${bandLabel(targetPrem)}`);
-        addLabel(changes.join(', '), to.clone().add(new THREE.Vector3(0, 5, 0)), 22, COLORS.redDeep);
+        addLabel(changes.join(', '), to.clone().add(new THREE.Vector3(0, -6, 0)), 22, COLORS.redDeep);
       }
+    } else {
+      /* Selected but off the floor: the pin stands in the tray, over nothing. */
+      const at = trayPositions.get(account.submissionId) ?? new THREE.Vector3(HALF + 26, 0.15, -HALF + 6);
+      const stalkTop = 14;
+      content.add(line([at, new THREE.Vector3(at.x, stalkTop, at.z)], COLORS.ink, 0.8));
+      const cap = new THREE.Mesh(
+        new THREE.SphereGeometry(2.4, 24, 16),
+        new THREE.MeshStandardMaterial({
+          color: account.verdict === 'REFER' ? COLORS.redTint : VERDICT_STYLES[account.verdict].fill,
+          roughness: 0.5,
+        }),
+      );
+      cap.position.set(at.x, stalkTop, at.z);
+      content.add(cap);
+      pickables.push({ mesh: cap, isPin: true, footprint: account });
+      addLabel(
+        `${account.insuredName} · no TIV or premium to stand on`,
+        new THREE.Vector3(at.x + 16, stalkTop + 6, at.z),
+        24,
+        COLORS.ink,
+      );
     }
   };
 
@@ -445,4 +531,57 @@ export function createTerrainScene(host: HTMLElement, callbacks: TerrainCallback
       el.remove();
     },
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Building the account from the API's own numbers                            */
+/* -------------------------------------------------------------------------- */
+
+/** The two factors the terrain sweeps; every other factor is held where the account has it. */
+const SWEPT_FACTORS = new Set(['tiv', 'total_premium']);
+
+/**
+ * Turn a submission detail into terrain input. Every number is the API's:
+ * `basePoints` is the sum of the account's own factor points outside the two
+ * swept factors, and the swept weights are the account's own weights, so the
+ * pin's terrace height equals the appetite score the queue shows.
+ */
+export function terrainAccountOf(detail: TerrainDetail): TerrainAccount {
+  const others = detail.factors.filter((f) => !SWEPT_FACTORS.has(f.factorId));
+  const weightOf = (factorId: string, fallback: number): number =>
+    detail.factors.find((f) => f.factorId === factorId)?.weight ?? fallback;
+  return {
+    submissionId: detail.submissionId,
+    insuredName: detail.insuredName,
+    verdict: detail.verdict,
+    tiv: detail.rollup.totalTiv,
+    premium: detail.pricing.quotedPremium,
+    appetiteScore: detail.appetiteScore,
+    basePoints: others.reduce((sum, f) => sum + f.points, 0),
+    tivWeight: weightOf('tiv', 0.15),
+    premiumWeight: weightOf('total_premium', 0.15),
+    knockedOutElsewhere: others.some((f) => f.knockout),
+    refersElsewhere:
+      others.some((f) => !f.known || f.tier === 'refer') ||
+      detail.contradictions.some((c) => c.severity === 'HIGH' && c.status === 'open'),
+  };
+}
+
+/** The slice of `SubmissionDetailView` the terrain reads. */
+export interface TerrainDetail {
+  readonly submissionId: string;
+  readonly insuredName: string;
+  readonly verdict: Verdict;
+  readonly appetiteScore: number;
+  readonly factors: readonly {
+    readonly factorId: string;
+    readonly weight: number;
+    readonly points: number;
+    readonly known: boolean;
+    readonly knockout: boolean;
+    readonly tier: string | null;
+  }[];
+  readonly rollup: { readonly totalTiv: number | null };
+  readonly pricing: { readonly quotedPremium: number | null };
+  readonly contradictions: readonly { readonly severity: string; readonly status: string }[];
 }

@@ -58,6 +58,20 @@ const PRIOR_PSEUDO_ROWS = 2;
 /** Factors are rounded to this many decimals in the frozen table. */
 const FACTOR_DIGITS = 4;
 
+/**
+ * The flood load. **Not fitted, and deliberately not a family above.**
+ *
+ * Only three of the 27 real policies have a location inside a Special Flood
+ * Hazard Area, which is far too few to fit a factor from; a number fitted on
+ * three observations would carry a precision it has not earned. So these are a
+ * stated judgement, written here so `rating:fit` still reproduces the packaged
+ * table byte for byte, and `minimal` is pinned at exactly 1 — an account
+ * outside the mapped hazard, or one whose flood enrichment never ran, prices
+ * precisely as it did before flood existed, and the fitted MAPE still
+ * describes it.
+ */
+const FLOOD_LOAD = { minimal: 1, sfha: 1.15, coastal: 1.35 } as const;
+
 type FamilyName = 'construction' | 'age' | 'protectionClass' | 'sprinkler' | 'lossHistory';
 const FAMILIES: readonly FamilyName[] = [
   'construction',
@@ -347,6 +361,7 @@ export function fitMonotonic(
     protectionClass: bands('protectionClass'),
     sprinkler,
     lossHistory: bands('lossHistory'),
+    flood: FLOOD_LOAD,
     credibilityK: CREDIBILITY_K,
     fitError: error,
   };

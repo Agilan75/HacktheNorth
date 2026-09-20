@@ -102,15 +102,23 @@ type Num = number | null;
  * The expected vector, written out component by component in the order of
  * `vectors/commercial.json` (0 isNewBusiness .. 10 tivWeightedProtectionClass).
  * `m` is derived: 1 exactly where `x` is known. Tiers are given for the nine
- * appetite components; 9 and 10 are extension-only and always carry `t = null`.
+ * appetite components; 9, 10 and 11 are extension-only and always carry
+ * `t = null`.
+ *
+ * Component 11, `worstFloodZoneTier`, is appended here rather than written into
+ * every case: it is fed only by the OpenFEMA enrichment, and no synthetic case
+ * has a flood zone, so it is missing on all of them. That is the point — these
+ * cases pin the guideline boundaries, and adding flood must not move a single
+ * one of them.
  */
 function vec(x: readonly Num[], t: readonly Num[]): FeatureVector {
+  const full = [...x, null];
   return {
     lineOfBusiness: 'commercial_property',
     specVersion: '1.0.0',
-    x: [...x],
-    t: [...t, null, null],
-    m: x.map((v) => (v === null ? 0 : 1)),
+    x: full,
+    t: [...t, null, null, null],
+    m: full.map((v) => (v === null ? 0 : 1)),
   };
 }
 

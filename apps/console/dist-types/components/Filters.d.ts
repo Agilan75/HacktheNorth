@@ -17,6 +17,6 @@ export interface FiltersProps {
     readonly options: FilterOptions;
     readonly onChange: (next: QueueFilterValue) => void;
 }
-/** PRD §10 /queue filters: line, verdict, state, underwriter, plus free-text search. */
+/** Queue filters: line, verdict, state, underwriter, plus free-text search. */
 export declare function Filters(props: FiltersProps): ReactElement;
 //# sourceMappingURL=Filters.d.ts.map

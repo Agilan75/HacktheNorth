@@ -44,9 +44,13 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().positive().max(65535).default(3000),
 
-  /** Unset -> the API still starts, prints a banner and serves the seeded sweep. */
+  /**
+    * Legacy. Every LLM call now goes to Anthropic; the Gemini provider stays in
+    * the tree as dead-but-working code and is wired to nothing. Set this only to
+    * run `gemini.live.test.ts`.
+    */
   GEMINI_API_KEY: optionalNonEmpty,
-  /** Claude for every text-only LLM call; Gemini keeps the vision calls (DECISIONS L-1). */
+  /** The one LLM credential. Unset -> the API still starts, prints a banner and serves the seeded sweep. */
   ANTHROPIC_API_KEY: optionalNonEmpty,
   /** Needed only when the Claude key is not scoped to one workspace. */
   ANTHROPIC_WORKSPACE_ID: optionalNonEmpty,
@@ -140,7 +144,7 @@ export function describeEnv(env: Env): {
   return {
     nodeEnv: env.NODE_ENV,
     port: env.PORT,
-    llmConfigured: env.GEMINI_API_KEY !== undefined || env.ANTHROPIC_API_KEY !== undefined,
+    llmConfigured: env.ANTHROPIC_API_KEY !== undefined,
     federatoConfigured:
       env.FEDERATO_BASE_URL !== undefined &&
       env.FEDERATO_CLIENT_ID !== undefined &&

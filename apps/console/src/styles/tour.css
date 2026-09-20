@@ -1,0 +1,2238 @@
+/*
+ * `/tour` — the 3D house page. Imported by TourPage only, so nothing here
+ * reaches the console's own routes. Every value still comes from a --rf-* token
+ * in tokens.css; the only new idea is a translucent card, because the copy has
+ * to sit over a moving room and stay readable.
+ */
+
+.rf-tour {
+  position: relative;
+  background: var(--rf-paper);
+  color: var(--rf-ink);
+}
+
+/* The room: fixed behind everything, never scrolls, never focusable. */
+.rf-tour__stage {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.rf-tour__canvas {
+  position: absolute;
+  inset: 0;
+}
+
+/* A paper veil over the room. The scene is drawn at full strength for its own
+   sake, but every word on the page sits on top of it, so it is knocked back
+   toward the paper before the copy ever lands. The tags are siblings of the
+   canvas and stay crisp above this. */
+.rf-tour__canvas::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgb(250 248 242 / 42%);
+  pointer-events: none;
+}
+
+/* Until WebGL is up, the page is a plain document on paper. */
+.rf-tour:not(.rf-tour--live) .rf-tour__stage {
+  display: none;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Floating tags                                                              */
+/* -------------------------------------------------------------------------- */
+
+.rf-tour__badges {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+/* JS owns `transform`, `opacity` and `visibility` on this element. */
+.rf-tour__badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  visibility: hidden;
+  will-change: transform, opacity;
+}
+
+.rf-tour__badge-dot {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--rf-red);
+  outline: 3px solid rgb(250 248 242 / 70%);
+}
+
+.rf-tour__badge-card {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 132px;
+  padding: var(--rf-space-xs) var(--rf-space-sm);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+  background: rgb(250 248 242 / 92%);
+  white-space: nowrap;
+}
+
+/* A hairline from the dot up to the card, so the tag reads as attached. */
+.rf-tour__badge-card::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  bottom: -10px;
+  width: 10px;
+  height: 10px;
+  border-left: var(--rf-border-width) solid var(--rf-border-color);
+  border-bottom: var(--rf-border-width) solid var(--rf-border-color);
+}
+
+.rf-tour__badge-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--rf-size-small);
+  font-weight: var(--rf-weight-semibold);
+  color: var(--rf-ink);
+}
+
+.rf-tour__badge-value {
+  font-size: var(--rf-size-small);
+  color: var(--rf-muted-deep);
+}
+
+/* -------------------------------------------------------------------------- */
+/* The copy                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/* The story column sits over the room; only the cards take the pointer. */
+.rf-tour__story {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.rf-tour__beat {
+  display: flex;
+  align-items: center;
+  min-height: 100vh;
+  min-height: 100svh;
+  padding: var(--rf-space-xxl) var(--rf-space-xxl);
+}
+
+/*
+ * The pinned story. `--pinned` is added by TourPage once the room is running.
+ * The copy is stacked in one pinned layer and never scrolls; only its opacity
+ * changes. Scroll drives the camera end to end — one screen per rail stop —
+ * and scrolling back up walks it in reverse.
+ *
+ * JS owns `opacity` and `visibility` on the beat and `transform` on the card.
+ */
+.rf-tour__story--pinned {
+  /* One screen per rail stop, plus one for the dissolve into the dossier. */
+  height: calc(var(--rf-tour-screens, 5) * 100vh);
+  height: calc(var(--rf-tour-screens, 5) * 100svh);
+}
+
+.rf-tour__story--pinned .rf-tour__pin {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  height: 100svh;
+}
+
+.rf-tour__story--pinned .rf-tour__beat {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+  /* Before the first paint pass the opening beat must still be readable. */
+  opacity: 1;
+  will-change: opacity;
+}
+
+/* One line per beat over the room, so the card is a caption, not a column:
+   narrower, tighter, and with nothing under the heading. */
+.rf-tour__story--pinned .rf-tour__card {
+  width: min(26rem, 100%);
+  padding: var(--rf-space-lg) var(--rf-space-xl);
+  will-change: transform;
+}
+
+.rf-tour__story--pinned .rf-tour__title {
+  margin-bottom: 0;
+}
+
+.rf-tour__story--pinned .rf-tour__cta {
+  margin-top: var(--rf-space-md);
+}
+
+.rf-tour__card {
+  pointer-events: auto;
+  width: min(30rem, 100%);
+  padding: var(--rf-space-xl);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+  background: var(--rf-paper);
+}
+
+/*
+ * Over the room the card is a plate, not a tint. 96% still shows that there is
+ * a room behind it; it does not let a wireframe or a label run through a line
+ * of text. The blur is desaturating as well as softening, so whatever the
+ * camera happens to be looking at reduces to paper-coloured haze, and the edge
+ * darkens because the token border is invisible against a moving scene.
+ */
+.rf-tour--live .rf-tour__card {
+  border-color: rgb(94 99 87 / 22%);
+  background: rgb(250 248 242 / 96%);
+  backdrop-filter: blur(14px) saturate(0.35) brightness(1.06);
+  box-shadow: 0 2px 24px rgb(31 30 27 / 7%);
+}
+
+/* No backdrop-filter (older Firefox, some embedded views): go fully opaque
+   rather than hand back a card the room reads through. */
+@supports not (backdrop-filter: blur(1px)) {
+  .rf-tour--live .rf-tour__card {
+    background: var(--rf-paper);
+  }
+}
+
+/* The copy crosses the room as the camera does: left, right, left. */
+.rf-tour__beat:nth-child(even) .rf-tour__card {
+  margin-left: auto;
+}
+
+.rf-tour__kicker {
+  margin: 0 0 var(--rf-space-xs);
+  font-size: var(--rf-size-small);
+  font-weight: var(--rf-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rf-muted-deep);
+}
+
+.rf-tour__title {
+  margin: 0 0 var(--rf-space-md);
+}
+
+.rf-tour__body {
+  margin: 0 0 var(--rf-space-sm);
+  color: var(--rf-ink);
+}
+
+.rf-tour__body code {
+  font-size: 0.95em;
+}
+
+.rf-tour__note {
+  margin: var(--rf-space-sm) 0 0;
+  padding-top: var(--rf-space-sm);
+  border-top: var(--rf-border-width) solid var(--rf-border-color);
+  font-size: var(--rf-size-small);
+  color: var(--rf-muted-deep);
+}
+
+.rf-tour__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-sm);
+  margin: var(--rf-space-lg) 0 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* The six-stage chain (the engine beat)                                      */
+/* -------------------------------------------------------------------------- */
+
+/* Six stages listed down a rail rather than named in a sentence. The rail
+   draws itself top to bottom and each stage arrives behind it, so the list
+   plays as the pipeline running once, in order. It plays on arrival only:
+   `paintBeats` adds `--active` when the beat owns the slot and removes it on
+   the way out, which rewinds every animation below for the next pass. */
+.rf-tour__chain {
+  margin: 0 0 var(--rf-space-lg);
+  padding: 0;
+  list-style: none;
+}
+
+.rf-tour__chain-step {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--rf-space-sm);
+  padding: 0.3rem 0 0.3rem 1.5rem;
+}
+
+/* The dot sits on the rail at the row's first baseline. */
+.rf-tour__chain-step::before {
+  content: '';
+  position: absolute;
+  top: 0.75rem;
+  left: 0;
+  width: 0.62rem;
+  height: 0.62rem;
+  border: 2px solid var(--rf-blue);
+  border-radius: 50%;
+  background: var(--rf-paper);
+}
+
+.rf-tour__chain-step:last-child::before {
+  border-color: var(--rf-blue-deep);
+  background: var(--rf-blue-deep);
+}
+
+.rf-tour__chain-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(0.31rem - 1px);
+  width: 2px;
+  background: var(--rf-blue);
+  opacity: 0.55;
+  transform-origin: top;
+}
+
+/* The rail spans dot to dot, not edge to edge. */
+.rf-tour__chain-step:first-child .rf-tour__chain-rail {
+  top: 1.06rem;
+}
+
+.rf-tour__chain-step:last-child .rf-tour__chain-rail {
+  bottom: calc(100% - 1.06rem);
+}
+
+.rf-tour__chain-name {
+  font-family: var(--rf-font-type);
+  font-size: var(--rf-size-small);
+  font-weight: var(--rf-weight-semibold);
+  color: var(--rf-ink);
+}
+
+.rf-tour__chain-carries {
+  font-size: var(--rf-size-small);
+  color: var(--rf-muted-deep);
+}
+
+/* The play-once pass. Delays are per row, so the rail segment fills just
+   before the stage it leads to appears. */
+.rf-tour__beat--active .rf-tour__chain-step {
+  animation: rf-chain-in 420ms cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+  animation-delay: calc(var(--rf-chain-i, 0) * 110ms + 120ms);
+}
+
+.rf-tour__beat--active .rf-tour__chain-step::before {
+  animation: rf-chain-dot 420ms cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  animation-delay: calc(var(--rf-chain-i, 0) * 110ms + 120ms);
+}
+
+.rf-tour__beat--active .rf-tour__chain-rail {
+  animation: rf-chain-rail 260ms linear backwards;
+  animation-delay: calc(var(--rf-chain-i, 0) * 110ms + 60ms);
+}
+
+@keyframes rf-chain-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-0.5rem, 0, 0);
+  }
+}
+
+@keyframes rf-chain-dot {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+}
+
+@keyframes rf-chain-rail {
+  from {
+    transform: scaleY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The six stages are content, not decoration: they stay, they stop moving. */
+  .rf-tour__beat--active .rf-tour__chain-step,
+  .rf-tour__beat--active .rf-tour__chain-step::before,
+  .rf-tour__beat--active .rf-tour__chain-rail {
+    animation: none;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* The transport                                                              */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * Autoplaying motion must be stoppable (WCAG 2.2.2), and a visitor who would
+ * rather read than watch needs a way past it. Pause, any shot by name, and a
+ * skip straight to the dossier — the only chrome the film carries.
+ */
+/* -------------------------------------------------------------------------- */
+/* The film's ten seconds                                                     */
+/* -------------------------------------------------------------------------- */
+
+/* The only chrome the room carries: what to do, then where to go next. */
+.rf-tour__hint {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: var(--rf-space-xl);
+  transform: translateX(-50%);
+  margin: 0;
+  padding: var(--rf-space-xs) var(--rf-space-lg);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-pill);
+  background: rgb(250 248 242 / 92%);
+  backdrop-filter: blur(6px);
+  font-size: var(--rf-size-small);
+  color: var(--rf-muted-deep);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rf-tour__hint {
+    transition: opacity 400ms ease;
+  }
+
+  /* Quiet while the room is moving under the scroll; full strength at the
+     door and at the end, where the hint is the thing being asked for. */
+  .rf-tour__hint[data-phase='rolling'] {
+    opacity: 0.65;
+  }
+}
+
+@media (max-width: 47rem) {
+  .rf-tour__hint {
+    bottom: var(--rf-space-md);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Narrow screens and reduced motion                                          */
+/* -------------------------------------------------------------------------- */
+
+@media (max-width: 47rem) {
+  /* No room for a tag beside an object: the same facts are in the copy. */
+  .rf-tour__badges {
+    display: none;
+  }
+
+  .rf-tour__beat {
+    min-height: 88svh;
+    padding: var(--rf-space-lg) var(--rf-space-md);
+  }
+
+  .rf-tour__story--pinned .rf-tour__beat {
+    min-height: 0;
+  }
+
+  .rf-tour__card,
+  .rf-tour__beat:nth-child(even) .rf-tour__card {
+    width: 100%;
+    margin: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The camera still follows scroll — that is direct manipulation, not
+     animation — but it stops easing, and the tags stop fading. */
+  .rf-tour__badge {
+    transition: none;
+  }
+
+  /* The cross-fade is scroll-linked too, so it stays; the drift does not. */
+  .rf-tour__story--pinned .rf-tour__card {
+    transform: none !important;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* The dossier: everything past the story                                     */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The room carries the argument; the dossier carries the evidence. Past the
+ * last beat the canvas fades out and these sections sit on opaque paper,
+ * because weight tables over a moving 3D background are unreadable.
+ */
+/* Scroll owns the stage's opacity (TourPage's onScroll): it dissolves over the
+   last screen of the story, before the dossier slides in. No transition here --
+   a timed fade on top of a scroll-linked one makes it lag the scroll. */
+.rf-tour--parked .rf-tour__stage {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.rf-tour__dossier {
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+  background: var(--rf-paper);
+  border-top: var(--rf-border-width) solid var(--rf-border-color);
+}
+
+.rf-tour__dossier-inner {
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: var(--rf-space-xxxl) var(--rf-space-xxl) var(--rf-space-huge);
+}
+
+/* Section index: the chip row that makes the whole page one click deep. */
+.rf-tour__index {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-sm);
+  margin: 0 0 var(--rf-space-xxl);
+  padding: var(--rf-space-md) 0;
+  background: var(--rf-paper);
+  border-bottom: var(--rf-border-width) solid var(--rf-border-color);
+}
+
+.rf-tour__chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--rf-min-touch-target);
+  padding: 0 var(--rf-space-lg);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-pill);
+  background: var(--rf-paper);
+  color: var(--rf-ink);
+  font-size: var(--rf-size-small);
+  font-weight: var(--rf-weight-medium);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.rf-tour__chip:hover {
+  border-color: var(--rf-muted);
+  background: var(--rf-muted-tint);
+}
+
+.rf-tour__chip--action {
+  margin-left: auto;
+  font-family: inherit;
+}
+
+.rf-tour__group {
+  margin: 0 0 var(--rf-space-xxxl);
+  scroll-margin-top: 5rem;
+}
+
+.rf-tour__group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--rf-space-md);
+  margin: 0 0 var(--rf-space-md);
+}
+
+.rf-tour__group-head h2 {
+  margin: 0;
+}
+
+/* Every section title carries a rule under it. With motion allowed it draws
+   itself left to right as the head arrives; otherwise it is simply there. */
+.rf-tour__group-head::after {
+  content: '';
+  flex: 0 0 100%;
+  height: 2px;
+  margin-top: var(--rf-space-xs);
+  background: var(--rf-ink);
+  transform-origin: left;
+}
+
+.rf-tour__group-lede {
+  margin: 0 0 var(--rf-space-lg);
+  color: var(--rf-muted-deep);
+  max-width: 44rem;
+}
+
+/* -------------------------------------------------------------------------- *
+ * The Federato agent: the schema graph pinned beside its six steps.
+ *
+ * Two columns wide, one column narrow. The canvas is decorative and
+ * aria-hidden — it illustrates the panels beside it and never replaces them,
+ * so with no WebGL the stage stays collapsed and the section is an ordinary
+ * document. Ink hairlines on paper, no shadows, like everything else here.
+ * -------------------------------------------------------------------------- */
+
+/*
+ * The scroll track. Five screens of scrolling for one screen of pinned
+ * content, so the section advances at about a fifth of normal scroll speed
+ * while the film plays over it.
+ *
+ * This is native scrolling, not a hijack: no wheel handler, no preventDefault,
+ * no re-emitted deltas. Trackpad momentum, Page Down, Home/End, find-in-page
+ * and screen-reader navigation all behave exactly as they do everywhere else —
+ * there is simply more page here. A visitor who wants out keeps scrolling and
+ * gets out, which is the property a hijacked section cannot offer.
+ */
+.rf-agent__track--live {
+  height: 500vh;
+  /* When the film ends the track is frozen to a pixel height, which a later
+     window resize would make stale. This keeps it at least tall enough to
+     hold the sticky row whatever the viewport does afterwards. */
+  min-height: 100vh;
+}
+
+.rf-agent {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--rf-space-xxl);
+  align-items: start;
+}
+
+.rf-agent__track--live .rf-agent {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  align-items: center;
+}
+
+/*
+ * Pinned, the six steps sit dead centre of the screen: equal space above step
+ * one and below step six. The figure tiles come out of flow to make that true
+ * — left in it they sit above the list and push it below the midline, which
+ * reads as the whole column having slipped down the page.
+ *
+ * The list is centred with `margin: auto` rather than `align-items: center`,
+ * because a flex-centred box that outgrows its parent becomes unscrollable at
+ * the top edge. Auto margins collapse instead, so opening several panels stays
+ * readable.
+ */
+.rf-agent__track--live .rf-agent__steps {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.rf-agent__track--live .rf-agent__panels {
+  width: 100%;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
+.rf-agent__track--live .rf-agent__steps > .rf-tour__figures {
+  position: absolute;
+  inset: 0 0 auto;
+  margin: 0;
+}
+
+/* Short viewport: the tiles would land on top of the list, so put them back
+   in flow and let the column sit where it falls. */
+@media (max-height: 44rem) {
+  .rf-agent__track--live .rf-agent__steps > .rf-tour__figures {
+    position: static;
+    margin: 0 0 var(--rf-space-lg);
+  }
+}
+
+.rf-agent__steps {
+  min-width: 0;
+}
+
+/* Collapsed until the scene reports it is running, the way the story stage is. */
+.rf-agent__stage {
+  display: none;
+}
+
+.rf-agent__stage--live {
+  display: block;
+  /* Positioned, not pinned: the track above pins the whole row. Still a
+     containing block, which the absolutely placed badges need. */
+  position: relative;
+  height: min(70vh, 40rem);
+  /* The graph reads as a drawing on the page, not as a panel sitting on it. */
+  background: transparent;
+  pointer-events: none;
+}
+
+.rf-agent__canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* Badges are positioned by the scene, in px, from the element's own origin. */
+.rf-agent__badges {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.rf-agent__badge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* The scene writes translate3d(x, y, 0) onto this element, so centring is
+     done here: the negative left margin is exactly half the width. A resource
+     name is one token and must never wrap — a wrapped label re-centres on two
+     lines and visibly drifts off its node. */
+  margin: -2.6rem 0 0 -3.5rem;
+  width: 7rem;
+  white-space: nowrap;
+  text-align: center;
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+  font-weight: 600;
+  color: var(--rf-ink);
+  opacity: 0;
+  visibility: hidden;
+  will-change: transform, opacity;
+}
+
+/*
+ * The readout card. Wider than the node labels because it carries a sentence,
+ * left-aligned because centred prose of two or three lines is a ragged block
+ * the eye has to re-find on every line. The left margin stays exactly half the
+ * width so the card still centres under the point it is describing.
+ */
+.rf-agent__badge--readout {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0.75rem 0 0 -6.5rem;
+  width: 13rem;
+  padding: var(--rf-space-sm) var(--rf-space-md);
+  background: rgb(250 248 242 / 94%);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+  white-space: normal;
+  text-align: left;
+  text-wrap: pretty;
+}
+
+.rf-agent__readout-label {
+  font-family: var(--rf-font-body);
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--rf-red-deep);
+}
+
+.rf-agent__readout-value {
+  font-family: var(--rf-font-body);
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+  font-weight: 400;
+  /* Figures line up column-wise across steps: 158 and 38 and 27 all sit on
+     the same rhythm instead of jittering as the card changes. */
+  font-variant-numeric: tabular-nums;
+  color: var(--rf-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-agent__badge {
+    will-change: auto;
+  }
+}
+
+/* Narrow: the panels are the content. The graph needs width to be read at
+   all, so below the breakpoint it is dropped rather than shrunk. */
+@media (max-width: 62rem) {
+  .rf-agent {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rf-agent__stage,
+  .rf-agent__stage--live {
+    display: none;
+  }
+
+  /* No graph to watch, so no reason to slow anybody down. */
+  .rf-agent__track--live {
+    height: auto;
+  }
+
+  .rf-agent__track--live .rf-agent {
+    position: static;
+    height: auto;
+    align-items: start;
+  }
+
+  .rf-agent__track--live .rf-agent__steps {
+    position: static;
+    height: auto;
+    overflow-y: visible;
+    display: block;
+  }
+
+  .rf-agent__track--live .rf-agent__panels {
+    margin: 0;
+  }
+
+  .rf-agent__track--live .rf-agent__steps > .rf-tour__figures {
+    position: static;
+    margin: 0 0 var(--rf-space-lg);
+  }
+}
+
+/*
+ * The step the film is currently drawing. A left edge in the brand red and a
+ * faint tint — enough to follow from the corner of the eye while watching the
+ * graph, not enough to read as a selected or pressed control. It marks what is
+ * playing; it does not claim the panel is open.
+ */
+.rf-tour__panel--active {
+  border-color: var(--rf-red);
+  background: var(--rf-red-tint);
+}
+
+.rf-tour__panel--active > summary {
+  box-shadow: inset 2px 0 0 0 var(--rf-red);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rf-tour__panel {
+    transition:
+      background 240ms ease,
+      border-color 240ms ease;
+  }
+}
+
+/* One collapsible panel. Native <details>, so it works with no JS at all. */
+.rf-tour__panel {
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+  margin: 0 0 var(--rf-space-sm);
+  background: var(--rf-paper);
+}
+
+.rf-tour__panel > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--rf-space-md);
+  min-height: var(--rf-min-touch-target);
+  padding: var(--rf-space-md) var(--rf-space-lg);
+  border-radius: var(--rf-radius-card);
+  cursor: pointer;
+  font-weight: var(--rf-weight-semibold);
+  list-style: none;
+}
+
+.rf-tour__panel > summary::-webkit-details-marker {
+  display: none;
+}
+
+.rf-tour__panel > summary:hover {
+  background: var(--rf-muted-tint);
+}
+
+.rf-tour__panel > summary:focus-visible {
+  outline: 2px solid var(--rf-blue);
+  outline-offset: 2px;
+}
+
+/* The caret is the only affordance, so it has to be obvious and animate. */
+.rf-tour__caret {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid var(--rf-muted-deep);
+  border-bottom: 2px solid var(--rf-muted-deep);
+  transform: rotate(-45deg);
+  transition: transform 160ms ease;
+}
+
+.rf-tour__panel[open] > summary .rf-tour__caret {
+  transform: rotate(45deg);
+}
+
+.rf-tour__panel-note {
+  margin-left: auto;
+  font-size: var(--rf-size-small);
+  font-weight: var(--rf-weight-regular);
+  color: var(--rf-muted-deep);
+}
+
+.rf-tour__panel-body {
+  padding: 0 var(--rf-space-lg) var(--rf-space-lg);
+}
+
+.rf-tour__panel-body > :last-child {
+  margin-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-tour__stage,
+  .rf-tour--parked .rf-tour__stage,
+  .rf-tour__caret {
+    transition: none;
+  }
+}
+
+@media (max-width: 47rem) {
+  .rf-tour__dossier-inner {
+    padding: var(--rf-space-xxl) var(--rf-space-md) var(--rf-space-xxxl);
+  }
+
+  .rf-tour__index {
+    margin-bottom: var(--rf-space-lg);
+  }
+
+  .rf-tour__chip--action {
+    margin-left: 0;
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Dossier content primitives                                                 */
+/* -------------------------------------------------------------------------- */
+
+/* A labelled figure row: big number, small caption. */
+.rf-tour__figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--rf-space-md);
+  margin: 0 0 var(--rf-space-lg);
+  padding: 0;
+  list-style: none;
+}
+
+.rf-tour__figure {
+  padding: var(--rf-space-md) var(--rf-space-lg);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+}
+
+.rf-tour__figure-value {
+  display: block;
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-heading);
+  line-height: var(--rf-leading-heading);
+  font-weight: var(--rf-weight-semibold);
+}
+
+.rf-tour__figure-label {
+  display: block;
+  font-size: var(--rf-size-small);
+  color: var(--rf-muted-deep);
+}
+
+/* Definition grid: term on the left, value on the right, hairline between. */
+.rf-tour__defs {
+  margin: 0 0 var(--rf-space-lg);
+}
+
+.rf-tour__def {
+  display: grid;
+  grid-template-columns: minmax(8rem, 14rem) 1fr;
+  gap: var(--rf-space-lg);
+  padding: var(--rf-space-sm) 0;
+  border-top: var(--rf-border-width) solid var(--rf-border-color);
+}
+
+.rf-tour__def:first-child {
+  border-top: 0;
+}
+
+.rf-tour__def dt {
+  font-weight: var(--rf-weight-semibold);
+}
+
+.rf-tour__def dd {
+  margin: 0;
+  color: var(--rf-muted-deep);
+}
+
+/* A quoted guideline line, as the rule cards show it. */
+.rf-tour__quote {
+  margin: 0 0 var(--rf-space-md);
+  padding: var(--rf-space-md) var(--rf-space-lg);
+  border-left: 3px solid var(--rf-muted);
+  background: var(--rf-muted-tint);
+  border-radius: 0 var(--rf-radius-card) var(--rf-radius-card) 0;
+  font-size: var(--rf-size-small);
+}
+
+.rf-tour__mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+}
+
+.rf-tour__list {
+  margin: 0 0 var(--rf-space-md);
+  padding-left: var(--rf-space-xl);
+}
+
+.rf-tour__list li {
+  margin-bottom: var(--rf-space-xs);
+}
+
+.rf-tour__state {
+  margin: 0;
+  padding: var(--rf-space-md) var(--rf-space-lg);
+  border: var(--rf-border-width) dashed var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+}
+
+@media (max-width: 47rem) {
+  .rf-tour__def {
+    grid-template-columns: 1fr;
+    gap: var(--rf-space-xs);
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* The guideline sheet: the rulebook drawn as the table it came from           */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * The console's ledger skin (styles/ledger.css, loaded globally) already says
+ * what a rulebook looks like on paper: a ruled sheet, typed manila tabs for
+ * rule ids, a double red margin, red-pen notes in it. The tour borrows those
+ * tokens rather than inventing a second look for the same table.
+ */
+/*
+ * The two rulebooks, side by side. A matrix has a 46rem floor, so the pair
+ * only fits by stepping outside the dossier's 62rem column: it grows
+ * symmetrically into the margin with negative margins rather than a transform,
+ * which would make a containing block for anything sticky inside it. Below
+ * 88rem of viewport there is no room for two and the grid falls to one column,
+ * where the bleed computes to zero on its own.
+ */
+/*
+ * The bleed itself, which the pair and the lone extensions sheet below it both
+ * take. Sheets that sit one above the other have to share their edges: a sheet
+ * at the dossier's 62rem beneath a pair at 82rem read as a layout accident,
+ * not as three pages of the same rulebook.
+ */
+.rf-tour__wide {
+  --rf-pair-bleed: max(0px, (min(82rem, 100vw - 11rem) - 100%) / 2);
+  margin-right: calc(-1 * var(--rf-pair-bleed));
+  margin-left: calc(-1 * var(--rf-pair-bleed));
+}
+
+.rf-tour__pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(34rem, 1fr));
+  gap: var(--rf-space-xl);
+  /* Stretched, not `start`: the two rulebooks are never the same number of
+     rows, and a ragged pair leaves a column of hole under the shorter one.
+     Equal sheets put that space on the paper, where it reads as a margin. */
+  align-items: stretch;
+}
+
+@media (max-width: 78rem) {
+  .rf-tour__wide {
+    --rf-pair-bleed: 0px;
+  }
+
+  .rf-tour__pair {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Paired, a matrix has about half the room, so it is set one step smaller and
+   its floor drops from 46rem to 40rem. Below that the sheet's own `.rf-scroll-x`
+   takes over, exactly as it does on a phone. */
+.rf-tour__pair .rf-tour__matrix {
+  min-width: 34rem;
+  font-size: 12px;
+  line-height: 15px;
+}
+
+.rf-tour__pair .rf-tour__matrix th,
+.rf-tour__pair .rf-tour__matrix td {
+  padding: var(--rf-space-xs);
+  overflow-wrap: anywhere;
+}
+
+/*
+ * Half-width cells, so everything that was allowed to be wider than its column
+ * at full width has to give. The rule tabs stop being one unbreakable line,
+ * the pen notes come down four points, and the tier names stop hyphenating
+ * ("ACCEPTABL / E") by losing a little of their tracking.
+ */
+.rf-tour__pair .rf-rule-tab {
+  max-width: 100%;
+  padding: 3px 8px 2px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.rf-tour__pair .rf-margin-note {
+  font-size: 15px;
+  line-height: 1.15;
+}
+
+.rf-tour__pair .rf-tour__matrix thead th {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  word-break: keep-all;
+}
+
+.rf-tour__pair .rf-tour__tier-gloss {
+  font-size: 10px;
+}
+
+/*
+ * Paired column widths. The margin holds handwriting and the factor holds a
+ * name, so both give what they can to the four tier columns: those hold the
+ * criterion prose, and every centimetre they lack comes back as three more
+ * wrapped lines in every row.
+ */
+.rf-tour__pair .rf-tour__col-margin {
+  width: 16%;
+}
+
+.rf-tour__pair .rf-tour__col-factor {
+  width: 17%;
+}
+
+.rf-tour__pair .rf-tour__col-weight {
+  width: 8%;
+}
+
+/*
+ * Height. Two sheets this tall are a scroll each; paired, they lose the parts
+ * sized for a thumb. The criterion button drops from the 44px touch target to
+ * 32px — still well past the 24px WCAG 2.2 minimum, and this layout only ever
+ * exists above 78rem, where the pointer is a mouse — and the factor names come
+ * down from display body to small.
+ */
+.rf-tour__pair .rf-tour__crit {
+  min-height: 2rem;
+  padding: var(--rf-space-xs);
+}
+
+.rf-tour__pair .rf-tour__row-head {
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+
+.rf-tour__pair .rf-tour__crit-tab {
+  margin-top: 2px;
+}
+
+.rf-tour__pair .rf-tour__sheet {
+  padding: var(--rf-space-md) var(--rf-space-md) var(--rf-space-sm);
+}
+
+.rf-tour__pair .rf-tour__sheet-head h3 {
+  font-size: var(--rf-size-body);
+  line-height: var(--rf-leading-body);
+}
+
+.rf-tour__pair > .rf-tour__sheet {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.rf-tour__sheet {
+  margin: 0 0 var(--rf-space-xl);
+  padding: var(--rf-space-lg) var(--rf-space-lg) var(--rf-space-md);
+  background: var(--rf-sheet);
+  border: 1px solid var(--rf-rule);
+  /* The next sheet in the pile, showing at the corner. */
+  box-shadow: 3px 3px 0 -1px var(--rf-sheet), 3px 3px 0 0 var(--rf-rule);
+}
+
+.rf-tour__sheet-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--rf-space-md);
+  padding-bottom: var(--rf-space-sm);
+  border-bottom: 2px solid var(--rf-ink);
+}
+
+.rf-tour__sheet-head h3 {
+  margin: 0;
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-heading);
+  line-height: var(--rf-leading-heading);
+}
+
+.rf-tour__sheet-aside {
+  font-family: var(--rf-font-type);
+  font-size: var(--rf-size-micro);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rf-muted-deep);
+}
+
+.rf-tour__sheet-note {
+  margin: var(--rf-space-md) 0 0;
+  max-width: 46rem;
+  font-size: var(--rf-size-small);
+  color: var(--rf-muted-deep);
+}
+
+.rf-tour__matrix {
+  width: 100%;
+  min-width: 46rem;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+
+.rf-tour__matrix th,
+.rf-tour__matrix td {
+  padding: var(--rf-space-sm);
+  border-top: 1px solid var(--rf-rule-faint);
+  text-align: left;
+  vertical-align: top;
+  min-width: 0;
+}
+
+.rf-tour__matrix thead th {
+  border-top: 0;
+  padding-bottom: var(--rf-space-xs);
+  font-size: 11px;
+  font-weight: var(--rf-weight-semibold);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--rf-muted-deep);
+}
+
+.rf-tour__col-factor { width: 18%; }
+.rf-tour__col-weight { width: 10%; }
+.rf-tour__col-margin { width: 17%; }
+
+/* Ruled columns, as on a printed table: the tier is named in the head, not
+   painted down the page. */
+.rf-tour__tier-head,
+.rf-tour__cell {
+  border-left: 1px solid var(--rf-rule-faint);
+}
+
+.rf-tour__tier-head {
+  position: relative;
+}
+
+/* The tier's own colour is one rule under its name — drawn, not filled. */
+.rf-tour__tier-head::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  background: var(--rf-tier-edge, var(--rf-muted));
+  transform-origin: left center;
+}
+
+.rf-tour__tier-name {
+  display: block;
+  color: var(--rf-ink);
+}
+
+.rf-tour__tier-gloss {
+  display: block;
+  margin-top: 2px;
+  font-weight: var(--rf-weight-regular);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--rf-muted-deep);
+}
+
+.rf-tour__row-head {
+  padding-left: 0;
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-body);
+  line-height: var(--rf-leading-body);
+  font-weight: var(--rf-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+/* The ledger's double red rule, separating the printed table from the margin. */
+/*
+ * The margin rule. It used to be a border plus an inset shadow, which cannot
+ * be animated; it is now one 4px strip per cell — two 1px red lines with the
+ * sheet showing between them — so it can be drawn down the page a row at a
+ * time as the reader arrives. Identical at rest.
+ */
+.rf-tour__margin-cell {
+  position: relative;
+  padding-left: var(--rf-space-lg);
+  vertical-align: middle;
+}
+
+.rf-tour__margin-cell::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: -1px;
+  left: 0;
+  width: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--rf-red) 0 1px,
+    transparent 1px 3px,
+    var(--rf-red) 3px 4px
+  );
+  transform-origin: top;
+}
+
+.rf-tour__cell {
+  padding: var(--rf-space-xs);
+}
+
+.rf-tour__cell-empty {
+  display: inline-block;
+  padding: var(--rf-space-xs);
+  color: var(--rf-muted-deep);
+}
+
+/* The weight, and a rule under it sized by share of the heaviest factor. */
+.rf-tour__weight,
+.rf-tour__weight-track,
+.rf-tour__weight-fill {
+  display: block;
+}
+
+.rf-tour__weight-value {
+  display: block;
+  font-family: var(--rf-font-type);
+  font-variant-numeric: tabular-nums;
+}
+
+.rf-tour__weight-track {
+  height: 3px;
+  margin-top: 3px;
+  background: var(--rf-rule-faint);
+}
+
+.rf-tour__weight-fill {
+  height: 3px;
+  background: var(--rf-ink);
+  transform: scaleX(var(--rf-share, 0));
+  transform-origin: left center;
+}
+
+/* ------------------------------------------------------------ One criterion */
+
+.rf-tour__crit {
+  display: block;
+  width: 100%;
+  min-height: var(--rf-min-touch-target);
+  padding: var(--rf-space-sm);
+  border: 0;
+  background: transparent;
+  box-shadow: inset 0 0 0 var(--rf-ink);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rf-tour__crit:hover {
+  background: rgb(250 248 242 / 70%);
+}
+
+.rf-tour__crit:focus-visible {
+  outline: 2px solid var(--rf-blue);
+  outline-offset: -2px;
+}
+
+.rf-tour__crit[data-open='true'] {
+  background: var(--rf-paper);
+  box-shadow: inset 3px 0 0 var(--rf-ink);
+}
+
+.rf-tour__crit-line {
+  display: block;
+}
+
+.rf-tour__crit-text {
+  font-weight: var(--rf-weight-semibold);
+}
+
+.rf-tour__crit-label {
+  display: block;
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+  color: var(--rf-muted-deep);
+}
+
+.rf-tour__crit-tab {
+  display: block;
+  margin-top: var(--rf-space-xs);
+}
+
+.rf-tour__crit .rf-rule-tab {
+  display: inline-block;
+}
+
+/* --------------------------------------------------------- The opened rule */
+
+.rf-tour__detail-row > td {
+  padding: 0 var(--rf-space-lg) var(--rf-space-lg) 0;
+  border-top: 0;
+}
+
+.rf-tour__detail {
+  max-width: 54rem;
+  padding: var(--rf-space-md) var(--rf-space-lg) var(--rf-space-lg);
+  background: var(--rf-paper);
+  border: 1px solid var(--rf-rule);
+  border-top: 2px solid var(--rf-ink);
+}
+
+.rf-tour__detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--rf-space-sm);
+  margin: 0 0 var(--rf-space-md);
+}
+
+.rf-tour__detail-tier,
+.rf-tour__detail-flag {
+  font-size: var(--rf-size-micro);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--rf-muted-deep);
+}
+
+.rf-tour__detail-flag {
+  padding: 1px 6px 0;
+  border: 1px dashed var(--rf-rule);
+  font-family: var(--rf-font-type);
+  text-transform: none;
+}
+
+.rf-tour__detail-meta {
+  margin: 0;
+}
+
+.rf-tour__detail-meta > div {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: var(--rf-space-md);
+  padding: var(--rf-space-xs) 0;
+  border-top: 1px solid var(--rf-rule-faint);
+}
+
+.rf-tour__detail-meta dt {
+  color: var(--rf-muted-deep);
+}
+
+.rf-tour__detail-meta dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Motion: the sheet arrives as it is read                                    */
+/* -------------------------------------------------------------------------- */
+
+/*
+ * `rf-reveal` is added by JS, and only when the reader has not asked for
+ * reduced motion. Without JS, and under `prefers-reduced-motion`, none of the
+ * hidden states below ever apply and the table is simply there.
+ */
+/*
+ * A reading-progress rule under the sticky section index: the one piece of
+ * motion here tied to the scroll itself rather than to arrival. Pure CSS
+ * scroll-timeline, so browsers without it simply have no line and nothing
+ * else changes.
+ */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .rf-tour__index::after {
+      content: '';
+      position: absolute;
+      right: 0;
+      bottom: -1px;
+      left: 0;
+      height: 2px;
+      background: var(--rf-blue);
+      transform: scaleX(0);
+      transform-origin: left;
+      animation: rf-tour-progress linear both;
+      animation-timeline: scroll(root block);
+    }
+  }
+}
+
+@keyframes rf-tour-progress {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes rf-tour-rule {
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rf-reveal {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  .rf-tour__group-head.rf-reveal::after {
+    transform: scaleX(0);
+  }
+
+  .rf-tour__group-head.rf-reveal.is-in::after {
+    transform: scaleX(1);
+    transition: transform 620ms cubic-bezier(0.22, 0.61, 0.36, 1) 80ms;
+  }
+
+  /* The head itself only fades: it must not slide out from under its rule. */
+  .rf-tour__group-head.rf-reveal {
+    transform: none;
+  }
+
+  /* The tiles land left to right, 50ms apart. */
+  .rf-reveal.rf-tour__figures > .rf-tour__figure {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  .rf-reveal.rf-tour__figures.is-in > .rf-tour__figure {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 340ms ease calc(min(var(--rf-fig-i, 0), 6) * 50ms),
+      transform 380ms cubic-bezier(0.22, 0.61, 0.36, 1) calc(min(var(--rf-fig-i, 0), 6) * 50ms);
+  }
+
+  /* The row is the container of the tiles above; it must not fade twice. */
+  .rf-reveal.rf-tour__figures {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* A panel arrives shorter than a sheet: 8px, not 14. */
+  .rf-reveal.rf-tour__panel {
+    transform: translateY(8px);
+  }
+
+  .rf-reveal.is-in {
+    opacity: 1;
+    transform: none;
+    transition: opacity 480ms ease, transform 520ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  }
+
+  /* The head rules draw themselves left to right, like a pen. */
+  .rf-reveal .rf-tour__tier-head::after {
+    transform: scaleX(0);
+  }
+
+  .rf-reveal.is-in .rf-tour__tier-head::after {
+    transform: scaleX(1);
+    transition: transform 520ms cubic-bezier(0.22, 0.61, 0.36, 1) 160ms;
+  }
+
+  /* Rows settle one after another, 36ms apart, and stop at the eighth. */
+  .rf-reveal .rf-tour__matrix tbody tr {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  .rf-reveal.is-in .rf-tour__matrix tbody tr {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 320ms ease calc(min(var(--rf-row, 0), 8) * 36ms + 120ms),
+      transform 320ms cubic-bezier(0.22, 0.61, 0.36, 1) calc(min(var(--rf-row, 0), 8) * 36ms + 120ms);
+  }
+
+  /*
+   * The margin rule is ruled in by the scroll itself, not by a timer: each
+   * cell's segment is tied to its own progress across the viewport, so the red
+   * line grows exactly as fast as the reader moves and stops when they stop.
+   * Scrolling back up un-draws it.
+   */
+  @supports (animation-timeline: view()) {
+    .rf-tour__margin-cell::before {
+      transform: scaleY(0);
+      animation: rf-tour-rule linear both;
+      animation-timeline: view(block);
+      animation-range: cover 5% cover 45%;
+    }
+  }
+
+  /* No scroll-timeline: fall back to the row-staggered pass on arrival. */
+  @supports not (animation-timeline: view()) {
+    .rf-reveal .rf-tour__margin-cell::before {
+      transform: scaleY(0);
+    }
+
+    .rf-reveal.is-in .rf-tour__margin-cell::before {
+      transform: scaleY(1);
+      transition: transform 300ms linear calc(min(var(--rf-row, 0), 8) * 36ms + 200ms);
+    }
+  }
+
+  /* The weight bar fills after its row has landed. */
+  .rf-reveal .rf-tour__weight-fill {
+    transform: scaleX(0);
+  }
+
+  .rf-reveal.is-in .rf-tour__weight-fill {
+    transform: scaleX(var(--rf-share, 0));
+    transition: transform 620ms cubic-bezier(0.22, 0.61, 0.36, 1)
+      calc(min(var(--rf-row, 0), 8) * 36ms + 260ms);
+  }
+
+  .rf-tour__crit {
+    transition:
+      background-color 140ms ease,
+      box-shadow 180ms ease;
+  }
+
+  .rf-tour__crit .rf-rule-tab {
+    transition: transform 140ms ease;
+  }
+
+  .rf-tour__crit:hover .rf-rule-tab {
+    transform: translateY(-1px);
+  }
+
+  .rf-tour__crit[data-open='true'] .rf-rule-tab {
+    transform: translateY(-1px) rotate(-1deg);
+  }
+
+  /* An opened rule unfolds from under its row rather than appearing. */
+  .rf-tour__detail {
+    animation: rf-tour-unfold 260ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  }
+
+  .rf-margin-note {
+    transition: transform 160ms ease;
+  }
+
+  .rf-tour__matrix tbody tr:hover .rf-margin-note {
+    transform: rotate(-1.2deg) translateX(2px);
+  }
+}
+
+@keyframes rf-tour-unfold {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+    clip-path: inset(0 0 100% 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (max-width: 47rem) {
+  .rf-tour__sheet {
+    padding: var(--rf-space-md) var(--rf-space-md) var(--rf-space-sm);
+  }
+}
+
+/* The test bench: one case put through the run's five stations, live. */
+.rf-bench {
+  margin: 0 0 var(--rf-space-lg);
+  padding: var(--rf-space-lg) var(--rf-space-xl) var(--rf-space-xl);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+}
+
+.rf-bench__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--rf-space-md);
+}
+
+.rf-bench__heading {
+  margin: 0;
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-heading);
+  line-height: var(--rf-leading-heading);
+}
+
+.rf-bench__lede {
+  margin: var(--rf-space-xs) 0 0;
+  max-width: 62ch;
+  color: var(--rf-muted-deep);
+}
+
+.rf-bench__controls {
+  display: flex;
+  gap: var(--rf-space-sm);
+}
+
+.rf-bench__idle {
+  margin: var(--rf-space-lg) 0 0;
+  padding-top: var(--rf-space-md);
+  border-top: 1px solid var(--rf-border-color);
+  font-size: var(--rf-size-small);
+  color: var(--rf-muted-deep);
+}
+
+/* One case as a ledger: type and hairlines, no boxes. */
+.rf-bench__ledger {
+  margin-top: var(--rf-space-lg);
+  animation: rf-bench-in 0.3s ease both;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes rf-bench-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-bench__ledger { animation: none; }
+}
+
+.rf-bench__caseline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--rf-space-lg);
+  padding: var(--rf-space-sm) 0;
+  border-top: 2px solid var(--rf-ink);
+  border-bottom: 1px solid var(--rf-ink);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--rf-size-micro);
+  color: var(--rf-muted-deep);
+}
+
+.rf-bench__caseid {
+  color: var(--rf-ink);
+  font-weight: var(--rf-weight-semibold);
+}
+
+/* Stacked by default; side by side only when the bench itself is wide enough
+   for both tables to keep every row on one line (so rows line up across). */
+.rf-bench { container-type: inline-size; }
+
+.rf-bench__split,
+.rf-bench__foot {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--rf-space-lg) var(--rf-space-xl);
+  /* Not stretch: a stretched table spreads the extra height over its rows and they stop lining up. */
+  align-items: start;
+}
+
+.rf-bench__split { margin-top: var(--rf-space-md); }
+
+.rf-bench__foot {
+  margin-top: var(--rf-space-lg);
+  padding-top: var(--rf-space-md);
+  border-top: 1px solid var(--rf-ink);
+}
+
+@container (min-width: 820px) {
+  .rf-bench__split,
+  .rf-bench__foot { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+.rf-bench__table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: var(--rf-size-small);
+  line-height: 1.3;
+}
+
+.rf-bench__table caption,
+.rf-bench__label {
+  display: block;
+  padding-bottom: var(--rf-space-xs);
+  text-align: left;
+  font-size: var(--rf-size-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rf-muted-deep);
+}
+
+.rf-bench__table caption { display: table-caption; }
+
+/* Every row is the same height and never wraps, in both tables. */
+.rf-bench__table th,
+.rf-bench__table td {
+  height: 2.5rem;
+  padding: 0 var(--rf-space-sm) 0 0;
+  border: 0;
+  border-top: 1px solid var(--rf-border-color);
+  background: none;
+  text-align: left;
+  vertical-align: middle;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rf-bench__table tbody tr:last-child th,
+.rf-bench__table tbody tr:last-child td { border-bottom: 1px solid var(--rf-border-color); }
+
+.rf-bench__table thead th {
+  height: 1.75rem;
+  border-top: 0;
+  font-size: var(--rf-size-micro);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rf-muted-deep);
+}
+
+.rf-bench__table tbody th { color: var(--rf-muted-deep); }
+
+.rf-bench__col-value { width: 10.25rem; }
+.rf-bench__col-edge { width: 4.75rem; }
+.rf-bench__col-side { width: 8.25rem; }
+.rf-bench__col-eq { width: 1.5rem; }
+
+.rf-bench__table td.rf-bench__num,
+.rf-bench__table thead th.rf-bench__num { text-align: right; }
+
+.rf-bench__table td.rf-bench__edge {
+  padding-right: 0;
+  font-size: var(--rf-size-micro);
+  color: var(--rf-red-deep);
+}
+
+.rf-bench__table tr[data-edge='true'] td.rf-bench__num { font-weight: var(--rf-weight-semibold); }
+.rf-bench__table tr[data-strong='true'] td { font-weight: var(--rf-weight-semibold); }
+
+.rf-bench__table td.rf-bench__eq {
+  padding-right: 0;
+  text-align: right;
+  color: var(--rf-green);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.rf-bench__table tr[data-same='false'] td { color: var(--rf-red-deep); font-weight: var(--rf-weight-semibold); }
+
+.rf-bench__rule {
+  margin: 0;
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-body);
+  line-height: 1.3;
+}
+
+.rf-bench__rule span {
+  display: block;
+  margin-top: var(--rf-space-xs);
+  font-family: var(--rf-font-body);
+  font-size: var(--rf-size-micro);
+  color: var(--rf-muted-deep);
+}
+
+.rf-bench__laws {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  columns: 2;
+  column-gap: var(--rf-space-lg);
+  font-size: var(--rf-size-micro);
+  line-height: 1.6;
+  color: var(--rf-muted-deep);
+}
+
+.rf-bench__laws li::before { content: '✓  '; color: var(--rf-green); }
+.rf-bench__laws li[data-ok='false'] { color: var(--rf-red-deep); font-weight: var(--rf-weight-semibold); }
+.rf-bench__laws li[data-ok='false']::before { content: '✗  '; color: var(--rf-red-deep); }
+
+/* -------------------------------------------------------------------------- *
+ * The brief, answered: the live run, the four requirement rows, the ledger.
+ *
+ * Every value is a --rf-* token, as everywhere else in this file. The one
+ * custom property set from JS is --rf-brief-pct, the width of a score bar.
+ * -------------------------------------------------------------------------- */
+
+/* ---------- the run strip ---------- */
+
+.rf-brief__run {
+  margin: 0 0 var(--rf-space-xl);
+  padding: var(--rf-space-lg);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+  background: var(--rf-muted-tint);
+}
+
+.rf-brief__run-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rf-space-md);
+}
+
+.rf-brief__run-hint,
+.rf-brief__run-why,
+.rf-brief__run-summary {
+  margin: var(--rf-space-sm) 0 0;
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+  color: var(--rf-muted-deep);
+  max-width: 44rem;
+}
+
+.rf-brief__run-hint { margin: 0; }
+
+.rf-brief__run-summary {
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-body);
+  color: var(--rf-ink);
+}
+
+/* The one claim on this page that must never be wrong: live, or a replay. */
+.rf-brief__banner {
+  margin: 0;
+  padding: var(--rf-space-xs) var(--rf-space-md);
+  border-radius: var(--rf-radius-pill);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--rf-size-micro);
+  font-weight: var(--rf-weight-semibold);
+  letter-spacing: 0.04em;
+}
+
+.rf-brief__banner--live {
+  background: var(--rf-green-tint);
+  color: var(--rf-green-deep);
+  border: var(--rf-border-width) solid var(--rf-green);
+}
+
+.rf-brief__banner--replay {
+  background: var(--rf-red-tint);
+  color: var(--rf-red-deep);
+  border: var(--rf-border-width) solid var(--rf-red-deep);
+}
+
+.rf-brief__run-why { color: var(--rf-red-deep); }
+
+.rf-brief__steps {
+  margin: var(--rf-space-lg) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--rf-space-xs);
+}
+
+.rf-brief__step {
+  display: grid;
+  grid-template-columns: 8rem 7rem 6rem 4rem;
+  gap: var(--rf-space-sm);
+  align-items: baseline;
+  padding: var(--rf-space-sm) 0;
+  border-top: var(--rf-border-width) solid var(--rf-border-color);
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+}
+
+.rf-brief__step-pass {
+  font-weight: var(--rf-weight-semibold);
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.04em;
+}
+
+.rf-brief__step-root,
+.rf-brief__step-rows,
+.rf-brief__step-ms {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--rf-muted-deep);
+}
+
+.rf-brief__step-ms { text-align: right; }
+
+/* The reason for the query spans the full row underneath the numbers. */
+.rf-brief__step-goal {
+  grid-column: 1 / -1;
+  color: var(--rf-muted-deep);
+  max-width: 54rem;
+}
+
+.rf-brief__step--failed .rf-brief__step-pass { color: var(--rf-red-deep); }
+.rf-brief__step--pending .rf-brief__step-pass { color: var(--rf-muted); }
+
+@media (max-width: 40rem) {
+  .rf-brief__step { grid-template-columns: 1fr 1fr; }
+  .rf-brief__step-ms { text-align: left; }
+}
+
+/* ---------- a requirement row ---------- */
+
+.rf-brief__row { margin: 0; }
+
+.rf-brief__req {
+  display: flex;
+  align-items: baseline;
+  gap: var(--rf-space-md);
+  margin: 0 0 var(--rf-space-sm);
+}
+
+.rf-brief__req-n {
+  flex: 0 0 auto;
+  width: var(--rf-space-xl);
+  height: var(--rf-space-xl);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--rf-radius-pill);
+  background: var(--rf-ink);
+  color: var(--rf-paper);
+  font-size: var(--rf-size-micro);
+  font-weight: var(--rf-weight-semibold);
+}
+
+/* Quoted from the brief, so it reads as a quotation and not as our own claim. */
+.rf-brief__req-quote {
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-heading);
+  line-height: var(--rf-leading-heading);
+}
+
+.rf-brief__lede {
+  margin: 0 0 var(--rf-space-lg);
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+  max-width: 48rem;
+}
+
+.rf-brief__who {
+  margin: 0 0 var(--rf-space-md);
+  font-size: var(--rf-size-small);
+}
+
+.rf-brief__h {
+  margin: var(--rf-space-xl) 0 var(--rf-space-sm);
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-body);
+  line-height: 1.3;
+}
+
+/* The real console panels render inside here; they are built for a wider page,
+   so they are allowed to scroll sideways rather than be squeezed or reflowed. */
+.rf-brief__evidence { overflow-x: auto; }
+
+/* ---------- verdict pill ---------- */
+
+.rf-brief__pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--rf-space-xs);
+  padding: 0 var(--rf-space-sm);
+  border-radius: var(--rf-radius-pill);
+  border: var(--rf-border-width) solid currentcolor;
+  font-size: var(--rf-size-micro);
+  font-weight: var(--rf-weight-semibold);
+  white-space: nowrap;
+}
+
+.rf-brief__pill--fit { color: var(--rf-green-deep); background: var(--rf-green-tint); }
+.rf-brief__pill--refer { color: var(--rf-blue-deep); background: var(--rf-blue-tint); }
+.rf-brief__pill--does_not_fit { color: var(--rf-muted-deep); background: var(--rf-muted-tint); }
+
+/* ---------- row 3: the ranked book ---------- */
+
+.rf-brief__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-sm);
+  margin: 0 0 var(--rf-space-md);
+}
+
+/* Capped so the whole book is present without taking the page over. */
+.rf-brief__list {
+  max-height: 60vh;
+  overflow: auto;
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+}
+
+.rf-brief__table,
+.rf-brief__ledger {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+  text-align: left;
+}
+
+.rf-brief__caption {
+  padding: var(--rf-space-sm) var(--rf-space-md);
+  text-align: left;
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-micro);
+}
+
+.rf-brief__table th,
+.rf-brief__table td,
+.rf-brief__ledger th,
+.rf-brief__ledger td {
+  padding: var(--rf-space-sm) var(--rf-space-md);
+  border-top: var(--rf-border-width) solid var(--rf-border-color);
+  vertical-align: top;
+}
+
+.rf-brief__table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--rf-paper);
+  border-top: 0;
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.04em;
+  color: var(--rf-muted-deep);
+}
+
+.rf-brief__rank,
+.rf-brief__score {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  white-space: nowrap;
+}
+
+.rf-brief__sub {
+  display: block;
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-micro);
+}
+
+/* The bar is decoration over a number that is already there in text. */
+.rf-brief__bar {
+  display: block;
+  height: var(--rf-space-xs);
+  margin-top: var(--rf-space-xs);
+  border-radius: var(--rf-radius-pill);
+  background: var(--rf-muted-tint);
+}
+
+.rf-brief__bar::before {
+  content: '';
+  display: block;
+  width: var(--rf-brief-pct, 0%);
+  height: 100%;
+  border-radius: var(--rf-radius-pill);
+  background: var(--rf-blue);
+}
+
+.rf-brief__why {
+  color: var(--rf-muted-deep);
+  min-width: 22rem;
+}
+
+/* ---------- row 4: the brief's own block, and the awkward accounts ---------- */
+
+.rf-brief__shape {
+  margin: 0 0 var(--rf-space-lg);
+  padding: var(--rf-space-lg);
+  border-left: var(--rf-space-xs) solid var(--rf-ink);
+  background: var(--rf-muted-tint);
+}
+
+.rf-brief__shape-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--rf-space-md);
+  margin: 0 0 var(--rf-space-sm);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--rf-size-small);
+  font-weight: var(--rf-weight-semibold);
+}
+
+.rf-brief__shape-score { color: var(--rf-blue-deep); }
+
+.rf-brief__shape-line {
+  margin: 0 0 var(--rf-space-xs);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+  max-width: 48rem;
+}
+
+.rf-brief__cards {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--rf-space-md);
+}
+
+.rf-brief__card {
+  padding: var(--rf-space-md);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+}
+
+.rf-brief__card-head {
+  margin: 0 0 var(--rf-space-xs);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--rf-space-sm);
+  font-size: var(--rf-size-small);
+}
+
+.rf-brief__card-why {
+  margin: 0 0 var(--rf-space-sm);
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+  color: var(--rf-blue-deep);
+}
+
+.rf-brief__card-text {
+  margin: 0;
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+  color: var(--rf-muted-deep);
+}
+
+/* ---------- the ledger ---------- */
+
+.rf-brief__tier { margin: 0 0 var(--rf-space-xl); }
+
+.rf-brief__ledger th[scope='row'] {
+  font-weight: var(--rf-weight-medium);
+  max-width: 18rem;
+}
+
+.rf-brief__ev { color: var(--rf-muted-deep); }
+
+.rf-brief__mark {
+  display: inline-block;
+  padding: 0 var(--rf-space-sm);
+  border-radius: var(--rf-radius-pill);
+  border: var(--rf-border-width) solid currentcolor;
+  font-weight: var(--rf-weight-semibold);
+  white-space: nowrap;
+}
+
+.rf-brief__mark--yes { color: var(--rf-green-deep); background: var(--rf-green-tint); }
+.rf-brief__mark--partly { color: var(--rf-blue-deep); background: var(--rf-blue-tint); }
+.rf-brief__mark--no { color: var(--rf-red-deep); background: var(--rf-red-tint); }
+
+.rf-brief__limits {
+  margin: 0;
+  padding-left: var(--rf-space-xl);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+  color: var(--rf-muted-deep);
+  max-width: 48rem;
+}
+
+.rf-brief__limits li { margin-bottom: var(--rf-space-sm); }
+.rf-brief__limits strong { color: var(--rf-ink); }

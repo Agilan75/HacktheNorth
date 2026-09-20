@@ -312,6 +312,12 @@ export interface ActionLogEntryView {
   readonly afterRank: number | null;
   readonly beforeVerdict: Verdict | null;
   readonly afterVerdict: Verdict | null;
+  /** Who or what acted: `code`, `gemini:<call>` or `underwriter`. */
+  readonly actor?: string;
+  /** The action's own words — for a decision, the underwriter's reason. */
+  readonly note?: string | null;
+  /** Set only on a `decision` action: what the underwriter chose. */
+  readonly decision?: 'accept' | 'decline' | null;
 }
 
 export interface ReplyResultView {
@@ -493,6 +499,18 @@ export interface ActionsPanelProps {
   readonly drafts: readonly RequestDraftView[];
   readonly log: readonly ActionLogEntryView[];
   readonly onApprove: (actionId: string) => void | Promise<void>;
+  /**
+   * The engine's verdict for this account, so the decision block can name it.
+   * Passed in rather than derived from the log, because the block must say what
+   * the engine concluded even before any decision exists.
+   */
+  readonly engineVerdict?: Verdict;
+  /**
+   * Record an accept or decline beside the engine's verdict. Optional so a
+   * caller that only reads an account still typechecks; the panel shows the
+   * recorded decision either way and only offers the buttons when it is given.
+   */
+  readonly onDecide?: (decision: 'accept' | 'decline', reason: string) => void | Promise<void>;
 }
 
 /** (k) — the paste-or-upload box. */

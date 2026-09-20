@@ -120,6 +120,12 @@ button:not(:disabled):hover,
 a.rf-button:hover {
   background: var(--rf-muted-tint);
 }
+/* A toggle that is on (the verification field's colour / arrange / pick-out rows). */
+button[aria-pressed='true'],
+button[aria-pressed='true']:not(:disabled):hover {
+  background: var(--rf-ink);
+  color: var(--rf-paper);
+}
 
 /* Primary CTA (Approve, Extract fields): the one accent-filled button on a
    page, reserved for the action the underwriter is most likely to take next.
@@ -404,4 +410,836 @@ a.rf-button {
   align-items: center;
   color: var(--rf-ink);
   text-decoration: none;
+}
+
+/* ===================================================== Brand link (Layout) */
+
+/* The wordmark is the home affordance: no underline, ink-coloured, 44px tall. */
+.rf-brand-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--rf-min-touch-target);
+  padding-block: 0;
+  border-radius: var(--rf-radius-pill);
+  color: var(--rf-ink);
+  text-decoration: none;
+}
+.rf-brand-link:hover { text-decoration: underline; text-underline-offset: 4px; }
+.rf-brand-link:focus-visible { outline: 2px solid var(--rf-ink); outline-offset: 4px; }
+
+/* ========================================================= Home page */
+
+.rf-home {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-xxxl);
+  max-width: 1040px;
+}
+
+.rf-home__hero { display: flex; flex-direction: column; gap: var(--rf-space-md); }
+.rf-home__hero h1 { margin: 0; }
+.rf-home__lede {
+  margin: 0;
+  max-width: 62ch;
+  font-size: var(--rf-size-heading);
+  line-height: var(--rf-leading-heading);
+}
+.rf-home__thesis {
+  margin: var(--rf-space-sm) 0 0;
+  padding: var(--rf-space-md) 0 var(--rf-space-md) var(--rf-space-lg);
+  border-left: 2px solid var(--rf-red);
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-title);
+  line-height: var(--rf-leading-title);
+  font-style: italic;
+}
+.rf-home__principle {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.rf-home__principle strong { color: var(--rf-ink); font-weight: var(--rf-weight-semibold); }
+.rf-home__cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-md);
+  margin-top: var(--rf-space-sm);
+}
+
+.rf-home__section { display: flex; flex-direction: column; gap: var(--rf-space-lg); }
+.rf-home__section > h2 { margin: 0; }
+
+/* ------------------------------------------------ Home: the pipeline flow */
+
+.rf-flow { display: flex; flex-direction: column; gap: var(--rf-space-xl); }
+
+.rf-flow__rail {
+  display: flex;
+  align-items: stretch;
+  gap: var(--rf-space-md);
+}
+.rf-flow__col {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--rf-space-md);
+  min-width: 0;
+}
+.rf-flow__col--hub { flex: 1.4 1 0; }
+
+.rf-flow__node {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--rf-space-md) var(--rf-space-lg);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+  background: var(--rf-paper);
+  min-width: 0;
+}
+.rf-flow__node-name {
+  font-family: var(--rf-font-display);
+  font-weight: var(--rf-weight-semibold);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.rf-flow__node-gloss {
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+}
+.rf-flow__node--api {
+  border-color: var(--rf-ink);
+  gap: var(--rf-space-md);
+}
+.rf-flow__node--engine {
+  border-color: var(--rf-blue);
+  background: var(--rf-blue-tint);
+  padding: var(--rf-space-sm) var(--rf-space-md);
+}
+
+.rf-flow__edge {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--rf-space-md);
+  min-width: 0;
+}
+.rf-flow__edge-line {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+  text-align: center;
+  max-width: 13ch;
+}
+.rf-flow__arrow { color: var(--rf-muted); }
+.rf-flow__arrow::before { content: '\2192'; }
+
+/* The engine's own stage chain. */
+.rf-stages {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: var(--rf-space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: rf-stage;
+}
+.rf-stages li {
+  display: flex;
+  align-items: center;
+  gap: var(--rf-space-sm);
+  min-width: 0;
+}
+.rf-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--rf-space-sm) var(--rf-space-md);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+  min-width: 0;
+}
+.rf-stage__name {
+  font-family: var(--rf-font-body);
+  font-weight: var(--rf-weight-semibold);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.rf-stage__gloss {
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+}
+.rf-stages li:not(:last-child)::after {
+  content: '\2192';
+  color: var(--rf-muted);
+}
+
+/* ------------------------------------------------ Home: planner steps */
+
+.rf-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-md);
+  margin: 0;
+  padding-left: var(--rf-space-xl);
+  max-width: 76ch;
+}
+.rf-steps li { padding-left: var(--rf-space-xs); }
+.rf-steps li::marker { color: var(--rf-muted-deep); font-variant-numeric: tabular-nums; }
+
+.rf-home__stat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-xs) var(--rf-space-md);
+  margin: 0;
+  padding: var(--rf-space-md) var(--rf-space-lg);
+  border: var(--rf-border-width) solid var(--rf-ink);
+  border-radius: var(--rf-radius-card);
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+
+/* ------------------------------------------------ Home: infrastructure */
+
+.rf-spec {
+  display: grid;
+  grid-template-columns: minmax(9rem, 14rem) 1fr;
+  gap: 0;
+  margin: 0;
+  border-top: var(--rf-border-width) solid var(--rf-border-color);
+}
+.rf-spec__row { display: contents; }
+.rf-spec dt,
+.rf-spec dd {
+  margin: 0;
+  padding: var(--rf-space-sm) var(--rf-space-md) var(--rf-space-sm) 0;
+  border-bottom: var(--rf-border-width) solid var(--rf-border-color);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+  min-width: 0;
+}
+.rf-spec dt { color: var(--rf-muted-deep); }
+
+/* ------------------------------------------------ Home: link rail */
+
+.rf-rail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--rf-space-sm);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rf-rail a {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  height: 100%;
+  min-height: var(--rf-min-touch-target);
+  padding: var(--rf-space-md) var(--rf-space-lg);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+  color: var(--rf-ink);
+  text-decoration: none;
+}
+.rf-rail a:hover { background: var(--rf-muted-tint); }
+.rf-rail__label {
+  font-family: var(--rf-font-display);
+  font-weight: var(--rf-weight-semibold);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.rf-rail__gloss {
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+}
+
+/* The rail, the flow and the spec strip all stack at phone width. */
+@media (max-width: 720px) {
+  .rf-flow__rail { flex-direction: column; }
+  .rf-flow__edge { flex-direction: row; justify-content: flex-start; gap: var(--rf-space-lg); }
+  .rf-flow__edge-line { flex-direction: row; align-items: center; gap: var(--rf-space-xs); max-width: none; text-align: left; }
+  .rf-flow__arrow::before { content: '\2193'; }
+  .rf-stages { flex-direction: column; align-items: stretch; }
+  .rf-stages li { align-items: stretch; flex-direction: column; }
+  .rf-stage { width: 100%; }
+  .rf-stages li:not(:last-child)::after { content: '\2193'; align-self: flex-start; padding-left: var(--rf-space-lg); }
+  .rf-spec { grid-template-columns: 1fr; }
+  .rf-spec dt { padding-bottom: 0; border-bottom: 0; }
+  .rf-home__lede { font-size: var(--rf-size-body); line-height: var(--rf-leading-body); }
+  .rf-home__thesis { font-size: var(--rf-size-heading); line-height: var(--rf-leading-heading); }
+  .rf-home__cta a.rf-button { flex: 1 1 100%; justify-content: center; }
+}
+
+/* ==========================================================================
+ * Page and panel classes (C02, second pass).
+ *
+ * Everything below is additive: the markup has carried these class names since
+ * run 1 with no rule behind them, so each region fell back to browser defaults
+ * (a `<dl>` of indented label/value pairs, an unstyled figure, a naked table).
+ * These rules only supply layout and rhythm — no new colours, no new type,
+ * no shadows, tokens only.
+ * ========================================================================== */
+
+/* ------------------------------------------------- Shared: panel wrapper */
+
+/* Panels that own their own vertical rhythm rather than leaning on <p> margins. */
+.rf-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-lg);
+  min-width: 0;
+}
+
+/* A heading inside a card, one step below the card's own title. */
+.rf-card__subtitle {
+  margin: var(--rf-space-xl) 0 var(--rf-space-sm);
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-body);
+  line-height: var(--rf-leading-body);
+  font-weight: var(--rf-weight-semibold);
+}
+.rf-card__subtitle:first-child { margin-top: 0; }
+
+/* ------------------------------------------------- Shared: figure blocks */
+
+/*
+ * `.rf-stats` is a <dl> whose children are `.rf-stat` <div>s of <dt>/<dd>.
+ * A metric row, not a definition list: label small and muted above the value,
+ * and the browser's default <dd> indent reset away.
+ */
+.rf-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--rf-space-lg);
+  margin: 0;
+}
+.rf-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rf-stat dt {
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+}
+.rf-stat dd {
+  margin: 0;
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-body);
+  line-height: var(--rf-leading-body);
+  font-weight: var(--rf-weight-semibold);
+}
+/* The flip prints "before → after": the after is the figure, the before is context. */
+.rf-stat__value { font-weight: var(--rf-weight-semibold); }
+.rf-stat__before {
+  color: var(--rf-muted-deep);
+  font-weight: var(--rf-weight-regular);
+}
+/* A parenthetical after a figure, and the same treatment inside a table cell. */
+.rf-stat__hint {
+  color: var(--rf-muted-deep);
+  font-family: var(--rf-font-body);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+  font-weight: var(--rf-weight-regular);
+}
+
+/* ------------------------------------------- Shared: small text treatments */
+
+.rf-empty,
+.rf-footnote,
+.rf-chart-empty {
+  margin: 0;
+  color: var(--rf-muted-deep);
+}
+.rf-empty {
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.rf-footnote,
+.rf-chart-empty {
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+  max-width: 76ch;
+}
+
+/* An inline failure. Ink, not Red: Red is the verdict colour and nothing else. */
+.rf-error {
+  margin: var(--rf-space-sm) 0 0;
+  padding-left: var(--rf-space-md);
+  border-left: 2px solid var(--rf-ink);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+
+.rf-notes {
+  margin: 0;
+  padding-left: var(--rf-space-lg);
+  max-width: 76ch;
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.rf-notes li + li { margin-top: var(--rf-space-xs); }
+.rf-notes li::marker { color: var(--rf-muted); }
+
+.rf-code {
+  font-size: var(--rf-size-micro);
+  color: var(--rf-muted-deep);
+}
+
+/* ---------------------------------------------- Shared: hand-rolled tables */
+
+/*
+ * Panels build their own tables instead of the shared DataTable. Same density
+ * and the same hairline as DataTable's inline cell styles, so the two never
+ * read as different components on one page.
+ */
+.rf-table-wrap {
+  max-width: 100%;
+  min-width: 0;
+}
+.rf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.rf-table th,
+.rf-table td {
+  padding: var(--rf-space-sm) var(--rf-space-md);
+  border-bottom: var(--rf-border-width) solid var(--rf-muted-tint);
+  text-align: left;
+  vertical-align: top;
+}
+.rf-table thead th {
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+  font-weight: var(--rf-weight-semibold);
+  color: var(--rf-muted-deep);
+  white-space: nowrap;
+}
+/* A row header is a label, not a column head: ink, normal weight. */
+.rf-table tbody th {
+  color: var(--rf-ink);
+  font-weight: var(--rf-weight-regular);
+}
+.rf-table tbody tr:last-child th,
+.rf-table tbody tr:last-child td { border-bottom: 0; }
+
+/* -------------------------------------------------------- Shared: buttons */
+
+/* The secondary variant: the same shell as a bare <button>, so it pairs with
+   .rf-button--primary wherever the two sit side by side. */
+.rf-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rf-space-sm);
+  min-height: var(--rf-min-touch-target);
+  min-width: var(--rf-min-touch-target);
+  padding: 0 var(--rf-space-lg);
+  border: var(--rf-border-width) solid var(--rf-ink);
+  border-radius: var(--rf-radius-pill);
+  background: var(--rf-paper);
+  color: var(--rf-ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+.rf-button:not(:disabled):hover { background: var(--rf-muted-tint); }
+/* Re-assert the primary fill: the shell above would otherwise repaint it Paper. */
+.rf-button.rf-button--primary {
+  border-color: var(--rf-blue-deep);
+  background: var(--rf-blue);
+  color: var(--rf-paper);
+}
+.rf-button.rf-button--primary:not(:disabled):hover { background: var(--rf-blue-deep); }
+.rf-button.rf-button--primary:disabled {
+  background: var(--rf-paper);
+  color: var(--rf-muted-deep);
+}
+
+/* -------------------------------------------------------- Shared: tooltip */
+
+/*
+ * The trigger carries role="button" for the keyboard, which the global
+ * `[role='button']` rule was rendering as a 44px pill in the middle of a
+ * sentence. It is a word: undo the shell and give it a dotted underline.
+ */
+.rf-tooltip { min-width: 0; }
+.rf-tooltip__trigger {
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  cursor: help;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+/* The bubble is absolutely positioned by the component; keep it flat and on top. */
+.rf-tooltip__bubble {
+  z-index: 10;
+  box-shadow: var(--rf-shadow-none);
+}
+
+/* --------------------------------------------------------- Shared: charts */
+
+.rf-chart {
+  margin: 0;
+  max-width: 100%;
+  min-width: 0;
+}
+.rf-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.rf-chart figcaption {
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+}
+
+/* ==================================================== Panel: Actions (k) */
+
+.rf-actions__routing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-md);
+}
+.rf-actions__rationale {
+  margin: 0;
+  max-width: 76ch;
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+
+/* One drafted request. Bordered so several drafts read as separate letters. */
+.rf-draft {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--rf-space-md);
+  padding: var(--rf-space-lg);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+  min-width: 0;
+}
+.rf-draft + .rf-draft { margin-top: var(--rf-space-md); }
+.rf-draft__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--rf-space-sm);
+  width: 100%;
+  margin: 0;
+}
+.rf-draft__subject {
+  margin: 0;
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-body);
+  line-height: var(--rf-leading-body);
+  font-weight: var(--rf-weight-semibold);
+}
+.rf-draft__body {
+  margin: 0;
+  max-width: 76ch;
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-body);
+}
+.rf-draft .rf-scroll-x,
+.rf-draft .rf-table { width: 100%; }
+
+/* ================================================= Panel: Reply box (k) */
+
+.rf-reply {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-md);
+  min-width: 0;
+}
+.rf-reply__result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-lg);
+  padding-top: var(--rf-space-lg);
+  border-top: var(--rf-border-width) solid var(--rf-border-color);
+}
+
+/* ===================================================== Panel: Flip (g) */
+
+.rf-flip__distance { margin: 0; }
+.rf-flip__reason,
+.rf-flip__delta {
+  margin: 0;
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.rf-flip__moves {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-md);
+  margin: 0;
+  padding-left: var(--rf-space-xl);
+}
+.rf-flip__moves li::marker {
+  color: var(--rf-muted-deep);
+  font-variant-numeric: tabular-nums;
+}
+.rf-flip__human {
+  margin: 0 0 2px;
+  font-weight: var(--rf-weight-medium);
+}
+
+/* =============================================== Panel: Enrichment (j) */
+
+.rf-enrichment__summary {
+  margin: 0;
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.rf-enrichment__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--rf-space-md);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.rf-enrichment__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-sm);
+  padding: var(--rf-space-lg);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+  min-width: 0;
+}
+/* A source that could not be reached is demoted, not alarmed. */
+.rf-enrichment__card--unavailable {
+  background: var(--rf-muted-tint);
+  border-color: var(--rf-muted-tint);
+}
+.rf-enrichment__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--rf-space-sm);
+}
+.rf-enrichment__header h3 {
+  margin: 0;
+  font-size: var(--rf-size-body);
+  line-height: var(--rf-leading-body);
+}
+.rf-enrichment__rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--rf-space-sm) var(--rf-space-md);
+  margin: 0;
+}
+.rf-enrichment__reason {
+  margin: 0;
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+
+/* ================================================== Panel: Explanation (a) */
+
+.rf-explanation__paragraph { max-width: 76ch; }
+
+/* ====================================================== Submission page */
+
+.submission-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-xl);
+  min-width: 0;
+}
+
+.submission-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-md);
+  min-width: 0;
+}
+.submission-header h1 { margin: 0; }
+
+.submission-breadcrumb {
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+
+.submission-verdict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rf-space-sm);
+}
+
+/*
+ * The four headline numbers. A <dl> of <div><dt>label</dt><dd>value</dd></div>
+ * with the browser's default <dd> indent removed: a metric row rules off from
+ * the identity above it, not an indented list running down the page.
+ */
+.submission-headline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--rf-space-lg) var(--rf-space-xl);
+  margin: 0;
+  padding: var(--rf-space-lg) 0;
+  border-top: var(--rf-border-width) solid var(--rf-border-color);
+  border-bottom: var(--rf-border-width) solid var(--rf-border-color);
+}
+.submission-headline > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-xs);
+  min-width: 0;
+}
+.submission-headline dt {
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+}
+.submission-headline dd {
+  margin: 0;
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-title);
+  line-height: var(--rf-leading-title);
+  font-weight: var(--rf-weight-semibold);
+}
+
+.submission-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rf-space-sm);
+}
+
+/* The live region is empty most of the time; an empty box must not leave a gap. */
+.submission-status {
+  margin: 0;
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.submission-status:empty { display: none; }
+
+.submission-error,
+.submission-panel-error {
+  padding-left: var(--rf-space-md);
+  border-left: 2px solid var(--rf-ink);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.submission-error p,
+.submission-panel-error p { margin: 0 0 var(--rf-space-sm); }
+.submission-error p:last-child,
+.submission-panel-error p:last-child { margin-bottom: 0; }
+
+/* Each group of panels gets air above it so the page reads as three groups. */
+.submission-section { margin-top: var(--rf-space-lg); }
+
+/* ============================================ Queue, Actions, Not found */
+
+.queue-page,
+.actions-page,
+.not-found-page { min-width: 0; }
+
+.queue-count,
+.actions-count {
+  margin: var(--rf-space-md) 0;
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+
+.queue-error,
+.actions-error {
+  margin: var(--rf-space-md) 0;
+  padding-left: var(--rf-space-md);
+  border-left: 2px solid var(--rf-ink);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.queue-error p { margin: 0 0 var(--rf-space-sm); }
+
+.queue-out-of-appetite,
+.actions-outbox,
+.actions-movement,
+.actions-log,
+.actions-toolbar,
+.actions-stages { min-width: 0; }
+
+.actions-outbox,
+.actions-log { display: block; }
+
+/* before → after verdict in one log cell: two pills that wrap together. */
+.actions-verdict-change {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--rf-space-xs);
+}
+
+.not-found-page { max-width: 62ch; }
+.not-found-page code { font-size: var(--rf-size-small); }
+
+/* -------------------------------------------------------- Phone width */
+
+@media (max-width: 600px) {
+  /* The display sizes step down one rung so a 28px figure never widens a column. */
+  .submission-headline {
+    grid-template-columns: repeat(auto-fit, minmax(128px, 1fr));
+    gap: var(--rf-space-md) var(--rf-space-lg);
+  }
+  .submission-headline dd {
+    font-size: var(--rf-size-heading);
+    line-height: var(--rf-leading-heading);
+  }
+  .submission-controls > button { flex: 1 1 100%; }
+  .rf-stats { grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--rf-space-md); }
+  .rf-enrichment__cards { grid-template-columns: 1fr; }
+  .rf-draft { padding: var(--rf-space-md); }
+}
+
+/* --------------------------------------- Submission: panel anchor wrapper */
+
+/*
+ * Every panel renders its own `.rf-card`, so the page does not wrap one in
+ * another. This div exists only to carry the `#panel-x` deep-link anchor.
+ */
+.submission-panel {
+  display: contents;
+}
+.submission-panel-note {
+  margin: 0 0 var(--rf-space-sm);
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
 }

@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  * The collaborators (C01 useApi, C02 atoms, C03 DataTable/Filters) are built in
  * parallel, so they are replaced with minimal stand-ins that honour their frozen
  * signatures. What is under test is QueuePage's own logic: order, filtering, the
- * collapsed out-of-appetite group, the formatting of every cell, and navigation.
+ * collapsed out-of-appetite group, the formatting of every cell, the URL round
+ * trip, and navigation.
  */
 let apiState;
 const reload = vi.fn();
@@ -80,11 +81,18 @@ const ROWS = [
     row({ submissionId: 'X9', rank: 9, lineOfBusiness: 'cyber', verdict: 'DOES_NOT_FIT', outOfAppetiteLine: true }),
     row({ submissionId: 'X8', rank: 8, lineOfBusiness: 'auto', verdict: 'DOES_NOT_FIT', outOfAppetiteLine: true }),
 ];
-function LocationProbe() {
+function PathProbe() {
     return _jsx("div", { "data-testid": "location", children: useLocation().pathname });
 }
-function renderPage() {
-    render(_jsx(MemoryRouter, { initialEntries: ['/queue'], children: _jsxs(Routes, { children: [_jsx(Route, { path: "/queue", element: _jsx(QueuePage, {}) }), _jsx(Route, { path: "/submissions/:id", element: _jsx(LocationProbe, {}) })] }) }));
+function UrlProbe() {
+    const location = useLocation();
+    return _jsx("div", { "data-testid": "url", children: `${location.pathname}${location.search}` });
+}
+function renderPage(entry = '/queue') {
+    render(_jsxs(MemoryRouter, { initialEntries: [entry], children: [_jsx(UrlProbe, {}), _jsxs(Routes, { children: [_jsx(Route, { path: "/queue", element: _jsx(QueuePage, {}) }), _jsx(Route, { path: "/submissions/:id", element: _jsx(PathProbe, {}) })] })] }));
+}
+function url() {
+    return screen.getByTestId('url').textContent ?? '';
 }
 function mainRowIds() {
     const table = screen.getByRole('table', { name: 'Ranked submissions, best first' });
@@ -111,42 +119,69 @@ describe('QueuePage', () => {
         expect(mainRowIds()).toEqual(['S1', 'S2', 'S3']);
         expect(screen.queryByTestId('row-X8')).toBeNull();
         expect(screen.getByRole('status').textContent).toBe('5 submissions');
+        // A clean /queue URL stays clean: nothing is at a non-default value.
+        expect(url()).toBe('/queue');
     });
-    it('formats every PRD §10 column from the row, never recomputing', () => {
+    it('pairs the numbers into promoted and demoted columns without dropping one', () => {
         renderPage();
         expect(cell('S1', 'rank')).toBe('1');
-        expect(cell('S1', 'quality')).toBe('84.0');
+        expect(cell('S1', 'insured')).toBe('Acme HoldingsS1 · Property');
         expect(cell('S1', 'verdict')).toBe('FIT');
-        expect(cell('S1', 'insured')).toBe('Acme Holdings');
-        expect(cell('S1', 'appetite')).toBe('84');
-        expect(cell('S1', 'premium')).toBe('$88,000 vs $95,652');
-        expect(cell('S1', 'adequacy')).toBe('92%');
-        expect(cell('S1', 'completeness')).toBe('89%');
-        expect(cell('S1', 'contradictions')).toBe('2');
-        // A FIT row says so; a blank cell read as broken (queue diagnostics).
-        expect(cell('S1', 'flip')).toBe('Not needed');
-        expect(cell('S1', 'underwriter')).toBe('Unassigned');
-        expect(cell('S1', 'pending')).toBe('Request Info');
+        // Appetite carries completeness; premium carries adequacy.
+        expect(cell('S1', 'appetite')).toBe('8489% complete');
+        expect(cell('S1', 'quality')).toBe('84.0');
+        expect(cell('S1', 'premium')).toBe('$88,000 vs $95,65292% adequacy');
+        expect(cell('S1', 'contradictions')).toBe('2 contradictions');
+        expect(cell('S1', 'underwriter')).toBe('UnassignedRequest Info');
         expect(cell('S1', 'explanation')).toBe('All eight factors in appetite.');
-        // Missing numbers print an em dash, not 0.
-        expect(cell('S2', 'premium')).toBe('— vs $10,000');
-        expect(cell('S2', 'adequacy')).toBe('n/a');
-        expect(cell('S2', 'flip')).toBe('1 flip from FIT');
-        expect(cell('S2', 'pending')).toBe('None');
+        expect(cell('S2', 'premium')).toContain('— vs $10,000');
+        // No contradictions is one muted em dash, not a counted zero.
+        expect(cell('S2', 'contradictions')).toBe('—1 flip from FIT');
+        // An absent pending action renders nothing at all.
+        expect(cell('S2', 'underwriter')).toBe('Ada');
     });
-    it('collapses the out-of-appetite group by default and expands it on click', () => {
+    it('shows one em dash with a reason when a row has no premium at all', () => {
+        apiState = {
+            data: [row({ submissionId: 'S0', rank: 1, quotedPremium: null, predictedPremium: null, adequacy: null })],
+            loading: false,
+            error: null,
+            reload,
+        };
+        renderPage();
+        const td = screen.getByTestId('row-S0').querySelector('[data-col="premium"]');
+        expect(td?.textContent).toBe('—');
+        expect(td?.querySelector('[title]')?.getAttribute('title')).toBe('No quoted or predicted premium');
+    });
+    it('never quotes a spec section in a column header', () => {
+        renderPage();
+        const table = screen.getByRole('table', { name: 'Ranked submissions, best first' });
+        for (const th of within(table).getAllByRole('columnheader')) {
+            expect(th.textContent ?? '').not.toMatch(/PRD|§/);
+        }
+    });
+    it('collapses the out-of-appetite group by default, expands it, and round-trips through the URL', () => {
         renderPage();
         const toggle = screen.getByRole('button', { name: 'Out of appetite: line of business (2)' });
         expect(toggle.getAttribute('aria-expanded')).toBe('false');
         expect(screen.queryByRole('table', { name: 'Out of appetite: line of business' })).toBeNull();
         fireEvent.click(toggle);
         expect(toggle.getAttribute('aria-expanded')).toBe('true');
+        expect(url()).toBe('/queue?out=1');
         const outTable = screen.getByRole('table', { name: 'Out of appetite: line of business' });
         const ids = within(outTable)
             .getAllByRole('row')
             .map((tr) => tr.getAttribute('data-testid'))
             .filter((id) => id !== null);
         expect(ids).toEqual(['row-X8', 'row-X9']);
+        // A secondary listing: four columns, not the main table's nine.
+        const headers = within(outTable)
+            .getAllByRole('columnheader')
+            .map((th) => th.textContent);
+        expect(headers).toEqual(['ID', 'Insured', 'Line of business', 'Deciding rule']);
+        cleanup();
+        renderPage('/queue?out=1');
+        expect(screen.getByRole('button', { name: 'Out of appetite: line of business (2)' }).getAttribute('aria-expanded')).toBe('true');
+        expect(screen.getByRole('table', { name: 'Out of appetite: line of business' })).toBeTruthy();
     });
     it('derives filter options from the data', () => {
         renderPage();
@@ -176,6 +211,43 @@ describe('QueuePage', () => {
         act(() => lastFilters.onChange({ ...base }));
         expect(mainRowIds()).toEqual(['S1', 'S2', 'S3']);
         expect(screen.getByRole('status').textContent).toBe('5 submissions');
+    });
+    it('writes every filter to the URL and restores it from there', () => {
+        renderPage();
+        const base = lastFilters.value;
+        act(() => lastFilters.onChange({ ...base, verdict: 'FIT', state: 'CA', search: 'acme' }));
+        expect(url()).toBe('/queue?q=acme&verdict=FIT&state=CA');
+        // Back to the defaults leaves no params behind.
+        act(() => lastFilters.onChange(base));
+        expect(url()).toBe('/queue');
+        cleanup();
+        renderPage('/queue?verdict=FIT&uw=Ada');
+        expect(lastFilters?.value).toEqual({
+            line: null,
+            verdict: 'FIT',
+            state: null,
+            underwriter: 'Ada',
+            search: '',
+        });
+        expect(mainRowIds()).toEqual([]);
+    });
+    it('keeps the sort column and direction in the URL', () => {
+        renderPage();
+        expect(screen.getByLabelText('Sort by')).toHaveProperty('value', 'rank');
+        fireEvent.click(screen.getByRole('button', { name: /Sort direction/ }));
+        expect(url()).toBe('/queue?dir=desc');
+        expect(mainRowIds()).toEqual(['S3', 'S2', 'S1']);
+        fireEvent.change(screen.getByLabelText('Sort by'), { target: { value: 'insured' } });
+        expect(url()).toBe('/queue?sort=insured&dir=desc');
+        cleanup();
+        renderPage('/queue?sort=rank&dir=desc');
+        expect(mainRowIds()).toEqual(['S3', 'S2', 'S1']);
+        expect(screen.getByRole('button', { name: 'Sort direction: descending' })).toBeTruthy();
+    });
+    it('cross-links the other views of the same rows', () => {
+        renderPage();
+        expect(screen.getByRole('link', { name: 'Aggregate' }).getAttribute('href')).toBe('/aggregate');
+        expect(screen.getByRole('link', { name: 'Explore' }).getAttribute('href')).toBe('/explore');
     });
     it('navigates to the submission on row click', () => {
         renderPage();

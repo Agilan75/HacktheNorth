@@ -1,5 +1,5 @@
 /**
- * A03 live smoke for `observe` and `relate`: exactly ONE tiny Gemini call per
+ * A03 live smoke for `observe` and `relate`: exactly ONE tiny Anthropic call per
  * owned call (one 32x32 image for observe, two observations for relate), only
  * with RUN_LIVE=1 and a configured key. The offline suites live in
  * `observe.test.ts` and `relate.test.ts` (moved at CP1, docs/contracts/requests/A03.md).
@@ -7,9 +7,8 @@
 import { describe, expect, it } from 'vitest';
 import type { RelateInput } from '@retrofit/contracts';
 import { OBJECT_VOCAB } from '@retrofit/engine';
-import { MODELS } from '../gemini';
-import type { GenerateJsonRequest, GenerateJsonResult, LlmProvider } from '../types';
-import { LlmError } from '../types';
+import { createClaudeProvider } from '../claude';
+import type { LlmProvider } from '../types';
 import { loadEnv } from '../../env';
 import { observeCall } from './observe';
 import { relateCall } from './relate';
@@ -18,48 +17,14 @@ import { relateCall } from './relate';
 /* -------------------------------------------------------------------------- */
 
 const env = loadEnv();
-const LIVE = env.RUN_LIVE === '1' && env.GEMINI_API_KEY !== undefined;
+const LIVE = env.RUN_LIVE === '1' && env.ANTHROPIC_API_KEY !== undefined;
 
-/**
- * A minimal provider local to this test, so the smoke does not depend on the
- * A02 provider being finished. Walks the MODELS chain once; validates with zod.
- */
-async function liveProvider(apiKey: string): Promise<LlmProvider> {
-  const { GoogleGenAI } = await import('@google/genai');
-  const ai = new GoogleGenAI({ apiKey });
-  const generateJson = async <T>(request: GenerateJsonRequest<T>): Promise<GenerateJsonResult<T>> => {
-    const parts = [
-      { text: request.prompt },
-      ...(request.parts ?? []).map((p) =>
-        p.kind === 'text' ? { text: p.text } : { inlineData: { mimeType: p.mimeType, data: p.dataBase64 } },
-      ),
-    ];
-    let lastError: unknown = null;
-    for (const model of MODELS) {
-      try {
-        const res = await ai.models.generateContent({
-          model,
-          contents: [{ role: 'user', parts }],
-          config: {
-            responseMimeType: 'application/json',
-            responseSchema: request.schema.response as unknown as Record<string, unknown>,
-            ...(request.systemInstruction ? { systemInstruction: request.systemInstruction } : {}),
-            temperature: request.temperature ?? 0,
-            maxOutputTokens: 8192,
-          },
-        });
-        const data = request.schema.zod.parse(JSON.parse(res.text ?? ''));
-        return { data, model, attempts: 1, finishReason: 'STOP', usage: null, degraded: false, durationMs: 0 };
-      } catch (error) {
-        lastError = error;
-      }
-    }
-    throw new LlmError('live smoke: every model failed', { callName: request.callName, cause: lastError });
-  };
-  return { name: 'gemini-smoke', configured: true, generateJson };
+/** The real provider (A02), built once per call so each `it` is independent. */
+function liveProvider(): LlmProvider {
+  return createClaudeProvider({ apiKey: env.ANTHROPIC_API_KEY, workspaceId: env.ANTHROPIC_WORKSPACE_ID });
 }
 
-describe.skipIf(!LIVE)('live Gemini smoke (RUN_LIVE=1)', () => {
+describe.skipIf(!LIVE)('live Anthropic smoke (RUN_LIVE=1)', () => {
   it('observe: one 32x32 frame comes back as one sanitised frame entry', async () => {
     const sharp = (await import('sharp')).default;
     const png = await sharp({
@@ -67,7 +32,7 @@ describe.skipIf(!LIVE)('live Gemini smoke (RUN_LIVE=1)', () => {
     })
       .png()
       .toBuffer();
-    const provider = await liveProvider(env.GEMINI_API_KEY ?? '');
+    const provider = liveProvider();
     const out = await observeCall(
       provider,
       { roomLabel: 'Test', frames: [{ index: 7, bearingDeg: 0, quality: 1 }], vocabulary: OBJECT_VOCAB, runIndex: 0 },
@@ -83,7 +48,7 @@ describe.skipIf(!LIVE)('live Gemini smoke (RUN_LIVE=1)', () => {
   }, 120_000);
 
   it('relate: two observations return only allowed keys and known ids', async () => {
-    const provider = await liveProvider(env.GEMINI_API_KEY ?? '');
+    const provider = liveProvider();
     const input: RelateInput = {
       roomLabel: 'Bedroom',
       observations: [

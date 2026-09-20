@@ -1,0 +1,63 @@
+{
+  "externalId": "SUB-2026-00118",
+  "targetVerdict": "REFER",
+  "rationale": "Keeps the broker's answers already on file ($64.5M TIV, 1998 joisted masonry, $42,000 five-year loss), all within appetite; the lakeside campus in unincorporated Highlands County, FL rates Protection Class 9 (no hydrants, volunteer station about 8 km away), which fires X-PPC-UNPROTECTED and refers the account.",
+  "values": [
+    {
+      "canonicalPath": "submissionType",
+      "value": "new_business"
+    },
+    {
+      "canonicalPath": "locations.*.state",
+      "value": "FL"
+    },
+    {
+      "canonicalPath": "locations.*.city",
+      "value": "Lake Placid"
+    },
+    {
+      "canonicalPath": "locations.*.postalCode",
+      "value": "33852"
+    },
+    {
+      "canonicalPath": "locations.*.protectionClass",
+      "value": 9
+    },
+    {
+      "canonicalPath": "locations.*.fireStationDistanceKm",
+      "value": 8.4
+    },
+    {
+      "canonicalPath": "buildings.*.tiv",
+      "value": 64500000
+    },
+    {
+      "canonicalPath": "buildings.*.yearBuilt",
+      "value": 1998
+    },
+    {
+      "canonicalPath": "buildings.*.constructionType",
+      "value": "joisted_masonry"
+    },
+    {
+      "canonicalPath": "buildings.*.sprinklered",
+      "value": true
+    },
+    {
+      "canonicalPath": "buildings.*.stories",
+      "value": 3
+    },
+    {
+      "canonicalPath": "buildings.*.occupancy",
+      "value": "Multi-specialty physician group medical office and ambulatory clinic"
+    },
+    {
+      "canonicalPath": "pricing.quotedPremium",
+      "value": 172000
+    },
+    {
+      "canonicalPath": "rollup.fiveYearLoss",
+      "value": 42000
+    }
+  ]
+}

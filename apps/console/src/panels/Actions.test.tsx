@@ -137,3 +137,79 @@ describe('Actions', () => {
     expect(within(rows[2]!).getByTestId('log-rank')).toHaveTextContent('2 → 4 (down 2)');
   });
 });
+
+/*
+ * The underwriter's decision. The promise these defend is narrow and load
+ * bearing: the panel records what a person decided and never implies the
+ * engine's verdict moved with it.
+ */
+describe('Actions — the underwriter decision', () => {
+  const base = { submissionId: 'sub-1', routing, drafts: [] as RequestDraftView[] };
+
+  it('is absent when no handler is given, so a read-only view offers no buttons', () => {
+    render(<Actions {...base} log={[]} onApprove={() => {}} />);
+    expect(screen.queryByRole('button', { name: 'Accept' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Decline' })).not.toBeInTheDocument();
+  });
+
+  it('offers accept and decline, and names the verdict recording one will not change', () => {
+    render(<Actions {...base} log={[]} onApprove={() => {}} onDecide={() => {}} engineVerdict="REFER" />);
+    expect(screen.getByRole('button', { name: 'Accept' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Decline' })).toBeEnabled();
+    const line = screen.getByText(/recording a decision does not change that/);
+    // Before any decision exists the block must still say what the engine
+    // concluded, which it can only do if the verdict is passed in.
+    expect(line).toHaveTextContent('Refer');
+  });
+
+  it('passes the decision and the typed reason straight through', async () => {
+    const onDecide = vi.fn(() => Promise.resolve());
+    render(<Actions {...base} log={[]} onApprove={() => {}} onDecide={onDecide} />);
+
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'Rate is adequate despite the referral.' },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    });
+    expect(onDecide).toHaveBeenCalledWith('accept', 'Rate is adequate despite the referral.');
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Decline' }));
+    });
+    // The box is cleared after a successful decision, so the next reason is not
+    // silently the previous one.
+    expect(onDecide).toHaveBeenLastCalledWith('decline', '');
+  });
+
+  it('shows a recorded decision alongside the verdict the engine reached', () => {
+    const decision = logRow({
+      actionId: 'act_accept_1',
+      type: 'decision',
+      status: 'applied',
+      actor: 'underwriter',
+      decision: 'accept',
+      beforeVerdict: 'REFER',
+      afterVerdict: 'REFER',
+      note: 'Accepted by the underwriter on 2026-09-19. The engine said REFER; that verdict is unchanged.',
+    });
+    render(<Actions {...base} log={[decision]} onApprove={() => {}} onDecide={() => {}} />);
+
+    const recorded = screen.getByTestId('actions-decision-recorded');
+    expect(recorded).toHaveTextContent('Accepted');
+    // Both sides, never one presented as the other.
+    expect(recorded).toHaveTextContent('The engine said');
+    expect(recorded).toHaveTextContent('REFER');
+    expect(recorded).toHaveTextContent('that verdict is unchanged');
+  });
+
+  it('reports a failed decision without pretending it was recorded', async () => {
+    const onDecide = vi.fn(() => Promise.reject(new Error('API unreachable')));
+    render(<Actions {...base} log={[]} onApprove={() => {}} onDecide={onDecide} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Accept' }));
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent('The decision was not recorded: API unreachable');
+    expect(screen.queryByTestId('actions-decision-recorded')).not.toBeInTheDocument();
+  });
+});

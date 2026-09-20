@@ -7,7 +7,7 @@ import type {
   ErrorDto,
   RunResponseDto,
 } from '@retrofit/contracts';
-import { ROUTES } from '@retrofit/contracts';
+import { ROUTES, decisionRequestSchema } from '@retrofit/contracts';
 import type { ExternalValue, Sourced } from '@retrofit/engine';
 import type { ApiEnv } from '../app';
 import { createRepos } from '../db/repos';
@@ -15,6 +15,7 @@ import type { Repos } from '../db/repos';
 import type { EnrichmentRow, SubmissionRow } from '../db/schema';
 import { runEnrichment } from '../enrich/runner';
 import type { EnrichContext, EnrichLocation, EnrichOutcome } from '../enrich/types';
+import { decideSubmission } from '../services/actions';
 import { rescoreOne } from '../services/rescore';
 import type { Deps } from '../services/types';
 
@@ -185,5 +186,59 @@ export function registerRunRoutes(app: Hono<ApiEnv>, deps: Deps): void {
       result: rescored.result,
     };
     return c.json(body, 200);
+  });
+
+  /**
+   * Record an underwriter's accept or decline. The engine is deliberately NOT
+   * re-run and the verdict is deliberately NOT changed: nothing about the risk
+   * moved, only the human response to it, and a verdict a person could
+   * overwrite would stop being traceable to a guideline row.
+   */
+  app.post(ROUTES.decideSubmission.path, async (c) => {
+    const found = lookup(repos, c.req.param('id'));
+    if (!found.ok) return c.json(found.body, found.status);
+    const { row } = found;
+
+    let raw: unknown;
+    try {
+      const text = await c.req.text();
+      raw = text.trim() === '' ? {} : (JSON.parse(text) as unknown);
+    } catch (error) {
+      const body: ErrorDto = {
+        error: {
+          code: 'INVALID_REQUEST',
+          message: 'request body is not valid JSON',
+          issues: [{ path: '', message: error instanceof Error ? error.message : 'unparseable' }],
+        },
+      };
+      return c.json(body, 422);
+    }
+
+    const parsed = decisionRequestSchema.safeParse(raw);
+    if (!parsed.success) {
+      const body: ErrorDto = {
+        error: {
+          code: 'INVALID_REQUEST',
+          message: 'invalid decision',
+          issues: parsed.error.issues.map((i) => ({
+            path: i.path.map((p) => String(p)).join('.'),
+            message: i.message,
+          })),
+        },
+      };
+      return c.json(body, 422);
+    }
+
+    try {
+      return c.json(decideSubmission(deps, row.id, parsed.data), 200);
+    } catch (error) {
+      const body: ErrorDto = {
+        error: {
+          code: 'NOT_SCORED',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      };
+      return c.json(body, 409);
+    }
   });
 }

@@ -137,7 +137,7 @@ export function Tooltip(props) {
     return (_jsxs("span", { className: "rf-tooltip", style: wrapperStyle, onMouseEnter: () => {
             setHovered(true);
             setDismissed(false);
-        }, onMouseLeave: () => setHovered(false), children: [_jsx("span", { className: "rf-tooltip__trigger", style: triggerStyle, tabIndex: 0, "aria-describedby": tipId, "data-term": term, onFocus: () => {
+        }, onMouseLeave: () => setHovered(false), children: [_jsx("span", { className: "rf-tooltip__trigger", style: triggerStyle, role: "button", tabIndex: 0, "aria-describedby": tipId, "data-term": term, onFocus: () => {
                     setFocused(true);
                     setDismissed(false);
                 }, onBlur: () => setFocused(false), onKeyDown: onKeyDown, children: children }), _jsxs("span", { id: tipId, role: "tooltip", className: open ? 'rf-tooltip__bubble' : 'rf-tooltip__bubble rf-sr-only', style: open ? bubbleStyle : undefined, "data-open": open ? 'true' : 'false', "data-status": resolution.status, children: [definition, source !== null ? _jsx("span", { style: open ? sourceStyle : undefined, children: ` Source: ${source}.` }) : null] })] }));

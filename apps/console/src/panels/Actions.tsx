@@ -10,6 +10,7 @@ import type {
   ActionsPanelProps,
   RequestDraftView,
   RoutingView,
+  Verdict,
 } from './types.js';
 
 /** PRD 7.6: a request is saved as a draft; only a draft can be approved. */
@@ -203,14 +204,102 @@ function LogTable(props: { readonly log: readonly ActionLogEntryView[] }): React
   );
 }
 
+
+/* -------------------------------------------------------------------------- */
+/* The underwriter's decision                                                 */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Accept or decline, recorded **beside** the engine's verdict rather than over
+ * it. The engine's answer, its deciding rule and its score are untouched by
+ * this: the point of the whole system is that a number traces to a guideline
+ * row, and a verdict a person could overwrite would trace to nothing. So the
+ * block shows both — what the rulebook concluded, and what the underwriter did.
+ *
+ * A reason is optional but asked for, because the decision that is worth
+ * reading later is the one that disagreed with the engine and said why.
+ */
+function DecisionBlock(props: {
+  readonly engineVerdict: Verdict | null;
+  readonly decisions: readonly ActionLogEntryView[];
+  readonly onDecide: NonNullable<ActionsPanelProps['onDecide']>;
+}): ReactElement {
+  const { engineVerdict, decisions, onDecide } = props;
+  const [reason, setReason] = useState('');
+  const [state, setState] = useState<ApproveState>({ kind: 'idle' });
+  const pending = state.kind === 'pending';
+  const latest = decisions[0] ?? null;
+
+  const decide = async (decision: 'accept' | 'decline'): Promise<void> => {
+    setState({ kind: 'pending' });
+    try {
+      await onDecide(decision, reason);
+      setReason('');
+      setState({ kind: 'idle' });
+    } catch (err) {
+      setState({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  };
+
+  return (
+    <div data-testid="actions-decision">
+      <h3 className="rf-card__subtitle">Your decision</h3>
+      {latest === null ? (
+        <p className="rf-empty">
+          No decision has been recorded. The engine said{' '}
+          <strong>{formatVerdict(engineVerdict)}</strong>; recording a decision does not change that.
+        </p>
+      ) : (
+        <p data-testid="actions-decision-recorded">
+          <Badge
+            label={latest.decision === 'accept' ? 'Accepted' : latest.decision === 'decline' ? 'Declined' : titleCase(latest.status)}
+            tone={latest.decision === 'decline' ? 'quiet' : 'positive'}
+          />{' '}
+          by the underwriter on {formatDate(latest.createdAt, { style: 'long' })}. The engine said{' '}
+          <strong>{formatVerdict(latest.beforeVerdict ?? engineVerdict)}</strong>, and still does.
+          {latest.note === null || latest.note === undefined ? null : (
+            <span className="rf-actions__rationale"> {latest.note}</span>
+          )}
+        </p>
+      )}
+
+      <label className="rf-field">
+        <span className="rf-field__label">Why (optional, and worth writing if you disagree)</span>
+        <textarea
+          className="rf-field__input"
+          rows={2}
+          value={reason}
+          disabled={pending}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </label>
+      <div className="rf-draft__actions">
+        <button type="button" className="rf-button rf-button--primary" disabled={pending} onClick={() => void decide('accept')}>
+          {pending ? 'Recording…' : 'Accept'}
+        </button>
+        <button type="button" className="rf-button" disabled={pending} onClick={() => void decide('decline')}>
+          Decline
+        </button>
+      </div>
+      {state.kind === 'error' ? (
+        <p role="alert" className="rf-inline-error">
+          The decision was not recorded: {state.message}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 /**
  * PRD 10 (k) Routing, the drafted request with approve, and the log.
  *
  * Every number comes from the props; nothing is recomputed (PRD 10, 13).
  */
 export function Actions(props: ActionsPanelProps): ReactElement {
-  const { routing, drafts, log, onApprove, submissionId } = props;
+  const { routing, drafts, log, onApprove, onDecide, engineVerdict, submissionId } = props;
   const openDrafts = drafts.filter((d) => d.status === APPROVABLE_STATUS).length;
+  // Newest first: the log is already ordered that way by the API.
+  const decisions = log.filter((e) => e.type === 'decision');
   return (
     <Card
       title="Actions"
@@ -225,6 +314,14 @@ export function Actions(props: ActionsPanelProps): ReactElement {
           <p className="rf-empty">No request is needed for this submission.</p>
         ) : (
           drafts.map((d) => <DraftCard key={d.actionId} draft={d} onApprove={onApprove} />)
+        )}
+
+        {onDecide === undefined ? null : (
+          <DecisionBlock
+            engineVerdict={engineVerdict ?? decisions[0]?.beforeVerdict ?? null}
+            decisions={decisions}
+            onDecide={onDecide}
+          />
         )}
 
         <h3 className="rf-card__subtitle">Log</h3>

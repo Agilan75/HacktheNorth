@@ -1,6 +1,7 @@
-import { jsx as _jsx } from "react/jsx-runtime";
+import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 let apiState;
 const reload = vi.fn();
@@ -25,11 +26,14 @@ function ready(data) {
 function terms() {
     return screen.queryAllByRole('term').map((t) => t.textContent ?? '');
 }
+function mount(entry = '/glossary') {
+    return (_jsx(MemoryRouter, { initialEntries: [entry], children: _jsxs(Routes, { children: [_jsx(Route, { path: "/glossary", element: _jsx(GlossaryPage, {}) }), _jsx(Route, { path: "/queue", element: _jsx("p", { children: "queue" }) })] }) }));
+}
 afterEach(cleanup);
 describe('GlossaryPage', () => {
     it('lists every term alphabetically with definition, source and a stable anchor', () => {
         apiState = ready(glossary);
-        render(_jsx(GlossaryPage, {}));
+        render(mount());
         expect(screen.getByRole('heading', { level: 1, name: 'Glossary' })).toBeInTheDocument();
         expect(terms()).toEqual(['Appetite', 'Carrier', 'In-Appetite', 'Premium']);
         expect(screen.getByRole('status')).toHaveTextContent('4 terms');
@@ -38,27 +42,63 @@ describe('GlossaryPage', () => {
         expect(within(item).getByText('A submission inside the appetite.', { exact: false })).toBeInTheDocument();
         expect(within(item).getByText('Federato glossary, p. 2')).toBeInTheDocument();
     });
+    it('offers an A-Z jump bar, linking only the letters that have terms', () => {
+        apiState = ready(glossary);
+        render(mount());
+        const bar = screen.getByRole('navigation', { name: 'Jump to a letter' });
+        expect([...bar.querySelectorAll('a')].map((a) => a.textContent)).toEqual(['A', 'C', 'I', 'P']);
+        expect(bar.querySelector('a[href="#glossary-letter-c"]')).not.toBeNull();
+        // The letters with nothing behind them are still shown, muted and unlinked.
+        expect(bar.querySelectorAll('span').length).toBe(23);
+        expect(document.getElementById('glossary-letter-i').textContent).toBe('I');
+    });
+    it('keeps the search in the URL so a filtered glossary is shareable', () => {
+        apiState = ready(glossary);
+        render(mount('/glossary?q=premium'));
+        expect(screen.getByLabelText('Search terms and definitions')).toHaveValue('premium');
+        expect(terms()).toEqual(['Premium', 'Carrier']);
+    });
     it('searches terms and definitions, ranking term matches first', () => {
         apiState = ready(glossary);
-        render(_jsx(GlossaryPage, {}));
+        render(mount());
         const search = screen.getByLabelText('Search terms and definitions');
         fireEvent.change(search, { target: { value: 'premium' } });
         // "Premium" is a term match; "Carrier" only mentions premium in its definition.
         expect(terms()).toEqual(['Premium', 'Carrier']);
         expect(screen.getByRole('status')).toHaveTextContent('2 terms of 4 match “premium”');
+        // Ranked results are one flat list, so the alphabetical jump bar steps aside.
+        expect(screen.queryByRole('navigation', { name: 'Jump to a letter' })).toBeNull();
         fireEvent.change(search, { target: { value: 'in appetite' } });
         expect(terms()[0]).toBe('In-Appetite');
         fireEvent.change(search, { target: { value: 'zzz' } });
         expect(terms()).toEqual([]);
         expect(screen.getByText('No glossary term matches “zzz”.')).toBeInTheDocument();
+        fireEvent.change(search, { target: { value: '' } });
+        expect(terms()).toEqual(['Appetite', 'Carrier', 'In-Appetite', 'Premium']);
+    });
+    it('shows a way back only when the user came from another console page', () => {
+        apiState = ready(glossary);
+        const bare = render(mount());
+        expect(screen.queryByRole('link', { name: /Back to/ })).toBeNull();
+        bare.unmount();
+        render(mount({ pathname: '/glossary', state: { from: '/queue?verdict=REFER' } }));
+        expect(screen.getByRole('link', { name: '← Back to the queue' })).toHaveAttribute('href', '/queue?verdict=REFER');
+    });
+    it('states its source once, at the bottom, and never as a lead paragraph', () => {
+        apiState = ready(glossary);
+        render(mount());
+        const source = screen.getByText(/Source: Federato’s glossary/);
+        expect(source).toBeInTheDocument();
+        const heading = screen.getByRole('heading', { level: 1, name: 'Glossary' });
+        expect(heading.compareDocumentPosition(source) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
     it('shows a skeleton while loading and a retry on error', () => {
         apiState = { data: null, loading: true, error: null, reload };
-        const { unmount } = render(_jsx(GlossaryPage, {}));
+        const { unmount } = render(mount());
         expect(screen.getByRole('status', { name: 'Loading the glossary' })).toBeInTheDocument();
         unmount();
         apiState = { data: null, loading: false, error: new Error('offline'), reload };
-        render(_jsx(GlossaryPage, {}));
+        render(mount());
         expect(screen.getByRole('alert')).toHaveTextContent('The glossary could not be loaded: offline');
         fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
         expect(reload).toHaveBeenCalledTimes(1);

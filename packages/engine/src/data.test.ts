@@ -14,9 +14,17 @@ describe('data loaders read every packaged data file', () => {
     expect(p).not.toMatch(/\/src\//);
   });
 
-  it('loads the commercial vector spec with its 11 components', async () => {
+  it('loads the commercial vector spec with its 12 components', async () => {
     const spec = await readVectorSpec('commercial_property');
-    expect(spec.components).toHaveLength(11);
+    // 9 appetite components, then 3 extension-only: sprinklers, protection
+    // class and the FEMA flood zone.
+    expect(spec.components).toHaveLength(12);
+    expect(spec.components.filter((c) => c.appetiteFactor)).toHaveLength(9);
+    expect(spec.components.filter((c) => c.extensionOnly).map((c) => c.key)).toEqual([
+      'pctTivSprinklered',
+      'tivWeightedProtectionClass',
+      'worstFloodZoneTier',
+    ]);
   });
 
   it('loads all three rulebooks through the zod schema', async () => {

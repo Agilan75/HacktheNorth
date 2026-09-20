@@ -6,6 +6,7 @@ import '@fontsource-variable/fraunces';
 import '@fontsource-variable/inter';
 import './styles/tokens.css';
 import './styles/base.css';
+import './styles/ledger.css';
 import { App } from './App.js';
 // FROZEN (W0-4). Entry point only — no application logic lives here.
 const container = document.getElementById('root');

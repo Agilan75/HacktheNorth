@@ -1,5 +1,5 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { NavLink } from 'react-router';
+import { Link, NavLink } from 'react-router';
 import { cssVar, MIN_TOUCH_TARGET, RADIUS, SPACE } from '@retrofit/design';
 const MAIN_ID = 'rf-main';
 const shellStyle = {
@@ -77,6 +77,6 @@ export function Layout(props) {
                     event.currentTarget.style.top = `${SPACE.sm}px`;
                 }, onBlur: (event) => {
                     event.currentTarget.style.top = '-100px';
-                }, children: "Skip to content" }), _jsxs("header", { style: headerStyle, children: [_jsx("p", { style: brandStyle, children: "Retrofit" }), _jsx("nav", { "aria-label": "Primary", style: { flex: '1 1 auto' }, children: _jsx("ul", { style: navListStyle, children: nav.map((item) => (_jsx("li", { children: _jsx(NavLink, { to: item.to, style: navLinkStyle, children: item.label }) }, item.to))) }) }), _jsx("div", { "data-testid": "adapter-banner-slot", children: banner })] }), _jsx("main", { id: MAIN_ID, className: "rf-main", tabIndex: -1, style: mainStyle, children: children })] }));
+                }, children: "Skip to content" }), _jsxs("header", { style: headerStyle, children: [_jsx("p", { style: brandStyle, children: _jsx(Link, { to: "/", className: "rf-brand-link", "aria-label": "Retrofit \u2014 home", children: "Retrofit" }) }), _jsx("nav", { "aria-label": "Primary", style: { flex: '1 1 auto' }, children: _jsx("ul", { style: navListStyle, children: nav.map((item) => (_jsx("li", { children: _jsx(NavLink, { to: item.to, className: "rf-nav-link", style: navLinkStyle, children: item.label }) }, item.to))) }) }), _jsx("div", { "data-testid": "adapter-banner-slot", children: banner })] }), _jsx("main", { id: MAIN_ID, className: "rf-main", tabIndex: -1, style: mainStyle, children: children })] }));
 }
 //# sourceMappingURL=Layout.js.map

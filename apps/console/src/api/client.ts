@@ -7,6 +7,9 @@ import type {
   ErrorDto,
   GlossaryResponseDto,
   HealthDto,
+  IngestResponseDto,
+  IngestRunDto,
+  IngestStartedDto,
   QueryTraceEntryDto,
   QueueResponseDto,
   QueueRowDto,
@@ -19,7 +22,7 @@ import type {
   SweepDto,
   VerificationDto,
 } from '@retrofit/contracts';
-import { MAX_PAGE_LIMIT, ROUTES, routePath, titleCase, withQuery } from '@retrofit/contracts';
+import { formatPercent, MAX_PAGE_LIMIT, ROUTES, routePath, titleCase, withQuery } from '@retrofit/contracts';
 
 import type {
   AccountKind,
@@ -94,6 +97,8 @@ export interface AggregateResponse {
 
 export interface RulesResponse {
   readonly rulebooks: readonly unknown[];
+  /** Ambiguities the rulebooks resolved, deduplicated by the API. */
+  readonly interpretations?: readonly unknown[];
 }
 
 export interface GlossaryResponse {
@@ -110,6 +115,23 @@ export interface ApiClient {
   getActions(): Promise<readonly ActionLogEntryView[]>;
   approveAction(actionId: string): Promise<ActionLogEntryView>;
   postReply(id: string, input: { readonly text?: string; readonly file?: File }): Promise<ReplyResultView>;
+  /**
+   * Starts a real ingest run — the agent, over the whole book.
+   *
+   * Normally answers at once with a run id to poll through `getIngestRun`. An
+   * API too old to know the `async` flag instead runs the whole thing and
+   * answers with the finished summary, so the caller must handle both: that
+   * run was every bit as live, it just could not be watched step by step.
+   */
+  startIngest(): Promise<IngestStartedDto | IngestResponseDto>;
+  /** Progress of a run started by `startIngest`. */
+  getIngestRun(runId: string): Promise<IngestRunDto>;
+  /**
+   * Record an underwriter's accept or decline. The engine's verdict is not
+   * touched, so the returned detail carries the same verdict it did before —
+   * with the decision now in its action log.
+   */
+  decide(id: string, decision: 'accept' | 'decline', reason: string): Promise<SubmissionDetailView>;
   getAggregate(): Promise<AggregateResponse>;
   getRules(): Promise<RulesResponse>;
   getGlossary(): Promise<GlossaryResponse>;
@@ -395,13 +417,18 @@ function pricingView(price: SubmissionDetailDto['price']): PricingView {
   const notes: string[] = [];
   notes.push(price.basis === 'fitted' ? 'Rates fitted to the book.' : 'Rates from the rating table.');
   if (price.fitError) {
-    notes.push(`Fit error: MAPE ${price.fitError.mape}, R² ${price.fitError.r2}, n = ${price.fitError.n}.`);
+    const { mape, r2, n } = price.fitError;
+    notes.push(
+      `Fit error: MAPE ${formatPercent(mape, { decimals: 1 })}, R² ${r2.toFixed(3)}, n = ${n}.`,
+    );
   }
   if (price.estimate) notes.push('Estimate: no loss data behind this number.');
   if (price.termMonths !== null) notes.push(`Term: ${price.termMonths} months.`);
   if (price.expectedLossDetail) {
     const d = price.expectedLossDetail;
-    notes.push(`Loss credibility ${d.credibility} (n = ${d.n}, k = ${d.k}).`);
+    notes.push(
+      `Loss credibility ${formatPercent(d.credibility, { decimals: 0 })} (n = ${d.n}, k = ${d.k}).`,
+    );
   }
   const view: PricingView = {
     quotedPremium: price.quotedPremium,
@@ -633,6 +660,9 @@ function actionLogEntry(
     afterRank: rankAfter ?? after?.rank ?? null,
     beforeVerdict: before?.verdict ?? null,
     afterVerdict: after?.verdict ?? null,
+    actor: a.actor,
+    note: a.note,
+    decision: a.decision ?? null,
   };
 }
 
@@ -906,6 +936,24 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       }
       return replyView(await call<ReplyResponseDto>('replyToSubmission', { id }, { body }));
     },
+    async startIngest() {
+      // `force` so the run does real work on an already-seeded book: every
+      // account is re-planned, re-normalized and re-scored, which is what the
+      // live demo claims is happening.
+      return call<IngestStartedDto | IngestResponseDto>('ingestFederato', {}, {
+        body: { async: true, force: true },
+      });
+    },
+    async getIngestRun(runId) {
+      return call<IngestRunDto>('getIngestRun', { runId });
+    },
+    async decide(id, decision, reason) {
+      const trimmed = reason.trim();
+      await call('decideSubmission', { id }, {
+        body: { decision, ...(trimmed === '' ? {} : { reason: trimmed }) },
+      });
+      return getSubmission(id);
+    },
     async getAggregate() {
       // The queue only enriches the one-flip list; its failure must not hide the aggregate.
       const [dto, queue] = await Promise.all([
@@ -916,7 +964,7 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     },
     async getRules() {
       const dto = await call<RulesResponseDto>('rules');
-      return { rulebooks: dto.rulebooks };
+      return { rulebooks: dto.rulebooks, interpretations: dto.interpretations };
     },
     async getVerification() {
       return call<VerificationDto>('verification');

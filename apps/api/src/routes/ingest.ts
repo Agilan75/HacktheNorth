@@ -1,9 +1,10 @@
-/** POST /ingest/federato. Body owned by Run 1 unit A12. */
+/** POST /ingest/federato, GET /ingest/runs/:runId. Body owned by Run 1 unit A12. */
 import type { Hono } from 'hono';
-import type { ErrorDto, IngestRequestDto } from '@retrofit/contracts';
+import type { ErrorDto, IngestRequestDto, IngestStartedDto } from '@retrofit/contracts';
 import { ROUTES, ingestRequestSchema } from '@retrofit/contracts';
 import type { ApiEnv } from '../app';
 import { ingestFederato } from '../services/ingest';
+import { createIngestRun, readIngestRun } from '../services/ingest-progress';
 import type { Deps } from '../services/types';
 
 /** The 422 body (dto.schemas.ts header): zod issues flattened to path + message. */
@@ -58,7 +59,43 @@ export function registerIngestRoutes(app: Hono<ApiEnv>, deps: Deps): void {
       return c.json(invalidBody('invalid ingest request', parsed.error.issues), 422);
     }
     const request: IngestRequestDto = parsed.data;
+
+    /*
+     * Async: answer with a run id at once and keep working. The console polls
+     * `GET /ingest/runs/:runId` and shows each planner query as it lands, which
+     * is the only way to watch a 10-second run happen. `void` is deliberate —
+     * the promise is owned by the recorder from here on, and every failure path
+     * ends up on the run as `error`, never as an unhandled rejection.
+     */
+    if (request.async === true) {
+      const startedAt = deps.clock.nowIso();
+      const runId = `run-${startedAt.replace(/[^0-9]/g, '')}-${Math.random().toString(36).slice(2, 8)}`;
+      const run = createIngestRun(runId, startedAt);
+      void ingestFederato(deps, request, run.onQuery).then(
+        (response) => run.succeed(response, deps.clock.nowIso()),
+        (error: unknown) =>
+          run.fail(error instanceof Error ? error.message : String(error), deps.clock.nowIso()),
+      );
+      const started: IngestStartedDto = { runId, startedAt };
+      return c.json(started, 202);
+    }
+
     const response = await ingestFederato(deps, request);
     return c.json(response, 200);
+  });
+
+  app.get(ROUTES.getIngestRun.path, (c) => {
+    const runId = c.req.param('runId') ?? '';
+    const run = readIngestRun(runId);
+    if (run === null) {
+      const body: ErrorDto = {
+        error: {
+          code: 'NOT_FOUND',
+          message: `no ingest run "${runId}" — it finished long enough ago to be forgotten, or the API restarted`,
+        },
+      };
+      return c.json(body, 404);
+    }
+    return c.json(run, 200);
   });
 }

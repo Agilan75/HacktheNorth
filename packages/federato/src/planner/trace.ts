@@ -45,6 +45,13 @@ export interface TraceRecorderOptions {
   readonly now?: string | undefined;
   /** Deterministic id prefix, e.g. the submission id or the run id. */
   readonly idPrefix?: string | undefined;
+  /**
+   * Called once per query, the moment it finishes, with the entry exactly as
+   * `entries()` would render it. Purely an observer: it cannot change the trace,
+   * and a throw from it is swallowed so a watching console can never break a
+   * run. The API uses it to report planner progress while a run is still going.
+   */
+  readonly onQuery?: ((entry: QueryTraceEntry) => void) | undefined;
 }
 
 interface OpenEntry {
@@ -102,6 +109,31 @@ export function createTraceRecorder(options: TraceRecorderOptions): TraceRecorde
     return entry;
   }
 
+  function render(e: OpenEntry): QueryTraceEntry {
+    const f = e.finished;
+    const error = f === null ? UNFINISHED_ERROR : f.error;
+    const rowCount = f === null ? 0 : f.rowCount;
+    return {
+      id: e.id,
+      seq: e.seq,
+      pass: e.start.pass,
+      goal: e.start.goal,
+      requiredBy: [...e.start.requiredBy],
+      pathChosen: e.start.pathChosen,
+      payload: e.payload,
+      rowCount,
+      totalAvailable: f === null ? null : f.totalAvailable,
+      durationMs: f === null ? 0 : f.durationMs,
+      adapterKind: options.adapterKind,
+      startedAt: e.startedAt,
+      outcome: outcomeOf(rowCount, error),
+      error,
+      adaptedFrom: e.start.adaptedFrom ?? null,
+      adaptation: e.start.adaptation ?? 'none',
+      notes: [...e.notes],
+    };
+  }
+
   return {
     begin(start) {
       const seq = open.length;
@@ -139,6 +171,14 @@ export function createTraceRecorder(options: TraceRecorderOptions): TraceRecorde
         error,
       };
       for (const n of finish.notes ?? []) if (!entry.notes.includes(n)) entry.notes.push(n);
+      if (options.onQuery !== undefined) {
+        // An observer never breaks the run that is being observed.
+        try {
+          options.onQuery(render(entry));
+        } catch {
+          /* ignored on purpose */
+        }
+      }
     },
 
     note(id, note) {
@@ -148,30 +188,7 @@ export function createTraceRecorder(options: TraceRecorderOptions): TraceRecorde
     },
 
     entries() {
-      return open.map((e): QueryTraceEntry => {
-        const f = e.finished;
-        const error = f === null ? UNFINISHED_ERROR : f.error;
-        const rowCount = f === null ? 0 : f.rowCount;
-        return {
-          id: e.id,
-          seq: e.seq,
-          pass: e.start.pass,
-          goal: e.start.goal,
-          requiredBy: [...e.start.requiredBy],
-          pathChosen: e.start.pathChosen,
-          payload: e.payload,
-          rowCount,
-          totalAvailable: f === null ? null : f.totalAvailable,
-          durationMs: f === null ? 0 : f.durationMs,
-          adapterKind: options.adapterKind,
-          startedAt: e.startedAt,
-          outcome: outcomeOf(rowCount, error),
-          error,
-          adaptedFrom: e.start.adaptedFrom ?? null,
-          adaptation: e.start.adaptation ?? 'none',
-          notes: [...e.notes],
-        };
-      });
+      return open.map(render);
     },
   };
 }

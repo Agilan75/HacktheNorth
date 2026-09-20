@@ -55,8 +55,14 @@
     "experiments": {
       "typedRoutes": false
     },
+    "web": {
+      "output": "static"
+    },
     "extra": {
-      "apiUrlEnvVar": "EXPO_PUBLIC_API_URL"
+      "apiUrlEnvVar": "EXPO_PUBLIC_API_URL",
+      "eas": {
+        "projectId": "c365d015-34dd-4470-b581-3279d69effe3"
+      }
     }
   }
 }

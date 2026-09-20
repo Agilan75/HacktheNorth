@@ -4,6 +4,8 @@ import type {
   ActionDto,
   ActionsPlanRequestDto,
   ActionsPlanResponseDto,
+  DecisionDto,
+  DecisionResponseDto,
   DraftRequestInput,
   DraftRequestOutput,
   RequestedFieldDto,
@@ -194,6 +196,7 @@ export function actionDtoOf(row: ActionRow, submission: SubmissionRow | null): A
     rankBefore: p.rankBefore ?? null,
     rankAfter: p.rankAfter ?? null,
     note: p.note ?? null,
+    decision: p.decision ?? null,
     createdAt: row.createdAt,
   };
 }
@@ -473,4 +476,70 @@ export async function approveAction(deps: Deps, actionId: string): Promise<Actio
     },
   });
   return actionDtoOf(updated, repos.submissions.byId(updated.submissionId));
+}
+
+/* -------------------------------------------------------------------------- */
+/* Underwriter decisions (accept / decline)                                   */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Records what an underwriter decided to do about the engine's verdict.
+ *
+ * The decision is stored as an action **beside** the result, never over it: the
+ * verdict, its deciding rule, the appetite score and the rank are exactly what
+ * the engine computed, before and after. That is deliberate. The value of this
+ * system is that a number can be traced to a guideline row, and a verdict a
+ * person could quietly overwrite would not be traceable to anything. So the
+ * account page ends up saying both things — what the rulebook concluded, and
+ * what the underwriter did — and never conflates them.
+ *
+ * The engine is not re-run: nothing about the risk changed, only the human
+ * response to it. The snapshot is taken so the log says what the decision was
+ * taken *against*, which matters when a later reply re-scores the account.
+ */
+export function decideSubmission(
+  deps: Deps,
+  submissionId: string,
+  input: { readonly decision: DecisionDto; readonly reason?: string },
+): DecisionResponseDto {
+  const repos = createRepos(deps.db);
+  const row = repos.submissions.byId(submissionId);
+  if (row === null) throw new Error(`decideSubmission: no submission "${submissionId}"`);
+  const result = row.result;
+  if (result === null || result === undefined) {
+    throw new Error(`decideSubmission: submission "${submissionId}" has not been scored yet`);
+  }
+
+  const snapshot = snapshotOf(result, row.rank ?? null);
+  const reason = input.reason?.trim();
+  const verb = input.decision === 'accept' ? 'Accepted' : 'Declined';
+  const note =
+    reason === undefined || reason === ''
+      ? `${verb} by the underwriter on ${deps.clock.nowIso()}. The engine said ${result.verdict.verdict}; that verdict is unchanged.`
+      : `${verb} by the underwriter on ${deps.clock.nowIso()}: ${reason} The engine said ${result.verdict.verdict}; that verdict is unchanged.`;
+
+  const action = repos.actions.insert({
+    id: newActionId(input.decision),
+    submissionId,
+    type: 'decision',
+    // Terminal by construction: a decision is not a draft awaiting approval.
+    status: 'applied',
+    actor: 'underwriter',
+    payload: {
+      note,
+      decision: input.decision,
+      ...(reason === undefined || reason === '' ? {} : { draft: reason }),
+    },
+    // Same on both sides on purpose: a decision moves no score.
+    before: snapshot,
+    after: snapshot,
+    createdAt: deps.clock.nowIso(),
+  });
+
+  return {
+    id: submissionId,
+    decision: input.decision,
+    engineVerdict: result.verdict.verdict,
+    action: actionDtoOf(action, row),
+  };
 }

@@ -85,14 +85,15 @@ describe('VerificationPage', () => {
     });
     it('renders the per-stratum table, with a stratum that has no answers said in words', () => {
         mount({ data: REAL });
-        const rows = within(screen.getByRole('table', { name: 'Second-opinion agreement by stratum' })).getAllByRole('row');
+        const table = screen.getByRole('table', { name: 'Second-opinion agreement by stratum' });
+        const rows = within(table).getAllByRole('row');
         expect(rows).toHaveLength(5);
-        expect(screen.getByTestId('stratum-tiv_at_150m')).toHaveTextContent('TIV at 150M');
-        expect(within(screen.getByTestId('stratum-construction_exact_half')).getAllByRole('cell').map((c) => c.textContent)).toEqual(['80', '79', '98.8%']);
-        expect(screen.getByTestId('stratum-construction_exact_half')).toHaveTextContent('Construction exact half');
-        expect(screen.getByTestId('stratum-empty_stratum')).toHaveTextContent('No answered cases');
-        expect(document.body.textContent).toContain('706 cases were never answered');
-        expect(document.body.textContent).toContain('1,319 also named the same deciding factor');
+        expect(table).toHaveTextContent('TIV at 150M');
+        const half = within(table).getByText('Construction exact half').closest('tr');
+        expect(within(half).getAllByRole('cell').map((c) => c.textContent)).toEqual(['Construction exact half', '80', '79', '98.8%']);
+        expect(within(table).getByText('Empty stratum').closest('tr')).toHaveTextContent('No answered cases');
+        expect(screen.getByTestId('strata-note')).toHaveTextContent('706 unanswered');
+        expect(screen.getByTestId('strata-note')).toHaveTextContent('1,319 of 1,331 agreeing cases also named the same deciding factor');
     });
     it('shows each disagreement with both sides side by side', () => {
         mount({ data: REAL });
@@ -107,12 +108,17 @@ describe('VerificationPage', () => {
         expect(model).toHaveTextContent('deciding factor: Construction type');
         expect(model).toHaveTextContent(MODEL_REASONING);
         expect(d).toHaveTextContent('The engine says Fit; the model says Does not fit.');
+        expect(d).not.toHaveTextContent('less reliable party');
+        expect(within(d).getByTestId('disagreement-link-V03:947746280:34')).toHaveAttribute('href', `/submissions/${encodeURIComponent('V03:947746280:34')}`);
+        expect(d.tagName).toBe('DETAILS');
+        expect(d).toHaveAttribute('open');
     });
     it('lists what the testing found, with the counts from the DTO', () => {
         mount({ data: REAL });
         const lead = screen.getByTestId('found-lead');
         expect(lead).toHaveTextContent('20,662 invariant violations and 1,369 disagreements');
         expect(lead).toHaveTextContent('confirmed 39 defects and refuted 11');
+        expect(lead).not.toHaveTextContent('which is the point of it');
         expect(screen.getByTestId('defect-R2-3')).toHaveTextContent('Each hydrated building resolves to its own location.');
         expect(screen.getByTestId('defect-R2-3')).toHaveTextContent('(R2-3, Run 2)');
         expect(screen.getByTestId('sources')).toHaveTextContent('packages/verify/out/run.json');
@@ -121,9 +127,9 @@ describe('VerificationPage', () => {
         mount({ data: { ...REAL, layersAB: null, layerC: null, realAccounts: null } });
         const missing = screen.getAllByTestId('block-missing').map((e) => e.textContent);
         expect(missing).toEqual([
-            'Layers A and B: no result file was found (packages/verify/out/run.json), so there is nothing to show.',
-            'Layer C: no result file was found (packages/verify/out/layer-c.json), so there is nothing to show.',
-            'Per-account checks: no result file was found (packages/verify/out/per-account.json), so there is nothing to show.',
+            'No verification run found.',
+            'No verification run found.',
+            'No verification run found.',
         ]);
         expect(screen.queryByTestId('v-cases')).toBeNull();
     });
@@ -141,6 +147,27 @@ describe('VerificationPage', () => {
         expect(screen.getByRole('alert')).toHaveTextContent('Could not load the verification: HTTP 500');
         fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
         expect(reload).toHaveBeenCalledTimes(1);
+    });
+});
+describe('VerificationPage navigation (redesign)', () => {
+    it('opens with a breadcrumb back to the aggregate and an index of its sections', () => {
+        mount({ data: REAL });
+        const crumbs = screen.getByTestId('breadcrumb');
+        expect(within(crumbs).getByRole('link', { name: 'Aggregate' })).toHaveAttribute('href', '/aggregate');
+        const index = screen.getByTestId('section-index');
+        expect(within(index).getAllByRole('link').map((a) => a.getAttribute('href'))).toEqual([
+            '#v-headline',
+            '#v-field',
+            '#v-real',
+            '#v-strata',
+            '#v-disagreements',
+            '#v-found',
+        ]);
+    });
+    it('states the three layers as a strip, not an essay', () => {
+        mount({ data: REAL });
+        expect(within(screen.getByTestId('layer-strip')).getAllByRole('listitem')).toHaveLength(3);
+        expect(document.body.textContent).not.toContain('deliberately naive implementation');
     });
 });
 //# sourceMappingURL=VerificationPage.test.js.map

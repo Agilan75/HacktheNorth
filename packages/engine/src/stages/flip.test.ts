@@ -209,8 +209,10 @@ const IMMOVABLE_KEYS = [
 describe('flipBounds', () => {
   it('marks exactly the F-2 components immovable on the real spec', () => {
     const bounds = flipBounds(vectorOf(B1), SPEC, RULEBOOK);
-    expect(bounds).toHaveLength(11);
-    expect(bounds.filter((b) => b.immovable).map((b) => b.componentIndex)).toEqual([0, 1, 2, 5, 6, 8, 10]);
+    expect(bounds).toHaveLength(12);
+    // 11 is the flood zone: the building cannot leave the flood plain, so it is
+    // immovable and no flip may ever propose changing it.
+    expect(bounds.filter((b) => b.immovable).map((b) => b.componentIndex)).toEqual([0, 1, 2, 5, 6, 8, 10, 11]);
     expect(bounds.find((b) => b.componentKey === 'pctTivSprinklered')?.immovable).toBe(false);
   });
 

@@ -1,48 +1,83 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
+import { useState } from 'react';
 import { Link } from 'react-router';
 import { formatDate, formatMoney, formatPercent, formatScore, pluralize, titleCase } from '@retrofit/contracts';
-import { VERDICT_MARKS, VERDICT_STYLES } from '@retrofit/design';
-import { ROUTES, submissionPath } from '../App.js';
+import { MIN_TOUCH_TARGET, SPACE, VERDICT_MARKS, VERDICT_STYLES, cssVar } from '@retrofit/design';
+import { ROUTES, submissionPath } from '../routes.js';
 import { useApi } from '../api/useApi.js';
 import { Card } from '../components/atoms/Card.js';
 import { Skeleton } from '../components/atoms/Skeleton.js';
+import { Tile } from '../components/atoms/Tile.js';
 import { VerdictPill } from '../components/atoms/VerdictPill.js';
 import { AdequacyScale } from '../components/charts/AdequacyScale.js';
 import { BarList } from '../components/charts/BarList.js';
 import { Histogram } from '../components/charts/Histogram.js';
+import { DataTable } from '../components/DataTable.js';
 /** Display order of the three verdicts (PRD 13 styling, INTERPRETATIONS V-*). */
 const VERDICT_ORDER = ['FIT', 'REFER', 'DOES_NOT_FIT'];
 /** At most this many knockout factors are charted; the API already ranks them. */
 const MAX_KNOCKOUT_FACTORS = 8;
-const GRID = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 420px), 1fr))',
-    gap: 'var(--rf-space-xl)',
-    alignItems: 'start',
-};
+/** Rows shown before the one-flip table collapses behind "Show all". */
+const FLIP_PREVIEW_ROWS = 10;
+/** The queue reads its filters from the URL; these are the param names. */
+function queuePath(params) {
+    if (params === undefined)
+        return ROUTES.queue;
+    const search = new URLSearchParams(params).toString();
+    return search.length === 0 ? ROUTES.queue : `${ROUTES.queue}?${search}`;
+}
 const TILE_ROW = {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-    gap: 'var(--rf-space-lg)',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 170px), 1fr))',
+    gap: SPACE.lg,
     margin: 0,
 };
-const TILE = {
-    border: 'var(--rf-border-width) solid var(--rf-border-color)',
-    borderRadius: 'var(--rf-radius-card)',
-    padding: 'var(--rf-space-lg)',
-    margin: 0,
+/** The primary: the two charts that describe the book, side by side, full width. */
+const PRIMARY_SPLIT = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 340px), 1fr))',
+    gap: SPACE.xl,
+    alignItems: 'start',
 };
-const TILE_VALUE = {
-    fontFamily: 'var(--rf-font-display)',
-    fontSize: 'var(--rf-size-title)',
-    lineHeight: 'var(--rf-leading-title)',
-    margin: 0,
+/** The secondary row: smaller type, muted, visibly a footnote to the primary. */
+const SECONDARY_ROW = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
+    gap: SPACE.lg,
+    alignItems: 'start',
+    fontSize: cssVar('size-small'),
+    lineHeight: cssVar('leading-small'),
 };
-const TILE_LABEL = {
-    fontSize: 'var(--rf-size-micro)',
-    lineHeight: 'var(--rf-leading-micro)',
-    color: 'var(--rf-muted-deep)',
+const SUBHEAD = {
     margin: 0,
+    fontSize: cssVar('size-micro'),
+    lineHeight: cssVar('leading-micro'),
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    color: cssVar('mutedDeep'),
+};
+const LINK_ROW = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: SPACE.sm,
+    listStyle: 'none',
+    margin: `${SPACE.md}px 0 0`,
+    padding: 0,
+};
+const LINK_CHIP = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: SPACE.xs,
+    minHeight: MIN_TOUCH_TARGET,
+    padding: `0 ${SPACE.md}px`,
+    border: `1px solid ${cssVar('mutedTint')}`,
+    borderRadius: cssVar('radius-pill'),
+    fontSize: cssVar('size-small'),
+};
+const ERROR_BOX = {
+    border: `1px solid ${cssVar('mutedTint')}`,
+    borderRadius: cssVar('radius-card'),
+    padding: SPACE.lg,
 };
 /* -------------------------------------------------------------------------- */
 /* Pure view builders (presentation only; no number here changes value)       */
@@ -70,7 +105,7 @@ function knockoutBars(factors) {
         key: f.factorId,
         label: f.label ?? titleCase(f.factorId),
         count: f.count,
-        fill: 'var(--rf-ink)',
+        fill: 'var(--rf-blue)',
     }));
 }
 function asNumber(value) {
@@ -121,18 +156,61 @@ function verificationTiles(v) {
 /* -------------------------------------------------------------------------- */
 /* Small pieces                                                               */
 /* -------------------------------------------------------------------------- */
-function Tile(props) {
-    return (_jsxs("div", { style: TILE, "data-testid": props.testId, children: [_jsx("dt", { style: TILE_LABEL, children: props.label }), _jsxs("dd", { style: { margin: 0 }, children: [_jsx("span", { style: TILE_VALUE, children: props.value }), props.note ? _jsx("span", { style: { ...TILE_LABEL, display: 'block' }, children: props.note }) : null] })] }));
+/** The chart is an image; these are the same rows as links into the queue. */
+function ChartLinks(props) {
+    return (_jsx("ul", { style: LINK_ROW, "aria-label": props.label, "data-testid": props.testId, children: props.items.map((it) => (_jsx("li", { children: _jsxs(Link, { to: it.href, style: LINK_CHIP, "data-testid": `${props.testId}-${it.key}`, children: [_jsx("span", { children: it.label }), _jsx("strong", { children: it.count.toLocaleString('en-US') })] }) }, it.key))) }));
 }
+function flipRows(rows, moves) {
+    return rows
+        .map((row) => {
+        // The engine's own move (C14); the queue sentence only when the API sent none.
+        const move = moves?.[row.submissionId];
+        return {
+            row,
+            moveLabel: move?.moveLabel ?? row.explanationLine,
+            scoreAfter: move ? move.scoreAfter : null,
+            premiumAfter: move?.premiumAfter ?? null,
+        };
+    })
+        .slice()
+        .sort((a, b) => (b.scoreAfter ?? -1) - (a.scoreAfter ?? -1));
+}
+const FLIP_COLUMNS = [
+    {
+        key: 'insured',
+        header: 'Insured',
+        render: (r) => (_jsx(Link, { to: submissionPath(r.row.submissionId), "aria-label": `Open ${r.row.insuredName}`, children: r.row.insuredName })),
+        sortValue: (r) => r.row.insuredName,
+    },
+    {
+        key: 'verdict',
+        header: 'Verdict',
+        render: (r) => r.row.incomplete ? (_jsx("span", { style: { color: cssVar('mutedDeep') }, children: "Not in current queue" })) : (_jsx(VerdictPill, { verdict: r.row.verdict })),
+        sortValue: (r) => (r.row.incomplete ? null : r.row.verdict),
+    },
+    { key: 'appetite', header: 'Appetite', align: 'right', render: (r) => formatScore(r.row.appetiteScore), sortValue: (r) => r.row.appetiteScore },
+    {
+        key: 'predicted',
+        header: 'Predicted premium',
+        align: 'right',
+        render: (r) => formatMoney(r.row.predictedPremium),
+        sortValue: (r) => r.row.predictedPremium,
+    },
+    { key: 'move', header: 'What would flip it', minWidth: 280, clampLines: 2, title: (r) => r.moveLabel, render: (r) => r.moveLabel },
+    {
+        key: 'scoreAfter',
+        header: 'Score after',
+        align: 'right',
+        render: (r) => (r.scoreAfter === null ? '—' : formatScore(r.scoreAfter)),
+        sortValue: (r) => r.scoreAfter,
+    },
+    { key: 'premiumAfter', header: 'Premium after', align: 'right', render: (r) => formatMoney(r.premiumAfter), sortValue: (r) => r.premiumAfter },
+];
 function OneFlipTable(props) {
-    if (props.rows.length === 0) {
-        return _jsx("p", { style: { margin: 0, color: 'var(--rf-muted-deep)' }, children: "No submission is one change away from FIT." });
-    }
-    return (_jsx("div", { className: "rf-scroll-x", children: _jsxs("table", { style: { width: '100%', borderCollapse: 'collapse' }, children: [_jsx("caption", { className: "rf-sr-only", children: "Submissions one change away from FIT" }), _jsx("thead", { children: _jsxs("tr", { style: { textAlign: 'left', fontSize: 'var(--rf-size-micro)', color: 'var(--rf-muted-deep)' }, children: [_jsx("th", { scope: "col", children: "Insured" }), _jsx("th", { scope: "col", children: "Verdict" }), _jsx("th", { scope: "col", style: { textAlign: 'right' }, children: "Appetite" }), _jsx("th", { scope: "col", style: { textAlign: 'right' }, children: "Predicted premium" }), _jsx("th", { scope: "col", style: { paddingLeft: 'var(--rf-space-md)' }, children: "What would flip it" }), _jsx("th", { scope: "col", style: { textAlign: 'right' }, children: "Score after" }), _jsx("th", { scope: "col", style: { textAlign: 'right' }, children: "Premium after" })] }) }), _jsx("tbody", { children: props.rows.map((r) => {
-                        // The engine's own move (C14); the queue sentence only when the API sent none.
-                        const move = props.moves?.[r.submissionId];
-                        return (_jsxs("tr", { "data-testid": `flip-${r.submissionId}`, style: { borderTop: 'var(--rf-border-width) solid var(--rf-border-color)' }, children: [_jsx("th", { scope: "row", style: { textAlign: 'left', fontWeight: 500, padding: 'var(--rf-space-sm) var(--rf-space-sm) var(--rf-space-sm) 0' }, children: _jsx(Link, { to: submissionPath(r.submissionId), "aria-label": `Open ${r.insuredName}`, children: r.insuredName }) }), _jsx("td", { children: _jsx(VerdictPill, { verdict: r.verdict }) }), _jsx("td", { style: { textAlign: 'right' }, children: formatScore(r.appetiteScore) }), _jsx("td", { style: { textAlign: 'right' }, children: formatMoney(r.predictedPremium) }), _jsx("td", { style: { paddingLeft: 'var(--rf-space-md)' }, children: move?.moveLabel ?? r.explanationLine }), _jsx("td", { style: { textAlign: 'right' }, children: move ? formatScore(move.scoreAfter) : '—' }), _jsx("td", { style: { textAlign: 'right' }, children: formatMoney(move?.premiumAfter ?? null) })] }, r.submissionId));
-                    }) })] }) }));
+    const [showAll, setShowAll] = useState(false);
+    const all = flipRows(props.rows, props.moves);
+    const shown = showAll ? all : all.slice(0, FLIP_PREVIEW_ROWS);
+    return (_jsxs(_Fragment, { children: [_jsx(DataTable, { caption: "By score after the change", columns: FLIP_COLUMNS, rows: shown, rowKey: (r) => r.row.submissionId, emptyLabel: "No submission is one change away from FIT." }), all.length > FLIP_PREVIEW_ROWS ? (_jsx("button", { type: "button", "data-testid": "flip-show-all", onClick: () => setShowAll((v) => !v), style: { minHeight: MIN_TOUCH_TARGET, marginTop: SPACE.md }, children: showAll ? 'Show fewer' : `Show all (${all.length})` })) : null] }));
 }
 function AggregateBody(props) {
     const { data } = props;
@@ -152,7 +230,8 @@ function AggregateBody(props) {
         : null;
     const tiles = verificationTiles(data.verification);
     const generatedAt = typeof data.verification.generatedAt === 'string' ? data.verification.generatedAt : null;
-    return (_jsxs(_Fragment, { children: [_jsxs("dl", { style: TILE_ROW, "aria-label": "Book headline", children: [_jsx(Tile, { testId: "tile-total", label: "Submissions with a verdict", value: total.toLocaleString('en-US'), note: totalNote }), _jsx(Tile, { testId: "tile-fit", label: "Fit appetite", value: fit.toLocaleString('en-US'), note: total > 0 ? `${formatPercent(fit / total, { decimals: 1 })} of the book` : undefined }), _jsx(Tile, { testId: "tile-flip", label: "One change from FIT", value: data.oneFlipAway.length.toLocaleString('en-US') }), _jsx(Tile, { testId: "tile-adequacy", label: "Median adequacy", value: formatPercent(median), note: adequacy ? `${adequacy.underpricedCount.toLocaleString('en-US')} underpriced` : undefined })] }), _jsxs("div", { style: GRID, children: [_jsx(Card, { title: "Counts by verdict", aside: pluralize(total, 'submission'), children: _jsx(BarList, { title: "Submissions by verdict", items: verdicts, countLabel: "Submissions", emptyLabel: "No verdicts yet." }) }), _jsx(Card, { title: "Score distribution", aside: pluralize(scored, 'scored submission'), children: _jsx(Histogram, { title: "Appetite score distribution", buckets: data.scoreHistogram.map((b) => ({ label: b.bucket, count: b.count })), xLabel: "Appetite score (0\u2013100)" }) }), _jsx(Card, { title: "Top knockout factors", children: _jsx(BarList, { title: "Knockout factors by number of submissions", items: knockoutBars(data.topKnockoutFactors), countLabel: "Submissions knocked out", emptyLabel: "No knockouts in the book." }) }), _jsxs(Card, { title: "Book adequacy", aside: adequacy ? pluralize(adequacy.n, 'priced submission') : undefined, children: [_jsx(AdequacyScale, { median: median }), underpricedText !== null ? (_jsx("p", { "data-testid": "adequacy-underpriced", style: { margin: 'var(--rf-space-md) 0 0' }, children: underpricedText })) : null] })] }), _jsx(Card, { title: "One flip away from FIT", aside: pluralize(data.oneFlipAway.length, 'submission'), children: _jsx(OneFlipTable, { rows: data.oneFlipAway, moves: data.oneFlipMoves }) }), _jsxs(Card, { title: "Verification", aside: generatedAt ? `Run ${formatDate(generatedAt)}` : undefined, children: [tiles.length === 0 ? (_jsx("p", { style: { margin: 0, color: 'var(--rf-muted-deep)' }, "data-testid": "verification-empty", children: "No verification run yet. Run the verifier to populate these numbers." })) : (_jsx("dl", { style: TILE_ROW, "aria-label": "Verification headline", children: tiles.map((t) => (_jsx(Tile, { testId: `verify-${t.key}`, label: t.label, value: t.value, note: t.note }, t.key))) })), _jsx("p", { style: { margin: 'var(--rf-space-lg) 0 0' }, children: _jsx(Link, { to: ROUTES.verification, "data-testid": "verification-link", children: "See the full verification: every check, results by kind of case, each disagreement with both sides\u2019 reasoning, and what the testing found" }) })] })] }));
+    const knockouts = knockoutBars(data.topKnockoutFactors);
+    return (_jsxs(_Fragment, { children: [_jsxs("dl", { style: TILE_ROW, "aria-label": "Book headline", children: [_jsx(Tile, { testId: "tile-total", label: "Submissions with a verdict", value: total.toLocaleString('en-US'), detail: totalNote, href: queuePath() }), _jsx(Tile, { testId: "tile-fit", label: "Fit appetite", tone: "positive", value: fit.toLocaleString('en-US'), detail: total > 0 ? `${formatPercent(fit / total, { decimals: 1 })} of the book` : undefined, href: queuePath({ verdict: 'FIT' }) }), _jsx(Tile, { testId: "tile-flip", label: "One change from FIT", tone: "info", value: data.oneFlipAway.length.toLocaleString('en-US'), href: "#rf-one-flip" }), _jsx(Tile, { testId: "tile-adequacy", label: "Median adequacy", value: formatPercent(median), detail: adequacy ? `${adequacy.underpricedCount.toLocaleString('en-US')} underpriced` : undefined })] }), _jsx(Card, { title: "The book", aside: `${pluralize(total, 'submission')} · ${scored.toLocaleString('en-US')} scored`, children: _jsxs("div", { style: PRIMARY_SPLIT, children: [_jsxs("div", { children: [_jsx("h3", { style: SUBHEAD, children: "By verdict" }), _jsx(BarList, { title: "Submissions by verdict", items: verdicts, countLabel: "Submissions", emptyLabel: "No verdicts yet." }), _jsx(ChartLinks, { label: "Open the queue filtered by verdict", testId: "verdict-links", items: verdicts.map((v) => ({ key: v.key, label: v.label, count: v.count, href: queuePath({ verdict: v.key }) })) })] }), _jsxs("div", { children: [_jsx("h3", { style: SUBHEAD, children: "Score distribution" }), _jsx(Histogram, { title: "Appetite score distribution", buckets: data.scoreHistogram.map((b) => ({ label: b.bucket, count: b.count })), xLabel: "Appetite score (0\u2013100)" })] })] }) }), _jsxs("div", { style: SECONDARY_ROW, children: [_jsxs(Card, { title: "Top knockout factors", children: [_jsx(BarList, { title: "Knockout factors by number of submissions", items: knockouts, countLabel: "Submissions knocked out", emptyLabel: "No knockouts in the book." }), knockouts.length > 0 ? (_jsx(ChartLinks, { label: "Open the queue filtered by knockout factor", testId: "knockout-links", items: knockouts.map((k) => ({ key: k.key, label: k.label, count: k.count, href: queuePath({ q: k.label }) })) })) : null] }), _jsxs(Card, { title: "Book adequacy", aside: adequacy ? pluralize(adequacy.n, 'priced submission') : undefined, children: [_jsx(AdequacyScale, { median: median }), underpricedText !== null ? (_jsx("p", { "data-testid": "adequacy-underpriced", style: { margin: `${SPACE.md}px 0 0` }, children: underpricedText })) : null] })] }), _jsx(Card, { title: "One flip away from FIT", anchorId: "rf-one-flip", aside: pluralize(data.oneFlipAway.length, 'submission'), children: _jsx(OneFlipTable, { rows: data.oneFlipAway, moves: data.oneFlipMoves }) }), _jsxs(Card, { title: "Verification", aside: generatedAt ? `Run ${formatDate(generatedAt)}` : undefined, children: [tiles.length === 0 ? (_jsx("p", { style: { margin: 0, color: cssVar('mutedDeep') }, "data-testid": "verification-empty", children: "No verification run yet." })) : (_jsx("dl", { style: TILE_ROW, "aria-label": "Verification headline", children: tiles.map((t) => (_jsx(Tile, { testId: `verify-${t.key}`, label: t.label, value: t.value, detail: t.note }, t.key))) })), _jsxs("p", { style: { margin: `${SPACE.lg}px 0 0` }, children: [_jsx(Link, { to: ROUTES.verification, "data-testid": "verification-link", children: "Verification" }), _jsx("span", { style: { color: cssVar('mutedDeep') }, children: ' — every check and disagreement' })] })] })] }));
 }
 /**
  * PRD 10 /aggregate - counts by verdict, score distribution, top knockout factors, one-flip-away list, book adequacy, verification headline.
@@ -162,6 +241,6 @@ function AggregateBody(props) {
  */
 export function AggregatePage() {
     const state = useApi((client) => client.getAggregate(), []);
-    return (_jsxs("section", { "aria-labelledby": "rf-aggregate-title", style: { display: 'flex', flexDirection: 'column', gap: 'var(--rf-space-xl)' }, children: [_jsx("h1", { id: "rf-aggregate-title", style: { fontFamily: 'var(--rf-font-display)', fontSize: 'var(--rf-size-display)', lineHeight: 'var(--rf-leading-display)', margin: 0 }, children: "Aggregate" }), state.error !== null ? (_jsxs("div", { role: "alert", style: TILE, children: [_jsx("p", { style: { margin: 0 }, children: `Could not load the aggregate: ${state.error.message}` }), _jsx("button", { type: "button", onClick: state.reload, style: { minHeight: 'var(--rf-min-touch-target)', marginTop: 'var(--rf-space-md)' }, children: "Retry" })] })) : state.data === null ? (_jsx(Skeleton, { label: "Loading aggregate", lines: 8 })) : (_jsx(AggregateBody, { data: state.data }))] }));
+    return (_jsxs("section", { "aria-labelledby": "rf-aggregate-title", style: { display: 'flex', flexDirection: 'column', gap: SPACE.xl }, children: [_jsx("h1", { id: "rf-aggregate-title", style: { fontFamily: cssVar('font-display'), fontSize: cssVar('size-display'), lineHeight: cssVar('leading-display'), margin: 0 }, children: "Aggregate" }), state.error !== null ? (_jsxs("div", { role: "alert", style: ERROR_BOX, children: [_jsx("p", { style: { margin: 0 }, children: `Could not load the aggregate: ${state.error.message}` }), _jsx("button", { type: "button", onClick: state.reload, style: { minHeight: MIN_TOUCH_TARGET, marginTop: SPACE.md }, children: "Retry" })] })) : state.data === null ? (_jsx(Skeleton, { label: "Loading aggregate", lines: 8 })) : (_jsx(AggregateBody, { data: state.data }))] }));
 }
 //# sourceMappingURL=AggregatePage.js.map

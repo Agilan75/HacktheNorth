@@ -33,6 +33,12 @@ export interface SceneCallbacks {
     readonly onOpen: (row: QueueRowView) => void;
 }
 export declare function scatterPosition(row: QueueRowView): THREE.Vector3;
+export declare function textSprite(text: string, opts?: {
+    size?: number;
+    color?: string;
+    weight?: number;
+}): THREE.Sprite;
+export declare function line(points: readonly THREE.Vector3[], color: string, opacity?: number): THREE.Line;
 export interface ExploreScene {
     setData(rows: readonly QueueRowView[], mode: ExploreMode): void;
     resetView(): void;

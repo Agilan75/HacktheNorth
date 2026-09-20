@@ -409,3 +409,55 @@ describe('rollup — five-year loss (I-4)', () => {
     expect(r.fiveYearLoss).toBe(0);
   });
 });
+
+describe('rollup — flood zone (component 11, fed by enrichment)', () => {
+  /** A location carrying only a FEMA zone, as the OpenFEMA enrichment writes it. */
+  const at = (externalId: string, zone: string): LocationFacts => ({
+    externalId,
+    floodZone: [{ value: zone, provenance: { source: 'enrichment' } }],
+  });
+
+  it('is null when no location states a zone, so an un-enriched account is unchanged', () => {
+    expect(rollup(submission({ locations: [location('L1', 'CA')] }), ASOF).worstFloodZoneTier).toBeNull();
+    expect(rollup(submission(), ASOF).worstFloodZoneTier).toBeNull();
+  });
+
+  it('maps every FEMA zone code to its tier, and an unreadable code to 0', () => {
+    const tierOf = (zone: string): number | null =>
+      rollup(submission({ locations: [at('L1', zone)] }), ASOF).worstFloodZoneTier;
+
+    // Outside the mapped hazard.
+    for (const zone of ['X', 'X500', 'D', 'x']) expect(tierOf(zone)).toBe(0);
+    // Special Flood Hazard Area, no wave action.
+    for (const zone of ['A', 'AE', 'AO', 'AH', 'AR', 'A99', 'ae']) expect(tierOf(zone)).toBe(1);
+    // Coastal, with wave action.
+    for (const zone of ['V', 'VE', 've']) expect(tierOf(zone)).toBe(2);
+    // A code we cannot read is never allowed to penalise the account.
+    for (const zone of ['ZONE-42', '?']) expect(tierOf(zone)).toBe(0);
+    // A blank zone is "no zone stated", which is not the same as "dry".
+    expect(tierOf('  ')).toBeNull();
+  });
+
+  it('takes the worst zone across locations, never an average', () => {
+    // One building in a V zone is the exposure; averaging it against three dry
+    // locations would report the account as safer than it is.
+    const many = submission({
+      locations: [at('L1', 'X'), at('L2', 'X'), at('L3', 'AE'), at('L4', 'X')],
+    });
+    expect(rollup(many, ASOF).worstFloodZoneTier).toBe(1);
+
+    const coastal = submission({ locations: [at('L1', 'X'), at('L2', 'AE'), at('L3', 'VE')] });
+    expect(rollup(coastal, ASOF).worstFloodZoneTier).toBe(2);
+  });
+
+  it('ignores locations with no zone rather than reading them as dry', () => {
+    const mixed = submission({ locations: [location('L1', 'CA'), at('L2', 'AE')] });
+    expect(rollup(mixed, ASOF).worstFloodZoneTier).toBe(1);
+  });
+
+  it('needs no building, because the zone is a property of the location', () => {
+    const noBuildings = submission({ locations: [at('L1', 'AE')], buildings: [] });
+    expect(rollup(noBuildings, ASOF).worstFloodZoneTier).toBe(1);
+    expect(rollup(noBuildings, ASOF).totalTiv).toBeNull();
+  });
+});

@@ -97,6 +97,11 @@
       "factor": 1.45
     }
   ],
+  "flood": {
+    "minimal": 1,
+    "sfha": 1.15,
+    "coastal": 1.35
+  },
   "credibilityK": 5,
   "fitError": {
     "mape": 0.27605527355342274,

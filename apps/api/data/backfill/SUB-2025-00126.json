@@ -1,0 +1,55 @@
+{
+  "externalId": "SUB-2025-00126",
+  "targetVerdict": "REFER",
+  "rationale": "All eight appetite factors pass (new business, GA acceptable state, $24.8M TIV, $84.5K target-band premium, 2008 masonry non-combustible, $12K loss), but the rural Lake Oconee campus sits in protection class 9, which fires the X-PPC-UNPROTECTED refer rule. One borderline factor, no knockout.",
+  "values": [
+    {
+      "canonicalPath": "submissionType",
+      "value": "new_business"
+    },
+    {
+      "canonicalPath": "locations.*.state",
+      "value": "GA"
+    },
+    {
+      "canonicalPath": "locations.*.city",
+      "value": "Eatonton"
+    },
+    {
+      "canonicalPath": "locations.*.protectionClass",
+      "value": 9
+    },
+    {
+      "canonicalPath": "buildings.*.tiv",
+      "value": 24800000
+    },
+    {
+      "canonicalPath": "buildings.*.yearBuilt",
+      "value": 2008
+    },
+    {
+      "canonicalPath": "buildings.*.constructionType",
+      "value": "masonry_non_combustible"
+    },
+    {
+      "canonicalPath": "buildings.*.sprinklered",
+      "value": true
+    },
+    {
+      "canonicalPath": "buildings.*.stories",
+      "value": 2
+    },
+    {
+      "canonicalPath": "buildings.*.occupancy",
+      "value": "Outpatient medical clinic and ambulatory surgery center"
+    },
+    {
+      "canonicalPath": "pricing.quotedPremium",
+      "value": 84500
+    },
+    {
+      "canonicalPath": "rollup.fiveYearLoss",
+      "value": 12000
+    }
+  ]
+}

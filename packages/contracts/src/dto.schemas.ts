@@ -17,7 +17,11 @@ import type {
   ErrorDto,
   GlossaryResponseDto,
   HealthDto,
+  DecisionResponseDto,
   IngestResponseDto,
+  IngestRunDto,
+  IngestRunStepDto,
+  IngestStartedDto,
   NextQuestionResponseDto,
   QueueResponseDto,
   ReplyResponseDto,
@@ -54,7 +58,8 @@ export const requestTriggerSchema = z.enum([
   'high_contradiction',
   'one_flip_from_fit',
 ]);
-export const actionTypeSchema = z.enum(['route', 'request', 'reply', 'rescore', 'log']);
+export const actionTypeSchema = z.enum(['route', 'request', 'reply', 'rescore', 'log', 'decision']);
+export const decisionSchema = z.enum(['accept', 'decline']);
 export const actionStatusSchema = z.enum([
   'draft',
   'approved',
@@ -371,6 +376,7 @@ export const ingestRequestSchema = z.object({
   lineOfBusiness: lineOfBusinessSchema.optional(),
   externalIds: z.array(z.string().min(1)).max(500).optional(),
   force: z.boolean().optional(),
+  async: z.boolean().optional(),
 });
 
 export const queueQuerySchema = z.object({
@@ -541,6 +547,7 @@ export const actionSchema: z.ZodType<ActionDto> = z.object({
   rankBefore: z.number().int().nullable(),
   rankAfter: z.number().int().nullable(),
   note: z.string().nullable(),
+  decision: decisionSchema.nullable().optional(),
   createdAt: isoDateSchema,
 });
 
@@ -626,6 +633,48 @@ export const ingestResponseSchema: z.ZodType<IngestResponseDto> = z.object({
   durationMs: z.number().nonnegative(),
   warnings: z.array(z.string()),
   externalIds: z.array(z.string()),
+});
+
+export const decisionRequestSchema = z.object({
+  decision: decisionSchema,
+  reason: z.string().max(2000).optional(),
+});
+
+export const decisionResponseSchema: z.ZodType<DecisionResponseDto> = z.object({
+  id: idSchema,
+  decision: decisionSchema,
+  engineVerdict: verdictSchema,
+  action: actionSchema,
+});
+
+export const ingestRunStepSchema: z.ZodType<IngestRunStepDto> = z.object({
+  id: z.string().min(1),
+  seq: z.number().int().nonnegative(),
+  pass: z.string().min(1),
+  goal: z.string(),
+  rootResource: z.string(),
+  rowCount: z.number().int().nonnegative(),
+  totalAvailable: z.number().int().nonnegative().nullable(),
+  durationMs: z.number().nonnegative(),
+  outcome: z.string(),
+  adaptation: z.string(),
+  adaptedFrom: z.string().nullable(),
+  error: z.string().nullable(),
+});
+
+export const ingestRunSchema: z.ZodType<IngestRunDto> = z.object({
+  runId: z.string().min(1),
+  startedAt: isoDateSchema,
+  finishedAt: isoDateSchema.nullable(),
+  done: z.boolean(),
+  error: z.string().nullable(),
+  steps: z.array(ingestRunStepSchema),
+  result: ingestResponseSchema.nullable(),
+});
+
+export const ingestStartedSchema: z.ZodType<IngestStartedDto> = z.object({
+  runId: z.string().min(1),
+  startedAt: isoDateSchema,
 });
 
 export const runResponseSchema: z.ZodType<RunResponseDto> = z.object({

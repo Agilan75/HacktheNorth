@@ -27,6 +27,7 @@ import type {
   QueryTraceEntryDto,
   RequestedFieldDto,
   RequestTriggerDto,
+  DecisionDto,
   RoutingDecisionDto,
   ScoreSnapshotDto,
   SweepFrameDto,
@@ -52,6 +53,8 @@ export interface ActionPayload {
   readonly note?: string | null;
   readonly rankBefore?: number | null;
   readonly rankAfter?: number | null;
+  /** Set only on a `decision` action: the underwriter's accept or decline. */
+  readonly decision?: DecisionDto | null;
 }
 
 export const submissions = sqliteTable(

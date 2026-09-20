@@ -68,7 +68,43 @@ interface Opts {
   referFactors?: AppetiteFactorId[];
   pre1990BuildingIds?: string[];
   interpretations?: string[];
+  contradictions?: unknown[];
 }
+
+/** The real rank-1 shape: two self-reported received dates, LOW, immaterial. */
+const receivedDateConflict = {
+  id: 'contradiction:receivedDate',
+  canonicalPath: 'receivedDate',
+  values: [
+    {
+      value: '2025-12-13',
+      provenance: { source: 'self_reported', sourceDetail: 'Policy.submission.received_date' },
+    },
+    {
+      value: '2025-12-29',
+      provenance: { source: 'self_reported', sourceDetail: 'Policy.dates.submission_received' },
+    },
+  ],
+  severity: 'LOW',
+  affectedRules: ['AG-LOSS-A', 'AG-LOSS-NA'],
+  status: 'open',
+  note:
+    '2 competing values for receivedDate (self_reported, self_reported); immaterial: the five-year loss ' +
+    'is $0 / $0 under the competing dates, the same loss-value tier either way',
+};
+
+const yearBuiltConflict = {
+  id: 'contradiction:yearBuilt',
+  canonicalPath: 'buildings.yearBuilt',
+  values: [
+    { value: 1972, provenance: { source: 'self_reported', sourceDetail: 'Policy.buildings[0].year_built' } },
+    { value: 1994, provenance: { source: 'enrichment' } },
+  ],
+  severity: 'HIGH',
+  affectedRules: ['R-AGE-REFER'],
+  status: 'open',
+  note: 'material: the building-age tier differs under the competing values',
+};
 
 function makeResult(o: Opts = {}): EngineResult {
   const fs = factors(o.tiers ?? {});
@@ -90,9 +126,11 @@ function makeResult(o: Opts = {}): EngineResult {
       pctTivAcceptableConstruction: 1,
       pre1990BuildingIds: o.pre1990BuildingIds ?? [],
     },
-    contradictions: o.openHigh
-      ? [{ id: 'C1', canonicalPath: 'buildings.yearBuilt', values: [], severity: 'HIGH', affectedRules: [], status: 'open' }]
-      : [],
+    contradictions:
+      o.contradictions ??
+      (o.openHigh
+        ? [{ id: 'C1', canonicalPath: 'buildings.yearBuilt', values: [], severity: 'HIGH', affectedRules: [], status: 'open' }]
+        : []),
     evaluate: {
       appetiteScore: score(fs),
       factors: fs,
@@ -420,6 +458,127 @@ describe('explain', () => {
     const bumped = narrateGuard(e, e.text.replace('85/100', '88/100'));
     expect(bumped.ok).toBe(false);
     expect(bumped.changedNumbers).toContain('appetiteScore');
+  });
+
+  it('no contradictions: no contradiction sentence, output unchanged', () => {
+    const e = explain({ result: makeResult(), insuredName: 'Harbor Foods', rank: 1 });
+    expect(e.sentences).toHaveLength(3);
+    expect(e.text).not.toContain('conflict');
+    expect(e.sentences[2]).toBe(
+      'Recommendation: accept, because every appetite factor is met and nothing is missing.',
+    );
+  });
+
+  it('a resolved contradiction emits nothing', () => {
+    const e = explain({
+      result: makeResult({ contradictions: [{ ...receivedDateConflict, status: 'resolved' }] }),
+      insuredName: 'Harbor Foods',
+    });
+    expect(e.sentences).toHaveLength(3);
+    expect(e.text).not.toContain('conflict');
+  });
+
+  it('one open LOW contradiction: names both values, both sources, verdict unchanged', () => {
+    const e = explain({
+      result: makeResult({ contradictions: [receivedDateConflict] }),
+      insuredName: 'Harbor Foods',
+      rank: 1,
+    });
+    expect(e.sentences).toHaveLength(4);
+    expect(e.sentences[2]).toBe(
+      'The open conflict on received date is between 2025-12-13 (Policy.submission.received_date) and ' +
+        '2025-12-29 (Policy.dates.submission_received); AG-LOSS-A and AG-LOSS-NA depend on it, and the engine ' +
+        'reads it as immaterial: the verdict is unchanged under either value.',
+    );
+    // The LOW conflict is not a HIGH one, so factorSentence stays out of it and
+    // the recommendation is untouched.
+    expect(e.sentences[1]).toBe('In appetite on every factor.');
+    expect(e.recommendation).toBe('accept');
+    expect(e.text).toBe(e.sentences.join(' '));
+  });
+
+  it('an open HIGH contradiction: verdict at risk, and it elaborates the investigate reason', () => {
+    const e = explain({
+      result: makeResult({ verdict: 'REFER', contradictions: [yearBuiltConflict] }),
+    });
+    expect(e.recommendation).toBe('investigate');
+    expect(e.sentences).toHaveLength(4);
+    // factorSentence keeps the short clause; the new sentence elaborates it.
+    expect(e.sentences[1]).toBe(
+      'In appetite on every factor; conflicting values on buildings year built.',
+    );
+    expect(e.sentences[2]).toBe(
+      'The open conflict on buildings year built is between 1972 (Policy.buildings[0].year_built) and ' +
+        '1994 (enrichment); R-AGE-REFER depends on it, and the verdict may change once it is settled.',
+    );
+    expect(e.sentences[3]).toBe(
+      'Recommendation: investigate, because the broker must supply the conflict on buildings year built.',
+    );
+    expect(e.text).not.toContain('immaterial');
+  });
+
+  it('several open contradictions: details the most severe and counts the rest', () => {
+    const e = explain({
+      result: makeResult({
+        verdict: 'REFER',
+        contradictions: [
+          receivedDateConflict,
+          yearBuiltConflict,
+          { ...receivedDateConflict, id: 'c3', canonicalPath: 'totalTiv', severity: 'MEDIUM' },
+        ],
+      }),
+    });
+    expect(e.sentences[2]).toBe(
+      'The open conflict on buildings year built is between 1972 (Policy.buildings[0].year_built) and ' +
+        '1994 (enrichment); R-AGE-REFER depends on it, and the verdict may change once it is settled; ' +
+        'two other open contradictions are recorded.',
+    );
+    expect(e.sentences[2]).not.toContain('received date');
+  });
+
+  it('ties are broken by array order, and a resolved one is never counted', () => {
+    const e = explain({
+      result: makeResult({
+        contradictions: [
+          { ...receivedDateConflict, id: 'c1', canonicalPath: 'effectiveDate' },
+          receivedDateConflict,
+          { ...yearBuiltConflict, status: 'resolved' },
+        ],
+      }),
+    });
+    expect(e.sentences[2]).toBe(
+      'The open conflict on effective date is between 2025-12-13 (Policy.submission.received_date) and ' +
+        '2025-12-29 (Policy.dates.submission_received); AG-LOSS-A and AG-LOSS-NA depend on it, and the engine ' +
+        'reads it as immaterial: the verdict is unchanged under either value; one other open contradiction ' +
+        'is recorded.',
+    );
+  });
+
+  it('with no note, materiality is never assumed away', () => {
+    const noNote = { ...receivedDateConflict, note: undefined };
+    const e = explain({ result: makeResult({ contradictions: [noNote] }) });
+    expect(e.sentences[2]).toContain('the verdict may change once it is settled');
+    expect(e.sentences[2]).not.toContain('immaterial');
+  });
+
+  it('the disputed dates land in `numbers` and the narrate guard still holds', () => {
+    const e = explain({ result: makeResult({ contradictions: [receivedDateConflict] }), rank: 1 });
+    // Decided: the competing values print verbatim, so the date digits are
+    // scraped into unnamed n<i> keys. Every number in the text stays keyed.
+    const values = Object.values(e.numbers);
+    for (const n of extractNumbers(e.text)) {
+      expect(values.some((v) => Math.abs(v - n) < 1e-9)).toBe(true);
+    }
+    expect(values).toContain(2025);
+    expect(values).toContain(13);
+    expect(values).toContain(29);
+
+    const g = narrateGuard(e, e.text);
+    expect(g.problems).toEqual([]);
+    expect(g.ok).toBe(true);
+    // Gemini may not quietly move a disputed date.
+    const edited = narrateGuard(e, e.text.replace('2025-12-29', '2025-12-30'));
+    expect(edited.ok).toBe(false);
   });
 
   it('is deterministic', () => {

@@ -1,9 +1,11 @@
 import type { ReactElement } from 'react';
 /**
- * PRD 10 /rules - rule cards by factor with citation, quote, weight and interpretation; extension rules in a separate labelled group.
+ * PRD §10 /rules — the appetite guidelines as the criteria table they are:
+ * one row per factor, one column per tier, the threshold in each cell, and the
+ * rule id, raw condition, citation and interpretation behind each one.
  *
- * Stub frozen by W0-4. Unit C13 replaces this body only.
- * Route registration lives in src/App.tsx and is frozen.
+ * The open rule lives in `?rule=`, so a verdict elsewhere in the console can
+ * link straight at the criterion that decided it.
  */
 export declare function RulesPage(): ReactElement;
 //# sourceMappingURL=RulesPage.d.ts.map

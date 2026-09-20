@@ -272,6 +272,10 @@ export function engineSubmissionForInput(input: NaiveInput, id = 'verify-case'):
     pctTivAcceptableConstruction: input.pctTivAcceptableConstruction,
     pctTivSprinklered: null,
     tivWeightedProtectionClass: null,
+    // Extension-only components are left unset by the generator, so the
+    // extension rules never fire in the differential and the naive twin has no
+    // flood logic to mirror.
+    worstFloodZoneTier: null,
     primaryState: input.primaryState,
     stateShares: [],
     fiveYearLoss: input.fiveYearLoss,

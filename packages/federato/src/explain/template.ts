@@ -6,6 +6,7 @@
 import type {
   AppetiteFactorId,
   Citation,
+  Contradiction,
   EngineResult,
   FactorOutcome,
   FlipMove,
@@ -156,6 +157,133 @@ function openHighContradictionPaths(result: EngineResult): string[] {
       .filter((c) => c.status === 'open' && c.severity === 'HIGH')
       .map((c) => humanize(c.canonicalPath)),
   );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Contradictions                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Ownership split with `factorSentence` (F12 decision, 2026-09-20):
+ *
+ * - `factorSentence` keeps naming **open HIGH** conflicts as a short clause
+ *   ("conflicting values on X"). It is load-bearing: the same predicate drives
+ *   the `investigate` recommendation, and the two must agree.
+ * - `contradictionSentence` covers **every open contradiction, any severity**
+ *   — the real book is all LOW `receivedDate` conflicts, so before this the
+ *   explanations never mentioned a contradiction at all — and carries the
+ *   detail: both competing values, where each came from, and the impact. When a
+ *   path appears in both, this sentence reads as the elaboration of the clause
+ *   above it, never a restatement of it.
+ */
+const SEVERITY_RANK: Readonly<Record<string, number>> = { HIGH: 3, MEDIUM: 2, LOW: 1 };
+
+function openContradictions(result: EngineResult): Contradiction[] {
+  return result.contradictions.filter((c) => c.status === 'open');
+}
+
+/** One competing value, as prose. Strings (dates, codes) are quoted verbatim. */
+function contradictionValueText(value: unknown): string {
+  if (value === null || value === undefined) return 'no value';
+  if (typeof value === 'string') return value.trim().length > 0 ? value.trim() : 'no value';
+  if (typeof value === 'number') {
+    return Number.isInteger(value) ? String(value) : value.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  }
+  if (typeof value === 'boolean') return value ? 'yes' : 'no';
+  return JSON.stringify(value) ?? 'no value';
+}
+
+/** Provenance as prose: the resource path when there is one, else the source kind. */
+function contradictionSourceText(provenance: { source: string; sourceDetail?: string }): string {
+  const detail = provenance.sourceDetail?.trim();
+  if (detail) return detail;
+  return humanize(provenance.source);
+}
+
+/**
+ * The engine already decided materiality and wrote it into `note` (e.g.
+ * "…; immaterial: the five-year loss is $0 / $0 under the competing dates").
+ * We reuse that judgement and never recompute one: no note, or a note that does
+ * not say "immaterial", means we must not claim the verdict is safe.
+ */
+function isImmaterial(c: Contradiction): boolean {
+  return typeof c.note === 'string' && /\bimmaterial\b/i.test(c.note);
+}
+
+/**
+ * Sentence 3 — the open contradictions, addressed transparently.
+ *
+ * Numbers map / narrate guard (F12 decision): the competing values are printed
+ * verbatim, so a date like "2025-12-13" is scraped by `extractNumbers` into
+ * three unnamed `n<i>` keys (2025, 12, 13). This is **accepted knowingly**, not
+ * an accident: `collectNumbers` keys every number it finds in the final text,
+ * so the map stays complete and `narrateGuard` stays correct — it simply also
+ * holds Gemini to reproducing the disputed dates unchanged, which is exactly
+ * the promise we want for a value under dispute. Reformatting the date to hide
+ * digits would either drop a number the guard should protect or state the value
+ * less precisely than the source does.
+ */
+function contradictionSentence(result: EngineResult): string | null {
+  const open = openContradictions(result);
+  if (open.length === 0) return null;
+
+  // Most severe first; stable sort keeps array order for ties.
+  const ranked = [...open].sort(
+    (a, b) => (SEVERITY_RANK[b.severity] ?? 0) - (SEVERITY_RANK[a.severity] ?? 0),
+  );
+  const c = ranked[0] as Contradiction;
+
+  const field = humanize(c.canonicalPath);
+  const values = c.values.map(
+    (v) => `${contradictionValueText(v.value)} (${contradictionSourceText(v.provenance)})`,
+  );
+  const head =
+    values.length > 0
+      ? `the open conflict on ${field} is between ${joinList(values)}`
+      : `${field} carries an open conflict with no competing values recorded`;
+
+  const clauses: string[] = [head];
+
+  const impact = isImmaterial(c)
+    ? `the engine reads it as immaterial: the verdict is unchanged under ${
+        values.length > 2 ? 'any of the competing values' : 'either value'
+      }`
+    : 'the verdict may change once it is settled';
+  const rules = [...c.affectedRules];
+  clauses.push(
+    rules.length > 0 && rules.length <= 3
+      ? `${joinList(rules)} depend${rules.length === 1 ? 's' : ''} on it, and ${impact}`
+      : impact,
+  );
+
+  const others = open.length - 1;
+  if (others > 0) {
+    // Spelled out: a bare count would land in `numbers` as another `n<i>` key
+    // for no gain, and the guard would then police a number nobody cites.
+    clauses.push(
+      `${countWord(others)} other open ${others === 1 ? 'contradiction is' : 'contradictions are'} recorded`,
+    );
+  }
+
+  return `${capitalize(clauses.join('; '))}.`;
+}
+
+const COUNT_WORD: readonly string[] = [
+  'no',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+];
+
+function countWord(n: number): string {
+  return COUNT_WORD[n] ?? String(n);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -495,6 +623,7 @@ export function explain(input: ExplainInput): Explanation {
   const sentences = [
     headline(input),
     factorSentence(result),
+    contradictionSentence(result),
     recommendationSentence(result, recommendation),
   ].filter((s): s is string => s !== null && s.length > 0);
   const text = sentences.join(' ');

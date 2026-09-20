@@ -220,14 +220,16 @@ describe('AggregatePage', () => {
     // Knockout labels are title-cased factor ids.
     expect(screen.getByTestId('bar-building_age').textContent).toContain('Building Age');
 
-    // 40 scored submissions across ten buckets
-    expect(screen.getByText('40 scored submissions')).toBeTruthy();
+    // The verdict split and the score distribution now share one "The book" card.
+    expect(screen.getByText('40 submissions · 40 scored')).toBeTruthy();
     expect(screen.getAllByTestId(/^column-/)).toHaveLength(10);
 
-    const flip = screen.getByTestId('flip-s-1');
-    expect(within(flip).getByRole('link', { name: 'Open Acme Storage LLC' }).getAttribute('href')).toBe('/submissions/s-1');
-    expect(flip.textContent).toContain('$180,000');
-    expect(flip.textContent).toContain('Confirm quoted premium');
+    // The one-flip list is a DataTable now, so find its row by the insured link.
+    const flipLink = screen.getByRole('link', { name: 'Open Acme Storage LLC' });
+    expect(flipLink.getAttribute('href')).toBe('/submissions/s-1');
+    const flip = flipLink.closest('tr');
+    expect(flip?.textContent).toContain('$180,000');
+    expect(flip?.textContent).toContain('Confirm quoted premium');
 
     expect(screen.getByTestId('verify-differentialCasesRun').textContent).toContain('10,000,000');
     expect(screen.getByTestId('verify-disagreements').textContent).toContain('0');

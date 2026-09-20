@@ -125,7 +125,7 @@ export type AnyGenerateJsonRequest = GenerateJsonRequest<unknown>;
 export interface LlmProvider {
   /** `gemini`, `fake`, and nothing else in phase 1. */
   readonly name: string;
-  /** False when `GEMINI_API_KEY` is unset. The API still starts (PRD §9.1). */
+  /** False when `ANTHROPIC_API_KEY` is unset. The API still starts (PRD §9.1). */
   readonly configured: boolean;
   generateJson<T>(request: GenerateJsonRequest<T>): Promise<GenerateJsonResult<T>>;
 }

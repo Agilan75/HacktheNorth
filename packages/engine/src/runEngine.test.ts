@@ -312,6 +312,61 @@ describe('runEngine flip agrees with the verdict (R1-2)', () => {
     expect(r.verdict.distanceToAppetite).toBeNull();
   });
 
+  /*
+   * The bonus criterion, end to end on the engine: a value that only an
+   * external API can supply changes the verdict. `perfect()` is FIT on every
+   * guideline factor; adding a FEMA flood zone to its location — which is what
+   * the OpenFEMA enrichment writes, and which Federato's schema cannot hold —
+   * refers it, and the appetite score is untouched because an extension rule
+   * carries no weight.
+   */
+  it('an enriched FEMA flood zone refers an otherwise-FIT account, without touching its score', () => {
+    const base = runEngine({ submission: perfect(), asOf: AS_OF }, CONFIG);
+    expect(base.verdict.verdict).toBe('FIT');
+
+    const flooded: CanonicalSubmission = {
+      ...perfect(),
+      locations: perfect().locations.map((l) => ({
+        ...l,
+        floodZone: [{ value: 'AE', provenance: { source: 'enrichment' } }],
+      })),
+    };
+    const r = runEngine({ submission: flooded, asOf: AS_OF }, CONFIG);
+
+    expect(r.rollup.worstFloodZoneTier).toBe(1);
+    expect(r.evaluate.knockout).toBe(false);
+    expect(r.evaluate.firedRules.map((f) => f.ruleId)).toContain('X-FLOOD-SFHA');
+    expect(r.verdict.verdict).toBe('REFER');
+    // The appetite score is Federato's document alone: an extension rule may
+    // refer an account but may never move the number.
+    expect(r.evaluate.appetiteScore).toBe(base.evaluate.appetiteScore);
+    // The building cannot leave the flood plain, so no flip may propose it.
+    expect(r.flip.flip).toBeNull();
+    expect(r.flip.blockedByImmovable).toContain('worstFloodZoneTier');
+  });
+
+  it('a coastal V zone refers on its own rule, and a dry zone changes nothing', () => {
+    const zoned = (zone: string): CanonicalSubmission => ({
+      ...perfect(),
+      locations: perfect().locations.map((l) => ({
+        ...l,
+        floodZone: [{ value: zone, provenance: { source: 'enrichment' } }],
+      })),
+    });
+
+    const coastal = runEngine({ submission: zoned('VE'), asOf: AS_OF }, CONFIG);
+    expect(coastal.rollup.worstFloodZoneTier).toBe(2);
+    expect(coastal.evaluate.firedRules.map((f) => f.ruleId)).toContain('X-FLOOD-COASTAL');
+    expect(coastal.verdict.verdict).toBe('REFER');
+
+    // Zone X is outside the mapped hazard: the account stays exactly as it was.
+    const dry = runEngine({ submission: zoned('X'), asOf: AS_OF }, CONFIG);
+    expect(dry.rollup.worstFloodZoneTier).toBe(0);
+    expect(dry.evaluate.firedRules.map((f) => f.ruleId)).toContain('X-FLOOD-MINIMAL');
+    expect(dry.verdict.verdict).toBe('FIT');
+    expect(dry.flip.flip?.moves).toEqual([]);
+  });
+
   // flip.ts builds its candidate bounds from the base rulebook only, so a
   // movable extension refer yields no flip (null), never a zero-move FIT.
   it('REFER only on a movable extension rule (X-SPRINKLER-LARGE-UNPROTECTED): no zero-distance flip', () => {

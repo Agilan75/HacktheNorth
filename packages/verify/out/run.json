@@ -1,6 +1,6 @@
 {
-  "startedAt": "2026-09-19T15:52:09.876Z",
-  "finishedAt": "2026-09-19T16:38:04.459Z",
+  "startedAt": "2026-09-20T10:00:34.817Z",
+  "finishedAt": "2026-09-20T10:38:29.929Z",
   "config": {
     "total": 10000000,
     "seed": 20260919,
@@ -9,11 +9,11 @@
     "maxDisagreements": 0,
     "outDir": "/Users/calebchincalebchin/hackthenorth/packages/verify/out"
   },
-  "completed": 10000000,
+  "completed": 1257983,
   "invariantViolations": 0,
   "disagreements": 0,
   "errors": 0,
-  "casesPerSecond": 3630.500562341317,
+  "casesPerSecond": 552.9471417328645,
   "firstViolations": [],
   "firstDisagreements": []
 }

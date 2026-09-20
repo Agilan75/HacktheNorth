@@ -46,9 +46,13 @@ const HOSTILE: NaiveInput[] = [
 describe('vector invariants', () => {
   it('B1 vector: T-SPAN writes the building_age tier into components 5 and 6', () => {
     const v = engineVectorForInput(B1);
-    expect(v.x).toEqual([1, 1, 2, 150_000_000, 175_000, 0, 0, 0.5, 100_000, null, null]);
+    // The three trailing nulls are the extension-only components: sprinklers,
+    // protection class and the flood zone. The generator sets none of them, so
+    // the extension rules never fire in the differential and the naive twin
+    // needs no flood logic to mirror.
+    expect(v.x).toEqual([1, 1, 2, 150_000_000, 175_000, 0, 0, 0.5, 100_000, null, null, null]);
     expect(v.t.slice(0, 9)).toEqual([1, 1, 1, 0.6, 0.6, 0.6, 0.6, 1, 1]);
-    expect(v.m).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0]);
+    expect(v.m).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0]);
   });
 
   it('scaling: stateTier divides by 2, missing stays null, log components clamp into [0, 1]', () => {

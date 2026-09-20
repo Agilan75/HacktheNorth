@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config';
 const root = fileURLToPath(new URL('.', import.meta.url));
 
 // Node 24 built-in .env loader. No dotenv dependency (PRD §5 constraints).
-// Live tests (RUN_LIVE=1) need GEMINI_API_KEY / FEDERATO_* from the repo-root .env.
+// Live tests (RUN_LIVE=1) need ANTHROPIC_API_KEY / FEDERATO_* from the repo-root .env.
 const envFile = `${root}.env`;
 if (existsSync(envFile)) {
   try {

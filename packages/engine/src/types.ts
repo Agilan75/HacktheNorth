@@ -340,6 +340,22 @@ export interface Rollup {
   readonly pctTivSprinklered: number | null;
   /** TIV-weighted mean, 1..10. */
   readonly tivWeightedProtectionClass: number | null;
+  /**
+   * The worst FEMA flood hazard across the account's locations, as an ordinal:
+   * 0 = outside the mapped hazard (zone X, X500, D or an unrecognised code),
+   * 1 = a Special Flood Hazard Area without a wave hazard (A, AE, AO, AH, AR,
+   * A99), 2 = a coastal SFHA with wave action (V, VE). `null` when no location
+   * states a zone at all.
+   *
+   * The worst rather than a TIV-weighted mean: a single building standing in a
+   * flood zone is the exposure, and averaging it away against dry buildings
+   * would report an account as safer than it is.
+   *
+   * Fed only by `openfema_flood` enrichment today, so an account whose
+   * enrichment has not run scores exactly as before. Read by the extension
+   * rulebook (never by the appetite score) and by the rating table.
+   */
+  readonly worstFloodZoneTier: number | null;
   readonly primaryState: string | null;
   readonly stateShares: readonly StateShare[];
   /** paid indemnity + paid expense + open reserves, within the 5-year window. */
@@ -580,6 +596,25 @@ export interface CommercialRatingTable {
   readonly protectionClass: readonly RatingBand[];
   readonly sprinkler: { readonly sprinklered: number; readonly unsprinklered: number };
   readonly lossHistory: readonly RatingBand[];
+  /**
+   * Flood load by `rollup.worstFloodZoneTier`, applied once per account.
+   *
+   * Unlike every other factor here these are a documented judgement, not a fit:
+   * the 27 real accounts carry too few flood-zone locations to fit against, and
+   * inventing a fitted number from three observations would be worse than
+   * saying so. `minimal` is therefore exactly 1, so an account outside the
+   * mapped hazard — and an account whose flood enrichment has never run —
+   * prices precisely as it did before flood existed, and the fitted MAPE still
+   * describes it. Optional so a table written before flood existed still loads.
+   */
+  readonly flood?: {
+    /** Outside the SFHA (zone X, X500, D). Pinned at 1: no load, no change. */
+    readonly minimal: number;
+    /** Special Flood Hazard Area without wave action (A, AE, AO, AH, AR, A99). */
+    readonly sfha: number;
+    /** Coastal high-hazard zone with wave action (V, VE). */
+    readonly coastal: number;
+  };
   readonly credibilityK: number;
   readonly fitError?: FitError;
   readonly fittedAt?: string;

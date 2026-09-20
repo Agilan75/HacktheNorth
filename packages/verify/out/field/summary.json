@@ -1,0 +1,646 @@
+{
+  "seed": 20260919,
+  "total": 10000000,
+  "generatedAt": "2026-09-20T05:57:20.665Z",
+  "verdicts": [
+    "FIT",
+    "REFER",
+    "DOES_NOT_FIT"
+  ],
+  "factors": [
+    "submission_type",
+    "line_of_business",
+    "primary_risk_state",
+    "tiv",
+    "total_premium",
+    "building_age",
+    "construction_type",
+    "loss_value"
+  ],
+  "strata": [
+    {
+      "key": "contradiction_open",
+      "description": "An open HIGH contradiction forces REFER (V-3) on an otherwise scoreable account."
+    },
+    {
+      "key": "state_tie_break",
+      "description": "I-1: two states carry exactly equal TIV; the alphabetically first code is primary."
+    },
+    {
+      "key": "construction_fire_resistive_decides",
+      "description": "I-3: Fire Resistive / Modified Fire Resistive TIV is what keeps construction Acceptable."
+    },
+    {
+      "key": "age_refer_unknown_tiv_pre1990",
+      "description": "R-AGE-REFER: a pre-1990 building with unknown TIV, so pctTivPre1990 = 0 yet REFER fires."
+    },
+    {
+      "key": "age_pre1990_exact_half",
+      "description": "3.4 / B6: exactly 50% of TIV pre-1990 — Acceptable plus refer, never a knockout."
+    },
+    {
+      "key": "age_pre1990_just_over_half",
+      "description": "3.4 / B7: pre-1990 TIV share just over 0.5 — Not Acceptable, knockout."
+    },
+    {
+      "key": "age_post2010_exact_half",
+      "description": "3.4: exactly 50% of TIV post-2010 — Acceptable, not Target."
+    },
+    {
+      "key": "construction_exact_half",
+      "description": "3.5 / B1: exactly 50% acceptable construction — Acceptable."
+    },
+    {
+      "key": "construction_just_under_half",
+      "description": "3.5 / B5: acceptable construction share just under 0.5 — Not Acceptable."
+    },
+    {
+      "key": "tiv_at_150m",
+      "description": "3.1 / B1: TIV exactly $150M — Acceptable (\"Over $150M\" is strict)."
+    },
+    {
+      "key": "tiv_just_over_150m",
+      "description": "3.1 / B2: TIV just over $150M — Not Acceptable."
+    },
+    {
+      "key": "tiv_at_100m",
+      "description": "3.1: TIV exactly $100M — Target (inclusive)."
+    },
+    {
+      "key": "tiv_at_50m",
+      "description": "3.1 / B9: TIV exactly $50M — Target (inclusive)."
+    },
+    {
+      "key": "premium_just_under_50k",
+      "description": "3.2 / B3: premium just under $50K — Not Acceptable."
+    },
+    {
+      "key": "premium_at_50k",
+      "description": "3.2: premium exactly $50K — Acceptable."
+    },
+    {
+      "key": "premium_at_75k",
+      "description": "3.2 / B9: premium exactly $75K — Target."
+    },
+    {
+      "key": "premium_at_100k",
+      "description": "3.2: premium exactly $100K — Target."
+    },
+    {
+      "key": "premium_at_175k",
+      "description": "3.2 / B1: premium exactly $175K — Acceptable."
+    },
+    {
+      "key": "premium_just_over_175k",
+      "description": "3.2: premium just over $175K — Not Acceptable."
+    },
+    {
+      "key": "loss_at_100k",
+      "description": "3.3 / B1: five-year loss exactly $100,000 — Acceptable (not \"over\")."
+    },
+    {
+      "key": "loss_just_over_100k",
+      "description": "3.3 / B4: five-year loss just over $100,000 — Not Acceptable."
+    },
+    {
+      "key": "loss_zero_known",
+      "description": "I-4: zero claims is a KNOWN loss of 0, not missing."
+    },
+    {
+      "key": "age_refer_minority_pre1990",
+      "description": "R-AGE-REFER: some but under half of TIV pre-1990 — REFER naming the buildings, no knockout."
+    },
+    {
+      "key": "state_multi",
+      "description": "I-1: the account spans several states; primary is the largest TIV share."
+    },
+    {
+      "key": "state_acceptable_tier",
+      "description": "3.6: primary state on the Acceptable-only list (NC, SC, GA, VA, UT)."
+    },
+    {
+      "key": "submission_not_new",
+      "description": "3.7 / B12: renewal or any non-new-business submission type — knockout."
+    },
+    {
+      "key": "line_not_property",
+      "description": "3.8: a non-property line of business — knockout."
+    },
+    {
+      "key": "missing_component",
+      "description": "G-2 / B11: at least one appetite component missing — completeness < 100, REFER."
+    }
+  ],
+  "byVerdict": [
+    139428,
+    937057,
+    8923515
+  ],
+  "byFactor": [
+    [
+      0,
+      82508,
+      0
+    ],
+    [
+      0,
+      5705,
+      2161594
+    ],
+    [
+      4044,
+      63775,
+      1398612
+    ],
+    [
+      56030,
+      277884,
+      1594163
+    ],
+    [
+      50943,
+      286036,
+      645644
+    ],
+    [
+      20095,
+      131465,
+      1684423
+    ],
+    [
+      8316,
+      86415,
+      520149
+    ],
+    [
+      0,
+      2059,
+      578684
+    ],
+    [
+      0,
+      1210,
+      340246
+    ]
+  ],
+  "byStratum": [
+    [
+      8883,
+      95,
+      234067
+    ],
+    [
+      0,
+      104138,
+      795027
+    ],
+    [
+      389,
+      2036,
+      54755
+    ],
+    [
+      2501,
+      10961,
+      301791
+    ],
+    [
+      0,
+      80577,
+      576585
+    ],
+    [
+      0,
+      119435,
+      719887
+    ],
+    [
+      0,
+      0,
+      628880
+    ],
+    [
+      37156,
+      93110,
+      782543
+    ],
+    [
+      38506,
+      116295,
+      781199
+    ],
+    [
+      0,
+      0,
+      701775
+    ],
+    [
+      5481,
+      20878,
+      168396
+    ],
+    [
+      0,
+      0,
+      118647
+    ],
+    [
+      5482,
+      21202,
+      168480
+    ],
+    [
+      5346,
+      21060,
+      168973
+    ],
+    [
+      0,
+      0,
+      77584
+    ],
+    [
+      4154,
+      16408,
+      95676
+    ],
+    [
+      4278,
+      16311,
+      95840
+    ],
+    [
+      4242,
+      16438,
+      96059
+    ],
+    [
+      4268,
+      16249,
+      95726
+    ],
+    [
+      0,
+      0,
+      77824
+    ],
+    [
+      7623,
+      38825,
+      277979
+    ],
+    [
+      0,
+      0,
+      208070
+    ],
+    [
+      5218,
+      24816,
+      389920
+    ],
+    [
+      0,
+      45431,
+      411903
+    ],
+    [
+      23,
+      25,
+      15049
+    ],
+    [
+      5761,
+      22111,
+      262311
+    ],
+    [
+      98,
+      2042,
+      232366
+    ],
+    [
+      19,
+      992,
+      134739
+    ],
+    [
+      0,
+      147622,
+      251464
+    ]
+  ],
+  "scoreHistogram": [
+    [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      13968,
+      0,
+      0,
+      0,
+      7115,
+      0,
+      38476,
+      0,
+      0,
+      0,
+      19663,
+      0,
+      32094,
+      0,
+      0,
+      0,
+      15752,
+      0,
+      8316,
+      0,
+      0,
+      0,
+      4044
+    ],
+    [
+      82508,
+      0,
+      0,
+      0,
+      0,
+      0,
+      760,
+      0,
+      0,
+      1894,
+      3729,
+      0,
+      0,
+      0,
+      0,
+      3910,
+      2175,
+      0,
+      921,
+      5886,
+      4106,
+      1829,
+      0,
+      0,
+      4289,
+      12541,
+      2363,
+      172,
+      3290,
+      7458,
+      7090,
+      6036,
+      0,
+      1764,
+      15377,
+      15656,
+      2556,
+      668,
+      4496,
+      7988,
+      17926,
+      6703,
+      204,
+      6617,
+      20743,
+      10749,
+      5855,
+      1048,
+      3862,
+      14895,
+      23293,
+      3688,
+      921,
+      10849,
+      14533,
+      12375,
+      7778,
+      1065,
+      4936,
+      24472,
+      15701,
+      2900,
+      2244,
+      11074,
+      9332,
+      20485,
+      5173,
+      729,
+      11275,
+      27870,
+      5710,
+      5499,
+      4308,
+      6283,
+      19199,
+      25688,
+      786,
+      0,
+      45311,
+      9187,
+      12949,
+      7526,
+      13269,
+      0,
+      100397,
+      3330,
+      3129,
+      0,
+      36788,
+      0,
+      78535,
+      0,
+      0,
+      0,
+      31451,
+      0,
+      20287,
+      0,
+      0,
+      0,
+      8668
+    ],
+    [
+      17657,
+      0,
+      0,
+      0,
+      0,
+      0,
+      8823,
+      0,
+      0,
+      24057,
+      43443,
+      0,
+      0,
+      0,
+      0,
+      46577,
+      23152,
+      0,
+      10888,
+      71856,
+      44548,
+      20014,
+      0,
+      0,
+      53191,
+      145808,
+      24503,
+      1764,
+      40195,
+      94408,
+      82120,
+      66713,
+      0,
+      22164,
+      210523,
+      197172,
+      30259,
+      8279,
+      67489,
+      113559,
+      259879,
+      95749,
+      3354,
+      112049,
+      375020,
+      161165,
+      87631,
+      16508,
+      68108,
+      289531,
+      461575,
+      61456,
+      20611,
+      242117,
+      310534,
+      251419,
+      159663,
+      15773,
+      100827,
+      582067,
+      325205,
+      61462,
+      50818,
+      218887,
+      198515,
+      479462,
+      99040,
+      5180,
+      196603,
+      466121,
+      118175,
+      123663,
+      49792,
+      66151,
+      275949,
+      337268,
+      18121,
+      0,
+      134550,
+      100517,
+      166974,
+      78771,
+      0,
+      0,
+      108516,
+      34001,
+      37376,
+      0,
+      0,
+      0,
+      28200,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  ],
+  "fromSubmission": 999999,
+  "onThreshold": 6886278
+}

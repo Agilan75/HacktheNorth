@@ -131,6 +131,10 @@ describe('collectNeededFields — commercial', () => {
       'history[].paidIndemnity',
       'history[].reserves',
       'lineOfBusiness',
+      // Needed by the flood extension rules and the flood rating load. Federato
+      // carries no flood field, so it can only ever arrive from enrichment —
+      // the planner says so rather than dropping the dependency.
+      'locations[].floodZone',
       'locations[].protectionClass',
       'locations[].state',
       'pricing.quotedPremium',
@@ -416,12 +420,19 @@ describe('locateFields', () => {
     const r = await locateFields({ ...base, needed });
     // The mini (and live) Building has no protection class; Location does.
     // That stays visibly unmapped, with the Location field as the rejected guess.
-    expect(r.unmapped.map((u) => u.canonicalPath)).toEqual(['buildings[].protectionClass']);
+    // Federato's schema has no flood field at all, so the flood zone can only
+    // ever come from enrichment and stays unmapped on purpose: the planner
+    // records the gap instead of pretending the carrier supplies it.
+    expect(r.unmapped.map((u) => u.canonicalPath)).toEqual([
+      'buildings[].protectionClass',
+      'locations[].floodZone',
+    ]);
     expect(r.fieldMap.unmapped[0]).toMatchObject({
       rawPath: 'Location.protection_class',
       bestGuess: { canonicalPath: 'buildings[].protectionClass', confidence: 0.6 },
     });
-    expect(r.located).toHaveLength(needed.length - 1);
+    // Two of the needed fields are unmapped, so the rest are located.
+    expect(r.located).toHaveLength(needed.length - 2);
     const by = new Map(r.located.map((l) => [l.canonicalPath, l]));
     expect(by.get('history[].dateOfLoss')?.schemaPath).toBe('claims.date_of_loss');
     expect(by.get('history[].dateOfLoss')?.crossesArray).toBe(true);

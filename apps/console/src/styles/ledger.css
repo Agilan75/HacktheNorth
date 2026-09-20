@@ -1,0 +1,202 @@
+/* ======================================================================= */
+/* The underwriter's ledger                                                 */
+/* ======================================================================= */
+
+/*
+ * One visual idea over the whole console: the paperwork underwriting already
+ * had. Verdicts are rubber stamps, tables are ruled ledger sheets, rule ids
+ * are typed file tabs, and an interpretation is a red-pen note in the margin.
+ * Loaded after base.css, so everything here overrides it by source order, so the atoms
+ * keep their class names and markup.
+ *
+ * Not in tokens.css or base.css: the first is generated and tested for drift,
+ * the second is tested to hold no raw colour. These are console-only.
+ */
+:root {
+  --rf-sheet: #F3EFE2;
+  --rf-rule: #C9C4B2;
+  --rf-rule-faint: #E2DDCC;
+  --rf-tab: #EADFB8;
+  --rf-tab-edge: #B9A96C;
+  --rf-font-stamp: Oswald, 'Avenir Next Condensed', 'Arial Narrow', Impact, sans-serif;
+  --rf-font-type: 'Courier Prime', 'Courier New', Courier, monospace;
+  --rf-font-pen: Caveat, 'Bradley Hand', 'Segoe Print', cursive;
+  /* Patchy ink: a thresholded noise tile, rasterised once and reused as a mask. */
+  --rf-ink-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='90'%3E%3Cfilter id='n' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.04 .09' numOctaves='3' seed='7'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -1.7 1.8'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* --------------------------------------------------------- Verdict stamp */
+
+.rf-pill {
+  gap: 6px;
+  padding: 5px 10px 4px;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+  outline: 1px solid currentColor;
+  outline-offset: 2px;
+  margin: 3px;
+  background: transparent;
+  font-family: var(--rf-font-stamp);
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transform: rotate(-2deg);
+  -webkit-mask-image: var(--rf-ink-mask);
+  mask-image: var(--rf-ink-mask);
+  -webkit-mask-size: 180px 90px;
+  mask-size: 180px 90px;
+}
+.rf-pill__mark { display: none; }
+.rf-pill__detail {
+  font-family: var(--rf-font-type);
+  font-size: var(--rf-size-micro);
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+.rf-pill--fit { background: transparent; border-color: currentColor; color: var(--rf-red-deep); }
+.rf-pill--refer { background: transparent; border-color: currentColor; color: var(--rf-blue-deep); }
+.rf-pill--does-not-fit { background: transparent; border-color: currentColor; color: var(--rf-ink); }
+/* No two stamps land at the same angle, and the ink never gaps in the same place. */
+tr:nth-child(3n + 1) .rf-pill { transform: rotate(1.5deg); -webkit-mask-position: 40px 20px; mask-position: 40px 20px; }
+tr:nth-child(3n + 2) .rf-pill { transform: rotate(-3deg); -webkit-mask-position: 95px 55px; mask-position: 95px 55px; }
+tr:nth-child(5n) .rf-pill { transform: rotate(2.5deg); -webkit-mask-position: 130px 10px; mask-position: 130px 10px; }
+
+/* ----------------------------------------------------------- Ledger sheet */
+
+.rf-card {
+  background: var(--rf-sheet);
+  border: 1px solid var(--rf-rule);
+  border-radius: 0;
+  /* The sheet underneath, showing at the corner. */
+  box-shadow: 3px 3px 0 -1px var(--rf-sheet), 3px 3px 0 0 var(--rf-rule);
+}
+.rf-card__header {
+  padding-bottom: var(--rf-space-sm);
+  border-bottom: 2px solid var(--rf-ink);
+}
+.rf-card__aside {
+  font-family: var(--rf-font-type);
+  font-size: var(--rf-size-micro);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* Inline `borderRadius: RADIUS.card` is everywhere in the pages; a ledger has
+   square corners. Buttons and form controls keep theirs. */
+.rf-main [style*='border-radius: 16px'] { border-radius: 2px !important; }
+
+hr { border-top-color: var(--rf-rule); }
+th,
+td { border-bottom-color: var(--rf-rule-faint); }
+thead th,
+.rf-table thead th {
+  font-size: 11px;
+  line-height: var(--rf-leading-micro);
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.rf-table th,
+.rf-table td { border-bottom-color: var(--rf-rule-faint); }
+
+/* The shared DataTable: a ruled sheet with the ledger's double red margin. */
+.rf-ledger {
+  box-sizing: border-box;
+  background: var(--rf-sheet);
+  border: 1px solid var(--rf-rule);
+  box-shadow: 3px 3px 0 -1px var(--rf-sheet), 3px 3px 0 0 var(--rf-rule);
+}
+.rf-ledger caption {
+  padding: var(--rf-space-md) var(--rf-space-lg) var(--rf-space-sm) !important;
+  border-bottom: 2px solid var(--rf-ink);
+}
+.rf-ledger thead th { border-bottom: 1px solid var(--rf-ink) !important; }
+.rf-ledger tbody td { border-bottom-color: var(--rf-rule) !important; vertical-align: middle !important; }
+.rf-ledger tbody tr:last-child td { border-bottom: 0 !important; }
+.rf-ledger th:first-child,
+.rf-ledger td:first-child {
+  border-right: 1px solid var(--rf-red);
+  box-shadow: 3px 0 0 var(--rf-sheet), 4px 0 0 var(--rf-red);
+  padding-right: var(--rf-space-md) !important;
+}
+.rf-ledger th:nth-child(2),
+.rf-ledger td:nth-child(2) { padding-left: var(--rf-space-lg) !important; }
+/* Figures are typed, so the columns line up like an adding-machine tape. */
+.rf-ledger td[data-align='right'],
+.rf-ledger td[data-align='right'] span {
+  font-family: var(--rf-font-type);
+  font-variant-numeric: tabular-nums;
+}
+.rf-ledger tr[data-clickable='true']:hover,
+.rf-ledger tr[data-clickable='true']:focus-visible { background: var(--rf-paper); }
+/* A clickable row is role=button; it must not inherit the button shell. */
+tr[role='button'] { border-radius: 0; border-left: 0; border-right: 0; border-top: 0; background: transparent; }
+
+/* ------------------------------------------------------- Typed labels, tabs */
+
+.rf-badge {
+  padding: 1px 6px 0;
+  border-radius: 2px;
+  border-color: var(--rf-rule);
+  font-family: var(--rf-font-type);
+  font-size: 12px;
+  letter-spacing: 0.03em;
+}
+.rf-badge--quiet { border-style: dashed; }
+
+/* A rule id is a filing reference: a typed manila tab, wherever it is cited. */
+.rf-rule-tab {
+  display: inline-block;
+  padding: 4px 11px 3px;
+  background: var(--rf-tab);
+  border: 1px solid var(--rf-tab-edge);
+  border-bottom: 0;
+  clip-path: polygon(7px 0, calc(100% - 7px) 0, 100% 100%, 0 100%);
+  font-family: var(--rf-font-type);
+  font-size: 12px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--rf-ink);
+  white-space: nowrap;
+}
+code,
+.rf-code { font-family: var(--rf-font-type); }
+
+.rf-citation { border-left: 1px solid var(--rf-red); box-shadow: inset 3px 0 0 var(--rf-sheet), inset 4px 0 0 var(--rf-red); padding-left: var(--rf-space-lg); }
+
+/* ------------------------------------------------------- Red-pen margin note */
+
+.rf-margin-note {
+  display: block;
+  font-family: var(--rf-font-pen);
+  font-size: 19px;
+  line-height: 1.1;
+  font-weight: 500;
+  color: var(--rf-red-deep);
+  text-decoration: none;
+  transform: rotate(-1.2deg);
+  transform-origin: left center;
+}
+.rf-margin-note::before { content: '\2190\00a0'; }
+.rf-margin-note:hover { text-decoration: underline; text-underline-offset: 3px; }
+.rf-margin-note + .rf-margin-note { margin-top: var(--rf-space-sm); }
+
+/* ------------------------------------------------------------------- Nav */
+
+.rf-nav-link {
+  border-radius: 2px !important;
+  background: transparent !important;
+  text-decoration: none !important;
+  font-size: var(--rf-size-small);
+  letter-spacing: 0.02em;
+  box-shadow: inset 0 -2px 0 transparent;
+}
+.rf-nav-link:hover { box-shadow: inset 0 -2px 0 var(--rf-rule); }
+.rf-nav-link[aria-current='page'] { box-shadow: inset 0 -2px 0 var(--rf-ink); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .rf-pill { transition: transform 0.15s ease; }
+  tr[data-clickable='true']:hover .rf-pill { transform: rotate(0deg) scale(1.04); }
+}

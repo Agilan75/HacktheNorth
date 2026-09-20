@@ -35,6 +35,52 @@ Do these in order, before judges arrive. Every command runs from the repo root, 
 
 ---
 
+## Cut 0: the finale, first (`/tour#brief`)
+
+**This is the one to lead with if you only get five minutes.** Open
+http://127.0.0.1:5173/tour, scroll past the room film to the last dossier
+section, **The brief, answered**, or click its chip in the section index.
+
+Say: *"Now that you know how it works, let's watch it work."*
+
+1. Click **Run the agent on the live queue**. The four planner queries appear
+   one at a time with their real row counts and durations — triage over
+   Submission returns 158, the deep pass over Policy returns 27, the no-policy
+   pass 11, the high-scorer pass 1 — and it finishes with **158 submissions
+   scored in about 9 s**. The banner reads `LIVE`. The ranked list below then
+   rebuilds itself from the run that just happened.
+   - **If the run cannot start or stalls**, the strip flips itself to an amber
+     `REPLAY — a stored run, not a live one` banner and completes from the trace
+     stored on the account, at its recorded timings. Say so out loud; the page
+     already does. Nothing needs doing.
+2. Walk the four rows. Each quotes one requirement from the brief verbatim and
+   answers it with the same panel the account page uses:
+   - **1** the 8 weighted factors, each quoting its `APPETITE_GUIDELINES.pdf`
+     row with the page and section, summing to 88/100.
+   - **2** the query trace: the goal, the rules that needed the field, the path
+     chosen and **why**, and the roads not taken — *"only 113 of 158
+     submissions have a policy, so triaging on Policy would silently lose the
+     ones that never bound."*
+   - **3** all 158 ranked, every explanation in full, filterable by verdict.
+   - **4** the rank-1 explanation in the brief's own `Policy #42: SCORE 87/100`
+     shape, then three deliberately awkward accounts, then the contradictions
+     panel showing both received dates with their sources.
+3. Open **Graded against the brief**. Every criterion reads Yes; say the line
+   the page says — *"a ledger of nothing but passes is a marketing document"* —
+   and scroll to **What we would tell you if you asked**, which is where the
+   real caveats live: two of the three external APIs still feed no decision, the
+   flood load is a judgement rather than a fit, pagination is limit-only, no live
+   account has a minimal flip, and reply-extraction accuracy was never measured.
+
+If a judge asks what enrichment actually changed: FEMA's flood zone is a field
+**Federato's schema does not have** — row 2 shows the planner reporting it
+unmapped — and it now refers an account and loads its premium 15% (inland) or
+35% (coastal). On this book that repriced 13 accounts and moved 19 of the 27 on
+rank or price. Dry accounts are pinned at a load of exactly 1, so the rank-1
+account is untouched.
+
+---
+
 ## Cut 1: Federato + Rox (console)
 
 ### 1. The agent's reasoning trail (show this first)
@@ -87,6 +133,7 @@ Then switch to **SUB-2025-00042, Anchor Transport LLC**, panel (g), the flip pan
 
 - **Price adequacy** (panel (d) on Coastal Freight): "Quoted $58,800 against a predicted $62,725, factor by factor."
 - **Peers** (panel (d), **Peer benchmark**): "The five nearest accounts in the book, with distance, rate and losses."
+- **Accept or decline** (panel (k) on any account, under **Your decision**): "The underwriter can act, not just read. And the decision is recorded *beside* the engine's verdict, never over it — the verdict, its deciding rule and its score stay exactly as computed, and the page says both what the rulebook concluded and what the person did. A verdict someone could quietly overwrite would stop tracing to a guideline row, which is the whole point."
 - **Verification**: "We checked the engine against its own invariants and against a separately written naive implementation. The 100K run found 0 violations and 0 disagreements, and the 10M results are in VERIFICATION.md. A second model, given only the guideline text and the facts, agreed on 1,331 of 1,332 cases, and on all 38 real property accounts. The one disagreement is exactly-50% construction, which the PDF leaves open. These tests found real bugs: the first run had 20,662 invariant violations, and review of real data found 39 defects. All are fixed."
 
 ---

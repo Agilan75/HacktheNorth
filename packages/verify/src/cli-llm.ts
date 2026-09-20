@@ -84,13 +84,13 @@ export async function main(argv: readonly string[]): Promise<number> {
 
   let llm: LlmProvider;
   try {
-    llm = deps.llm ?? createAppLlm({ geminiApiKey: getEnv().GEMINI_API_KEY, anthropicApiKey: getEnv().ANTHROPIC_API_KEY, anthropicWorkspaceId: getEnv().ANTHROPIC_WORKSPACE_ID });
+    llm = deps.llm ?? createAppLlm({ anthropicApiKey: getEnv().ANTHROPIC_API_KEY, anthropicWorkspaceId: getEnv().ANTHROPIC_WORKSPACE_ID });
   } catch (error) {
     log(`verify:llm: could not read configuration: ${messageOf(error)}`);
     return 2;
   }
   if (!llm.configured) {
-    log('verify:llm: GEMINI_API_KEY is not set, so layer C cannot run. Set it in .env and rerun.');
+    log('verify:llm: ANTHROPIC_API_KEY is not set, so layer C cannot run. Set it in .env and rerun.');
     return 2;
   }
 

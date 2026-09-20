@@ -26,7 +26,7 @@ export function buildDeps(): Deps {
   const handle = createDb({ url: env.DATABASE_URL });
   currentHandle = handle;
   const adapter = createAdapter({ env: federatoEnv(env) });
-  const llm = createAppLlm({ geminiApiKey: env.GEMINI_API_KEY, anthropicApiKey: env.ANTHROPIC_API_KEY, anthropicWorkspaceId: env.ANTHROPIC_WORKSPACE_ID });
+  const llm = createAppLlm({ anthropicApiKey: env.ANTHROPIC_API_KEY, anthropicWorkspaceId: env.ANTHROPIC_WORKSPACE_ID });
   return { db: handle.db, adapter, llm, clock: systemClock() };
 }
 

@@ -1,1 +1,1 @@
-{"version":3,"file":"SubmissionPage.d.ts","sourceRoot":"","sources":["../../src/pages/SubmissionPage.tsx"],"names":[],"mappings":"AACA,OAAO,KAAK,EAAa,YAAY,EAAa,MAAM,OAAO,CAAC;AAkVhE;;;;;GAKG;AACH,wBAAgB,cAAc,IAAI,YAAY,CAiR7C"}
+{"version":3,"file":"SubmissionPage.d.ts","sourceRoot":"","sources":["../../src/pages/SubmissionPage.tsx"],"names":[],"mappings":"AACA,OAAO,KAAK,EAA4B,YAAY,EAAa,MAAM,OAAO,CAAC;AA0nB/E;;;;GAIG;AACH,wBAAgB,cAAc,IAAI,YAAY,CAiX7C"}

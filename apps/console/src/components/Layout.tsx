@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router';
+import { Link, NavLink } from 'react-router';
 import type { CSSProperties, ReactElement, ReactNode } from 'react';
 
 import { cssVar, MIN_TOUCH_TARGET, RADIUS, SPACE } from '@retrofit/design';
@@ -113,7 +113,12 @@ export function Layout(props: LayoutProps): ReactElement {
         Skip to content
       </a>
       <header style={headerStyle}>
-        <p style={brandStyle}>Retrofit</p>
+        <p style={brandStyle}>
+          {/* The wordmark is the home affordance; there is no "Home" nav pill. */}
+          <Link to="/" className="rf-brand-link" aria-label="Retrofit — home">
+            Retrofit
+          </Link>
+        </p>
         <nav aria-label="Primary" style={{ flex: '1 1 auto' }}>
           <ul style={navListStyle}>
             {nav.map((item) => (

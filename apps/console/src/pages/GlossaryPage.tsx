@@ -1,9 +1,11 @@
-import { useId, useMemo, useState } from 'react';
+import { useId, useMemo } from 'react';
 import type { CSSProperties, ReactElement } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router';
 
 import { pluralize } from '@retrofit/contracts';
 import { cssVar, MIN_TOUCH_TARGET, RADIUS, SPACE } from '@retrofit/design';
 
+import { ROUTES } from '../routes.js';
 import type { GlossaryResponse } from '../api/client.js';
 import { useApi } from '../api/useApi.js';
 import { Skeleton } from '../components/atoms/Skeleton.js';
@@ -24,6 +26,17 @@ function anchorFor(term: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
   return `glossary-${slug || 'term'}`;
+}
+
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+function letterOf(term: string): string {
+  const first = term.trim().charAt(0).toUpperCase();
+  return LETTERS.includes(first) ? first : '#';
+}
+
+function letterAnchor(letter: string): string {
+  return `glossary-letter-${letter === '#' ? 'other' : letter.toLowerCase()}`;
 }
 
 /**
@@ -47,10 +60,81 @@ function filterEntries(entries: readonly GlossaryEntry[], query: string): readon
   return scored.map((s) => s.entry);
 }
 
+interface LetterGroup {
+  readonly letter: string;
+  readonly entries: readonly GlossaryEntry[];
+}
+
+/** Groups in display order. A search reorders within a letter but never across. */
+function groupByLetter(entries: readonly GlossaryEntry[]): readonly LetterGroup[] {
+  const buckets = new Map<string, GlossaryEntry[]>();
+  for (const entry of entries) {
+    const letter = letterOf(entry.term);
+    const bucket = buckets.get(letter);
+    if (bucket === undefined) buckets.set(letter, [entry]);
+    else bucket.push(entry);
+  }
+  const order = [...LETTERS, '#'];
+  return order
+    .filter((letter) => buckets.has(letter))
+    .map((letter) => ({ letter, entries: buckets.get(letter) ?? [] }));
+}
+
+/* --------------------------------------------------------------- the way back */
+
+/**
+ * Only the console's own pages; anything else (or no referrer) shows nothing.
+ * Read lazily: App.tsx imports this module before it defines `ROUTES`, so a
+ * module-scope read would see `undefined`.
+ */
+function backLabels(): readonly { readonly path: string; readonly label: string }[] {
+  return [
+    { path: ROUTES.queue, label: 'the queue' },
+    { path: ROUTES.actions, label: 'actions' },
+    { path: ROUTES.rules, label: 'rules' },
+    { path: ROUTES.aggregate, label: 'the aggregate' },
+    { path: ROUTES.verification, label: 'verification' },
+    { path: ROUTES.explore, label: 'explore' },
+  ];
+}
+
+interface BackLink {
+  readonly to: string;
+  readonly label: string;
+}
+
+function labelForPath(pathname: string): BackLink | null {
+  if (pathname.startsWith('/submissions/')) return { to: pathname, label: 'the submission' };
+  const hit = backLabels().find((row) => row.path === pathname);
+  return hit === undefined ? null : { to: hit.path, label: hit.label };
+}
+
+function readBackLink(state: unknown): BackLink | null {
+  const bag = typeof state === 'object' && state !== null ? (state as Record<string, unknown>) : {};
+  if (typeof bag.from === 'string' && bag.from.startsWith('/')) {
+    const [pathname] = bag.from.split('?');
+    const hit = labelForPath(pathname ?? '');
+    if (hit !== null) return { to: bag.from, label: hit.label };
+  }
+  try {
+    if (typeof document === 'undefined' || typeof window === 'undefined') return null;
+    const ref = document.referrer;
+    if (typeof ref !== 'string' || ref === '') return null;
+    const url = new URL(ref, window.location.href);
+    if (url.origin !== window.location.origin) return null;
+    const hit = labelForPath(url.pathname);
+    return hit === null ? null : { to: `${url.pathname}${url.search}`, label: hit.label };
+  } catch {
+    return null;
+  }
+}
+
+/* --------------------------------------------------------------- styles */
+
 const pageStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
-  gap: SPACE.xl,
+  gap: SPACE.lg,
   fontFamily: cssVar('font-body'),
   color: cssVar('ink'),
 };
@@ -62,7 +146,7 @@ const titleStyle: CSSProperties = {
   lineHeight: cssVar('leading-title'),
 };
 
-const leadStyle: CSSProperties = {
+const mutedStyle: CSSProperties = {
   margin: `${SPACE.xs}px 0 0`,
   color: cssVar('muted-deep'),
   fontSize: cssVar('size-small'),
@@ -90,56 +174,107 @@ const inputStyle: CSSProperties = {
   fontSize: cssVar('size-body'),
 };
 
-const listStyle: CSSProperties = {
-  margin: 0,
+const jumpBarStyle: CSSProperties = {
+  position: 'sticky',
+  top: 0,
+  zIndex: 2,
   display: 'flex',
-  flexDirection: 'column',
-  gap: SPACE.lg,
+  flexWrap: 'wrap',
+  gap: SPACE.xs,
+  padding: `${SPACE.sm}px 0`,
+  background: cssVar('paper'),
+  borderBottom: `${cssVar('border-width')} solid ${cssVar('border-color')}`,
+};
+
+const jumpBase: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minWidth: 28,
+  minHeight: 28,
+  padding: `0 ${SPACE.xs}px`,
+  borderRadius: RADIUS.pill,
+  fontSize: cssVar('size-micro'),
+  lineHeight: cssVar('leading-micro'),
+  fontVariantNumeric: 'tabular-nums',
+};
+
+const jumpActive: CSSProperties = { ...jumpBase, color: cssVar('ink'), textDecoration: 'none', fontWeight: 600 };
+const jumpMuted: CSSProperties = { ...jumpBase, color: cssVar('muted'), opacity: 0.5 };
+
+const groupHeadingStyle: CSSProperties = {
+  margin: 0,
+  fontFamily: cssVar('font-body'),
+  fontSize: cssVar('size-micro'),
+  lineHeight: cssVar('leading-micro'),
+  letterSpacing: '0.08em',
+  color: cssVar('muted-deep'),
+  fontWeight: 600,
+  scrollMarginTop: SPACE.xxl,
+};
+
+const gridStyle: CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+  gap: `${SPACE.md}px ${SPACE.xl}px`,
+  margin: `${SPACE.sm}px 0 0`,
 };
 
 const itemStyle: CSSProperties = {
-  padding: SPACE.lg,
-  border: `${cssVar('border-width')} solid ${cssVar('border-color')}`,
-  borderRadius: RADIUS.card,
-  scrollMarginTop: SPACE.xl,
+  borderTop: `${cssVar('border-width')} solid ${cssVar('border-color')}`,
+  paddingTop: SPACE.sm,
+  scrollMarginTop: SPACE.xxl,
 };
 
 const termStyle: CSSProperties = {
   fontFamily: cssVar('font-display'),
-  fontSize: cssVar('size-heading'),
-  lineHeight: cssVar('leading-heading'),
+  fontSize: cssVar('size-body'),
+  lineHeight: cssVar('leading-body'),
   fontWeight: 600,
 };
 
 const definitionStyle: CSSProperties = {
-  margin: `${SPACE.sm}px 0 0`,
-  fontSize: cssVar('size-body'),
-  lineHeight: cssVar('leading-body'),
+  margin: `${SPACE.xs}px 0 0`,
+  fontSize: cssVar('size-small'),
+  lineHeight: cssVar('leading-small'),
 };
 
 const sourceStyle: CSSProperties = {
   display: 'block',
-  marginTop: SPACE.sm,
+  marginTop: SPACE.xs,
   color: cssVar('muted-deep'),
   fontSize: cssVar('size-micro'),
   lineHeight: cssVar('leading-micro'),
+  fontStyle: 'normal',
 };
 
 /**
  * PRD 10 /glossary - searchable; also powers the tooltips.
  *
- * Stub frozen by W0-4. Unit C13 replaces this body only.
  * Route registration lives in src/App.tsx and is frozen.
  */
 export function GlossaryPage(): ReactElement {
   const state = useApi((client) => client.getGlossary(), []);
-  const [query, setQuery] = useState('');
+  const [params, setParams] = useSearchParams();
+  const location = useLocation();
   const searchId = useId();
   const statusId = useId();
 
+  const query = params.get('q') ?? '';
+  const back = useMemo(() => readBackLink(location.state), [location.state]);
+
   const entries = state.data?.entries ?? [];
   const visible = useMemo(() => filterEntries(entries, query), [entries, query]);
+  const groups = useMemo(() => groupByLetter(visible), [visible]);
+  const present = useMemo(() => new Set(groups.map((g) => g.letter)), [groups]);
   const trimmed = query.trim();
+
+  const onQuery = (value: string): void => {
+    const next = new URLSearchParams(params);
+    if (value.trim() === '') next.delete('q');
+    else next.set('q', value);
+    setParams(next, { replace: true });
+  };
 
   let body: ReactElement;
   if (state.data === null && state.loading) {
@@ -157,9 +292,11 @@ export function GlossaryPage(): ReactElement {
     body = <p>The glossary is empty.</p>;
   } else if (visible.length === 0) {
     body = <p>No glossary term matches “{trimmed}”.</p>;
-  } else {
+  } else if (trimmed.length > 0) {
+    // A search is ranked, not alphabetical: grouping it by letter would throw
+    // the ranking away, so the results stay one flat list.
     body = (
-      <dl style={listStyle} aria-label="Glossary terms">
+      <dl style={gridStyle} aria-label="Glossary terms">
         {visible.map((entry) => (
           <div key={entry.term} id={anchorFor(entry.term)} style={itemStyle}>
             <dt style={termStyle}>{entry.term}</dt>
@@ -170,6 +307,42 @@ export function GlossaryPage(): ReactElement {
           </div>
         ))}
       </dl>
+    );
+  } else {
+    body = (
+      <>
+        <nav aria-label="Jump to a letter" style={jumpBarStyle}>
+          {[...LETTERS, '#'].map((letter) =>
+            present.has(letter) ? (
+              <a key={letter} href={`#${letterAnchor(letter)}`} style={jumpActive}>
+                {letter}
+              </a>
+            ) : (
+              <span key={letter} aria-hidden="true" style={jumpMuted}>
+                {letter}
+              </span>
+            ),
+          )}
+        </nav>
+        {groups.map((group) => (
+          <section key={group.letter} aria-labelledby={letterAnchor(group.letter)}>
+            <h2 id={letterAnchor(group.letter)} style={groupHeadingStyle}>
+              {group.letter}
+            </h2>
+            <dl style={gridStyle} aria-label={`Glossary terms starting with ${group.letter}`}>
+              {group.entries.map((entry) => (
+                <div key={entry.term} id={anchorFor(entry.term)} style={itemStyle}>
+                  <dt style={termStyle}>{entry.term}</dt>
+                  <dd style={definitionStyle}>
+                    {entry.definition}
+                    <cite style={sourceStyle}>{entry.source}</cite>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ))}
+      </>
     );
   }
 
@@ -183,10 +356,12 @@ export function GlossaryPage(): ReactElement {
   return (
     <div style={pageStyle}>
       <header>
+        {back !== null ? (
+          <p style={{ margin: `0 0 ${SPACE.xs}px`, fontSize: cssVar('size-small') }}>
+            <Link to={back.to}>{`← Back to ${back.label}`}</Link>
+          </p>
+        ) : null}
         <h1 style={titleStyle}>Glossary</h1>
-        <p style={leadStyle}>
-          Terms from Federato’s glossary. The same definitions appear as tooltips across the console.
-        </p>
       </header>
       <div role="search" aria-label="Search the glossary">
         <label htmlFor={searchId} style={labelStyle}>
@@ -196,16 +371,19 @@ export function GlossaryPage(): ReactElement {
           id={searchId}
           type="search"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => onQuery(event.target.value)}
           aria-describedby={statusId}
           autoComplete="off"
           style={{ ...inputStyle, marginTop: SPACE.xs, width: '100%', maxWidth: 480, boxSizing: 'border-box' }}
         />
-        <p id={statusId} role="status" aria-live="polite" style={leadStyle}>
+        <p id={statusId} role="status" aria-live="polite" style={mutedStyle}>
           {status}
         </p>
       </div>
       {body}
+      <p style={{ ...mutedStyle, marginTop: SPACE.lg }}>
+        Source: Federato’s glossary. The same definitions appear as console tooltips.
+      </p>
     </div>
   );
 }

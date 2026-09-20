@@ -23,6 +23,18 @@ export interface DataTableProps<Row> {
     readonly emptyLabel: string;
     readonly loading?: boolean;
     readonly onRowClick?: (row: Row) => void;
+    /**
+     * Controlled sort. Pass both to own the sort yourself — the queue keeps it
+     * in the URL so Back and a shared link restore it. Omit both and the table
+     * sorts itself, as every other list here does.
+     */
+    readonly sort?: SortState | null;
+    readonly onSortChange?: (next: SortState | null) => void;
+}
+export type SortDirection = 'asc' | 'desc';
+export interface SortState {
+    readonly key: string;
+    readonly direction: SortDirection;
 }
 /**
  * Accessible data table shared by every console list (PRD §10, §13).

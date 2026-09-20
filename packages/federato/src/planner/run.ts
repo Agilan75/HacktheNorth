@@ -286,6 +286,7 @@ export async function runPlanner(input: RunPlannerInput): Promise<PlannerResult>
     clock: options.clock,
     now: nowIso,
     idPrefix: TRACE_PREFIX,
+    onQuery: options.onQuery,
   });
   const arrays = (r: FederatoResource): readonly string[] => arrayPathsFor(schema, graph, r);
 
@@ -442,6 +443,7 @@ export async function runFollowUps(
     clock: options.clock,
     now: options.now ?? new Date().toISOString(),
     idPrefix: `${TRACE_PREFIX}-followup`,
+    onQuery: options.onQuery,
   });
   const arrays = arrayPathsFor(result.schema, buildResourceGraph(result.schema), 'Policy');
 

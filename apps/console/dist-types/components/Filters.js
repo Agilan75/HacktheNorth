@@ -18,6 +18,7 @@ const formStyle = {
     alignItems: 'flex-end',
     gap: SPACE.md,
     padding: `${SPACE.md}px 0`,
+    borderBottom: `1px solid ${cssVar('muted-tint')}`,
     fontFamily: cssVar('font-body'),
 };
 const fieldStyle = {
@@ -56,7 +57,7 @@ function SelectField({ label, allLabel, value, options, onSelect }) {
     const shown = value !== null && !options.some((o) => o.value === value) ? [...options, { value, label: value }] : options;
     return (_jsxs("div", { style: fieldStyle, children: [_jsx("label", { htmlFor: id, children: label }), _jsxs("select", { id: id, style: controlStyle, value: value ?? ALL, onChange: (event) => onSelect(event.target.value === ALL ? null : event.target.value), children: [_jsx("option", { value: ALL, children: allLabel }), shown.map((option) => (_jsx("option", { value: option.value, children: option.label }, option.value)))] })] }));
 }
-/** PRD §10 /queue filters: line, verdict, state, underwriter, plus free-text search. */
+/** Queue filters: line, verdict, state, underwriter, plus free-text search. */
 export function Filters(props) {
     const { value, options, onChange } = props;
     const searchId = useId();

@@ -1,0 +1,59 @@
+{
+  "externalId": "SUB-2025-00143",
+  "targetVerdict": "DOES_NOT_FIT",
+  "rationale": "The only location is in Bellevue, WA, which is outside both the target and acceptable state lists, so primary risk state is Not Acceptable and knocks the submission out; every other factor (new business, $24.6M TIV, $71,500 premium, acceptable construction, no losses) is within appetite.",
+  "values": [
+    {
+      "canonicalPath": "submissionType",
+      "value": "new_business"
+    },
+    {
+      "canonicalPath": "locations.*.state",
+      "value": "WA"
+    },
+    {
+      "canonicalPath": "locations.*.city",
+      "value": "Bellevue"
+    },
+    {
+      "canonicalPath": "locations.*.postalCode",
+      "value": "98004"
+    },
+    {
+      "canonicalPath": "locations.*.protectionClass",
+      "value": 2
+    },
+    {
+      "canonicalPath": "buildings.*.tiv",
+      "value": 24600000
+    },
+    {
+      "canonicalPath": "buildings.*.yearBuilt",
+      "value": 2008
+    },
+    {
+      "canonicalPath": "buildings.*.constructionType",
+      "value": "non_combustible"
+    },
+    {
+      "canonicalPath": "buildings.*.sprinklered",
+      "value": true
+    },
+    {
+      "canonicalPath": "buildings.*.stories",
+      "value": 4
+    },
+    {
+      "canonicalPath": "buildings.*.occupancy",
+      "value": "Software engineering offices with on-site server room"
+    },
+    {
+      "canonicalPath": "pricing.quotedPremium",
+      "value": 71500
+    },
+    {
+      "canonicalPath": "rollup.fiveYearLoss",
+      "value": 0
+    }
+  ]
+}

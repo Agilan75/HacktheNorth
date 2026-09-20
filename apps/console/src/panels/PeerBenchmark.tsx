@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 
 import { formatMoney, formatScore, pluralize } from '@retrofit/contracts';
 
-import { submissionPath } from '../App.js';
+import { submissionPath } from '../routes.js';
 import { Card } from '../components/atoms/Card.js';
 import { VerdictPill } from '../components/atoms/VerdictPill.js';
 import type { PeerBenchmarkPanelProps } from './types.js';

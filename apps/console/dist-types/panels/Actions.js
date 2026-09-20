@@ -5,6 +5,16 @@ import { Badge } from '../components/atoms/Badge.js';
 import { Card } from '../components/atoms/Card.js';
 /** PRD 7.6: a request is saved as a draft; only a draft can be approved. */
 const APPROVABLE_STATUS = 'draft';
+/** Positive completion states, so "sent" reads as done, not as a leftover "quiet" grey next to "failed". */
+const POSITIVE_STATUSES = new Set(['approved', 'sent', 'replied', 'applied']);
+/** Decoration only — the label text (`titleCase(status)`) always carries the meaning. */
+function statusTone(status) {
+    if (status === APPROVABLE_STATUS || status === 'failed')
+        return 'attention';
+    if (POSITIVE_STATUSES.has(status))
+        return 'positive';
+    return 'quiet';
+}
 function authorityLabel(withinAuthority, underwriter) {
     if (withinAuthority === true)
         return 'Within authority';
@@ -36,7 +46,7 @@ function DraftCard(props) {
             setState({ kind: 'error', message: err instanceof Error ? err.message : String(err) });
         }
     };
-    return (_jsxs("article", { className: "rf-draft", "data-testid": "actions-draft", "data-action-id": draft.actionId, children: [_jsxs("header", { className: "rf-draft__header", children: [_jsx("h4", { className: "rf-draft__subject", children: draft.subject }), _jsx(Badge, { label: titleCase(draft.status), tone: approvable ? 'attention' : 'quiet' })] }), _jsx("p", { className: "rf-draft__body", style: { whiteSpace: 'pre-wrap' }, children: draft.body }), draft.requestedFields.length > 0 ? (_jsx("div", { className: "rf-scroll-x", children: _jsxs("table", { className: "rf-table", "aria-label": "Requested fields", children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", { scope: "col", children: "Field" }), _jsx("th", { scope: "col", children: "Path" }), _jsx("th", { scope: "col", children: "Value of information" })] }) }), _jsx("tbody", { children: draft.requestedFields.map((f) => (_jsxs("tr", { "data-testid": "draft-field", children: [_jsx("th", { scope: "row", children: f.label }), _jsx("td", { children: _jsx("code", { children: f.path }) }), _jsx("td", { children: f.voi === null ? 'Not ranked' : `${formatScore(f.voi, { decimals: 1 })} pts` })] }, f.path))) })] }) })) : null, approvable ? (_jsx("button", { type: "button", className: "rf-button", onClick: () => void approve(), disabled: pending, "aria-label": `Approve request: ${draft.subject}`, children: pending ? 'Approving…' : 'Approve and mark sent' })) : null, _jsx("p", { className: "rf-footnote", children: "Nothing is emailed; approving marks the request sent." }), state.kind === 'error' ? (_jsx("p", { role: "alert", className: "rf-error", children: `Approve failed: ${state.message}` })) : null] }));
+    return (_jsxs("article", { className: "rf-draft", "data-testid": "actions-draft", "data-action-id": draft.actionId, children: [_jsxs("header", { className: "rf-draft__header", children: [_jsx("h4", { className: "rf-draft__subject", children: draft.subject }), _jsx(Badge, { label: titleCase(draft.status), tone: statusTone(draft.status) })] }), _jsx("p", { className: "rf-draft__body", style: { whiteSpace: 'pre-wrap' }, children: draft.body }), draft.requestedFields.length > 0 ? (_jsx("div", { className: "rf-scroll-x", children: _jsxs("table", { className: "rf-table", "aria-label": "Requested fields", children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", { scope: "col", children: "Field" }), _jsx("th", { scope: "col", children: "Path" }), _jsx("th", { scope: "col", children: "Value of information" })] }) }), _jsx("tbody", { children: draft.requestedFields.map((f) => (_jsxs("tr", { "data-testid": "draft-field", children: [_jsx("th", { scope: "row", children: f.label }), _jsx("td", { children: _jsx("code", { children: f.path }) }), _jsx("td", { children: f.voi === null ? 'Not ranked' : `${formatScore(f.voi, { decimals: 1 })} pts` })] }, f.path))) })] }) })) : null, approvable ? (_jsx("button", { type: "button", className: "rf-button rf-button--primary", onClick: () => void approve(), disabled: pending, "aria-label": `Approve request: ${draft.subject}`, children: pending ? 'Approving…' : 'Approve and mark sent' })) : null, _jsx("p", { className: "rf-footnote", children: "Nothing is emailed; approving marks the request sent." }), state.kind === 'error' ? (_jsx("p", { role: "alert", className: "rf-error", children: `Approve failed: ${state.message}` })) : null] }));
 }
 /** Rank 1 is best, so a smaller number is a move up. Presentation only. */
 function rankMovement(before, after) {
@@ -49,6 +59,12 @@ function rankMovement(before, after) {
         return ` (down ${-delta})`;
     return ' (no change)';
 }
+/** The words always carry the meaning; green only highlights a genuine improvement. */
+function rankMovementStyle(before, after) {
+    if (before === null || after === null || before <= after)
+        return undefined;
+    return { color: 'var(--rf-green-deep)', fontWeight: 600 };
+}
 function beforeAfter(before, after, hasAfter) {
     return hasAfter ? `${before} → ${after}` : before;
 }
@@ -58,8 +74,7 @@ function LogTable(props) {
     }
     return (_jsx("div", { className: "rf-scroll-x", children: _jsxs("table", { className: "rf-table", "aria-label": "Action log", children: [_jsx("thead", { children: _jsxs("tr", { children: [_jsx("th", { scope: "col", children: "When" }), _jsx("th", { scope: "col", children: "Action" }), _jsx("th", { scope: "col", children: "Status" }), _jsx("th", { scope: "col", children: "Score" }), _jsx("th", { scope: "col", children: "Rank" }), _jsx("th", { scope: "col", children: "Verdict" })] }) }), _jsx("tbody", { children: props.log.map((e) => {
                         const hasAfter = e.afterScore !== null || e.afterRank !== null || e.afterVerdict !== null;
-                        return (_jsxs("tr", { "data-testid": "action-log-row", children: [_jsx("td", { children: formatDate(e.createdAt) }), _jsx("th", { scope: "row", children: titleCase(e.type) }), _jsx("td", { children: titleCase(e.status) }), _jsx("td", { "data-testid": "log-score", children: beforeAfter(formatScore(e.beforeScore), formatScore(e.afterScore), hasAfter) }), _jsx("td", { "data-testid": "log-rank", children: beforeAfter(formatScore(e.beforeRank), formatScore(e.afterRank), hasAfter) +
-                                        rankMovement(e.beforeRank, e.afterRank) }), _jsx("td", { "data-testid": "log-verdict", children: beforeAfter(formatVerdict(e.beforeVerdict), formatVerdict(e.afterVerdict), hasAfter) })] }, e.actionId));
+                        return (_jsxs("tr", { "data-testid": "action-log-row", children: [_jsx("td", { children: formatDate(e.createdAt) }), _jsx("th", { scope: "row", children: titleCase(e.type) }), _jsx("td", { children: titleCase(e.status) }), _jsx("td", { "data-testid": "log-score", children: beforeAfter(formatScore(e.beforeScore), formatScore(e.afterScore), hasAfter) }), _jsxs("td", { "data-testid": "log-rank", children: [beforeAfter(formatScore(e.beforeRank), formatScore(e.afterRank), hasAfter), _jsx("span", { style: rankMovementStyle(e.beforeRank, e.afterRank), children: rankMovement(e.beforeRank, e.afterRank) })] }), _jsx("td", { "data-testid": "log-verdict", children: beforeAfter(formatVerdict(e.beforeVerdict), formatVerdict(e.afterVerdict), hasAfter) })] }, e.actionId));
                     }) })] }) }));
 }
 /**

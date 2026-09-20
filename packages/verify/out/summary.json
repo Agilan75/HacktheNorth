@@ -1,6 +1,6 @@
 {
-  "propertyCasesRun": 10000000,
-  "differentialCasesRun": 10000000,
+  "propertyCasesRun": 1257983,
+  "differentialCasesRun": 1257983,
   "disagreements": 0,
   "llmCasesRun": 1332,
   "llmAgreementRate": 0.9992492492492493,
@@ -9,13 +9,13 @@
     0.9998674617628701
   ],
   "extractionFieldAccuracy": null,
-  "generatedAt": "2026-09-19T16:38:04.459Z",
-  "startedAt": "2026-09-19T15:52:09.876Z",
+  "generatedAt": "2026-09-20T10:38:29.929Z",
+  "startedAt": "2026-09-20T10:00:34.817Z",
   "requested": 10000000,
   "seed": 20260919,
   "invariantViolations": 0,
   "errors": 0,
-  "casesPerSecond": 3630.500562341317,
+  "casesPerSecond": 552.9471417328645,
   "layerC": {
     "total": 1332,
     "agreed": 1331,
@@ -181,8 +181,5 @@
     "disagreementCaseIds": [
       "V03:947746280:34"
     ]
-  },
-  "layerCUnanswered": 706,
-  "layerCRealCases": 38,
-  "extraction": null
+  }
 }

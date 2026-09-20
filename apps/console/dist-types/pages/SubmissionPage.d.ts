@@ -1,8 +1,7 @@
 import type { ReactElement } from 'react';
 /**
- * PRD 10 /submissions/:id - composes panels (a) through (l).
+ * PRD 10 /submissions/:id — the decision, then the supporting panels grouped.
  *
- * Stub frozen by W0-4. Unit C05 replaces this body only.
  * Route registration lives in src/App.tsx and is frozen.
  */
 export declare function SubmissionPage(): ReactElement;

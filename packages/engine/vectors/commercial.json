@@ -174,6 +174,22 @@
       "required": false,
       "min": 1,
       "max": 10
+    },
+    {
+      "index": 11,
+      "key": "worstFloodZoneTier",
+      "label": "Worst FEMA flood zone",
+      "source": "rollup.worstFloodZoneTier",
+      "type": "ordinal",
+      "scaling": { "rule": "divide", "divisor": 2 },
+      "direction": "lower_better",
+      "appetiteFactor": false,
+      "factor": "flood_zone",
+      "extensionOnly": true,
+      "immovable": true,
+      "required": false,
+      "min": 0,
+      "max": 2
     }
   ]
 }

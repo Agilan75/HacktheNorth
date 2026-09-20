@@ -409,7 +409,7 @@ export async function main(): Promise<void> {
     const deps: Deps = {
       db: handle.db,
       adapter: createAdapter({ env: federatoEnv(env) }),
-      llm: createAppLlm({ geminiApiKey: env.GEMINI_API_KEY, anthropicApiKey: env.ANTHROPIC_API_KEY, anthropicWorkspaceId: env.ANTHROPIC_WORKSPACE_ID }),
+      llm: createAppLlm({ anthropicApiKey: env.ANTHROPIC_API_KEY, anthropicWorkspaceId: env.ANTHROPIC_WORKSPACE_ID }),
       clock: systemClock(),
     };
     await runSeed(deps, {

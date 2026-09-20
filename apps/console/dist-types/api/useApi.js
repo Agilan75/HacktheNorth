@@ -3,7 +3,8 @@ import { createApiClient } from './client.js';
 /** Default when `VITE_API_URL` is unset: the API's default PORT (PRD §8). */
 const DEFAULT_API_URL = 'http://localhost:3000';
 let sharedClient = null;
-function resolveBaseUrl() {
+/** The API origin, for the few requests that are not JSON routes (the verification field's byte layers). */
+export function resolveBaseUrl() {
     let fromEnv;
     try {
         fromEnv = import.meta.env?.VITE_API_URL;

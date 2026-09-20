@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router';
+import type { ReactElement } from 'react';
+import { MemoryRouter, useLocation } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { AsyncState } from '../api/useApi.js';
@@ -9,7 +10,8 @@ import type { ActionLogEntryView } from '../panels/types.js';
 /*
  * useApi / DataTable / VerdictPill are replaced with signature-faithful
  * stand-ins (same approach as QueuePage.test.tsx). Under test: the outbox
- * selection, stage grouping, ordering, rank-movement text, approve and plan.
+ * selection, stage grouping, ordering, rank-movement text, the URL round trip,
+ * approve and plan.
  */
 
 let apiState: AsyncState<readonly ActionLogEntryView[]>;
@@ -30,6 +32,13 @@ vi.mock('../components/DataTable.js', () => ({
   DataTable: <Row,>(props: DataTableProps<Row>) => (
     <table>
       <caption>{props.caption}</caption>
+      <thead>
+        <tr>
+          {props.columns.map((c) => (
+            <th key={c.key}>{c.header}</th>
+          ))}
+        </tr>
+      </thead>
       <tbody>
         {props.loading === true ? (
           <tr>
@@ -114,12 +123,22 @@ const ENTRIES: readonly ActionLogEntryView[] = [
   entry({ actionId: 'A7', type: 'route', status: 'draft', createdAt: '2026-09-07T09:00:00.000Z' }),
 ];
 
-function renderPage(): void {
+function UrlProbe(): ReactElement {
+  const location = useLocation();
+  return <div data-testid="url">{`${location.pathname}${location.search}`}</div>;
+}
+
+function renderPage(entryPath = '/actions'): void {
   render(
-    <MemoryRouter initialEntries={['/actions']}>
+    <MemoryRouter initialEntries={[entryPath]}>
+      <UrlProbe />
       <ActionsPage />
     </MemoryRouter>,
   );
+}
+
+function url(): string {
+  return screen.getByTestId('url').textContent ?? '';
 }
 
 function tableIds(caption: string): string[] {
@@ -155,7 +174,14 @@ describe('ActionsPage', () => {
     expect(screen.getByRole('status').textContent).toBe(
       '7 actions · 2 awaiting approval · 1 sent · 2 replied',
     );
-    expect(screen.getByText(/nothing is emailed/)).toBeTruthy();
+  });
+
+  it('says sending is simulated in one short line beside the heading', () => {
+    renderPage();
+    const note = screen.getByText(/nothing is emailed/);
+    expect(note.textContent).toBe('Approving marks it sent; nothing is emailed.');
+    expect((note.textContent ?? '').split(/\s+/).length).toBeLessThanOrEqual(12);
+    expect(screen.getByText('Simulated send')).toBeTruthy();
   });
 
   it('puts only drafted broker requests in the outbox', () => {
@@ -176,15 +202,55 @@ describe('ActionsPage', () => {
     expect(cell(LOG, 'A1', 'score')).toBe('—');
     expect(cell(LOG, 'A3', 'type')).toBe('Request');
     expect(cell(LOG, 'A3', 'status')).toBe('Sent');
-
-    expect(screen.getByTestId('movement-A4').textContent).toBe('Birch Lane: #7 → #3 (up 4 places)');
-    expect(screen.getByTestId('movement-A5')).toBeTruthy();
   });
 
-  it('filters the log by stage', () => {
+  it('sorts the rank movements by size and links each one to its submission', () => {
+    renderPage();
+    const items = within(screen.getByRole('list')).getAllByRole('listitem');
+    // A4 moved 4 places, A5 moved 3: biggest mover first, not newest first.
+    expect(items.map((li) => li.getAttribute('data-testid'))).toEqual(['movement-A4', 'movement-A5']);
+    expect(screen.getByTestId('movement-A4').textContent).toBe('Birch Lane#7 → #3 (up 4 places)');
+    expect(
+      within(screen.getByTestId('movement-A4')).getByRole('link').getAttribute('href'),
+    ).toBe('/submissions/sub-A4');
+    // Two movements is under the cap, so there is no disclosure.
+    expect(screen.queryByRole('button', { name: /Show all/ })).toBeNull();
+  });
+
+  it('caps the movement list and discloses the rest through the URL', () => {
+    apiState = {
+      data: Array.from({ length: 10 }, (_, i) =>
+        entry({
+          actionId: `R${i}`,
+          type: 'reply',
+          status: 'replied',
+          beforeRank: 20 - i,
+          afterRank: 1,
+        }),
+      ),
+      loading: false,
+      error: null,
+      reload,
+    };
+    renderPage();
+    expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(8);
+    fireEvent.click(screen.getByRole('button', { name: 'Show all (10)' }));
+    expect(url()).toBe('/actions?moves=all');
+    expect(within(screen.getByRole('list')).getAllByRole('listitem')).toHaveLength(10);
+  });
+
+  it('never quotes a spec section in a column header', () => {
+    renderPage();
+    for (const th of screen.getAllByRole('columnheader')) {
+      expect(th.textContent ?? '').not.toMatch(/PRD|§/);
+    }
+  });
+
+  it('filters the log by stage and round-trips the stage through the URL', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: 'Awaiting approval (2)' }));
     expect(tableIds(LOG)).toEqual(['A7', 'A2']);
+    expect(url()).toBe('/actions?stage=awaiting');
     fireEvent.click(screen.getByRole('button', { name: 'Replied (2)' }));
     expect(tableIds(LOG)).toEqual(['A5', 'A4']);
     fireEvent.click(screen.getByRole('button', { name: 'Failed (1)' }));
@@ -192,11 +258,18 @@ describe('ActionsPage', () => {
     expect(screen.getByRole('button', { name: 'Failed (1)' }).getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(screen.getByRole('button', { name: 'Sent (1)' }));
     expect(tableIds(LOG)).toEqual(['A3']);
+    // The default stage leaves the URL clean again.
     fireEvent.click(screen.getByRole('button', { name: 'All (7)' }));
     expect(tableIds(LOG)).toHaveLength(7);
+    expect(url()).toBe('/actions');
+
+    cleanup();
+    renderPage('/actions?stage=failed');
+    expect(tableIds(LOG)).toEqual(['A6']);
+    expect(screen.getByRole('button', { name: 'Failed (1)' }).getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('approves a draft and reloads the log', async () => {
+  it('approves a draft, reloads the log and keeps focus on the approved row', async () => {
     approveAction.mockResolvedValue({ ...ENTRIES[1], status: 'sent' });
     renderPage();
     await act(async () => {
@@ -205,6 +278,7 @@ describe('ActionsPage', () => {
     expect(approveAction).toHaveBeenCalledWith('A2');
     expect(reload).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('status').textContent).toBe('Request to Acme Holdings approved and marked sent.');
+    expect(document.activeElement?.getAttribute('data-action-row')).toBe('A2');
   });
 
   it('reports an approve failure without reloading', async () => {
@@ -228,7 +302,7 @@ describe('ActionsPage', () => {
     expect(screen.getByRole('status').textContent).toBe('Action plan ran: 3 actions routed or drafted.');
   });
 
-  it('shows loading, empty and error states', () => {
+  it('shows loading, short empty labels and an error state', () => {
     apiState = { data: null, loading: true, error: null, reload };
     renderPage();
     expect(screen.getByRole('status').textContent).toBe('Loading the action log…');
@@ -236,8 +310,8 @@ describe('ActionsPage', () => {
 
     apiState = { data: [], loading: false, error: null, reload };
     renderPage();
-    expect(screen.getByText(/No actions yet/)).toBeTruthy();
-    expect(screen.getByText('No drafted requests awaiting approval.')).toBeTruthy();
+    expect(screen.getByText('No actions yet.')).toBeTruthy();
+    expect(screen.getByText('Nothing awaiting approval.')).toBeTruthy();
     expect(screen.queryByRole('heading', { name: 'Rank movement from replies' })).toBeNull();
     cleanup();
 

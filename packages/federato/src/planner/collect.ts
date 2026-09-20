@@ -27,6 +27,13 @@ const SPRINKLERED = 'buildings[].sprinklered';
 const BUILDING_PC = 'buildings[].protectionClass';
 const LOCATION_PC = 'locations[].protectionClass';
 const LOCATION_STATE = 'locations[].state';
+/**
+ * Fed by the OpenFEMA hazard layer, not by Federato — whose schema carries no
+ * flood field at all. Stated here anyway, because it is a field the rulebook
+ * genuinely needs: the planner then reports it unmapped, which is the honest
+ * record of why an external API is in this system rather than a silent gap.
+ */
+const LOCATION_FLOOD_ZONE = 'locations[].floodZone';
 const LOSS_INPUTS: readonly string[] = [
   'history[].dateOfLoss',
   'history[].paidIndemnity',
@@ -52,6 +59,7 @@ const ROLLUP_INPUTS: Readonly<Record<string, readonly string[]>> = {
   pctTivAcceptableConstruction: [CONSTRUCTION, TIV],
   pctTivSprinklered: [SPRINKLERED, TIV],
   tivWeightedProtectionClass: [BUILDING_PC, LOCATION_PC, TIV],
+  worstFloodZoneTier: [LOCATION_FLOOD_ZONE],
   primaryState: [LOCATION_STATE, TIV],
   stateShares: [LOCATION_STATE, TIV],
   fiveYearLoss: LOSS_INPUTS,
@@ -68,6 +76,7 @@ const COMMERCIAL_RATING_INPUTS: Readonly<Record<string, readonly string[]>> = {
   protectionClass: [BUILDING_PC, LOCATION_PC],
   sprinkler: [SPRINKLERED],
   lossHistory: ['rollup.fiveYearLoss'],
+  flood: ['rollup.worstFloodZoneTier'],
 };
 
 /** Tenant rating columns -> the vector component keys `priceTenant` reads. */

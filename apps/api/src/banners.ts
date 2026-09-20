@@ -1,6 +1,6 @@
 /**
  * The startup banners. They are never hidden: which adapter is live, whether
- * Gemini is configured, which driver SQLite is using. Unit A10.
+ * the LLM is configured, which driver SQLite is using. Unit A10.
  *
  * Only booleans and names are printed, never a credential (env.ts describeEnv).
  */
@@ -37,9 +37,9 @@ function adapterLine(kind: AdapterKind): string {
 }
 
 function llmLine(deps: Deps): string {
-  if (deps.llm.configured) return `Gemini: configured (provider ${deps.llm.name})`;
+  if (deps.llm.configured) return `LLM: configured (provider ${deps.llm.name})`;
   return (
-    `Gemini: NOT CONFIGURED (provider ${deps.llm.name}) - GEMINI_API_KEY is unset; ` +
+    `LLM: NOT CONFIGURED (provider ${deps.llm.name}) - ANTHROPIC_API_KEY is unset; ` +
     'LLM calls degrade and the seeded sweep is served'
   );
 }

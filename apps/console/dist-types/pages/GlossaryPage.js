@@ -1,7 +1,9 @@
-import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { useId, useMemo, useState } from 'react';
+import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
+import { useId, useMemo } from 'react';
+import { Link, useLocation, useSearchParams } from 'react-router';
 import { pluralize } from '@retrofit/contracts';
 import { cssVar, MIN_TOUCH_TARGET, RADIUS, SPACE } from '@retrofit/design';
+import { ROUTES } from '../routes.js';
 import { useApi } from '../api/useApi.js';
 import { Skeleton } from '../components/atoms/Skeleton.js';
 function normalize(value) {
@@ -17,6 +19,14 @@ function anchorFor(term) {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
     return `glossary-${slug || 'term'}`;
+}
+const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+function letterOf(term) {
+    const first = term.trim().charAt(0).toUpperCase();
+    return LETTERS.includes(first) ? first : '#';
+}
+function letterAnchor(letter) {
+    return `glossary-letter-${letter === '#' ? 'other' : letter.toLowerCase()}`;
 }
 /**
  * Every whitespace-separated query word must appear in the term, definition
@@ -40,10 +50,73 @@ function filterEntries(entries, query) {
     scored.sort((a, b) => a.rank - b.rank || a.order - b.order);
     return scored.map((s) => s.entry);
 }
+/** Groups in display order. A search reorders within a letter but never across. */
+function groupByLetter(entries) {
+    const buckets = new Map();
+    for (const entry of entries) {
+        const letter = letterOf(entry.term);
+        const bucket = buckets.get(letter);
+        if (bucket === undefined)
+            buckets.set(letter, [entry]);
+        else
+            bucket.push(entry);
+    }
+    const order = [...LETTERS, '#'];
+    return order
+        .filter((letter) => buckets.has(letter))
+        .map((letter) => ({ letter, entries: buckets.get(letter) ?? [] }));
+}
+/* --------------------------------------------------------------- the way back */
+/**
+ * Only the console's own pages; anything else (or no referrer) shows nothing.
+ * Read lazily: App.tsx imports this module before it defines `ROUTES`, so a
+ * module-scope read would see `undefined`.
+ */
+function backLabels() {
+    return [
+        { path: ROUTES.queue, label: 'the queue' },
+        { path: ROUTES.actions, label: 'actions' },
+        { path: ROUTES.rules, label: 'rules' },
+        { path: ROUTES.aggregate, label: 'the aggregate' },
+        { path: ROUTES.verification, label: 'verification' },
+        { path: ROUTES.explore, label: 'explore' },
+    ];
+}
+function labelForPath(pathname) {
+    if (pathname.startsWith('/submissions/'))
+        return { to: pathname, label: 'the submission' };
+    const hit = backLabels().find((row) => row.path === pathname);
+    return hit === undefined ? null : { to: hit.path, label: hit.label };
+}
+function readBackLink(state) {
+    const bag = typeof state === 'object' && state !== null ? state : {};
+    if (typeof bag.from === 'string' && bag.from.startsWith('/')) {
+        const [pathname] = bag.from.split('?');
+        const hit = labelForPath(pathname ?? '');
+        if (hit !== null)
+            return { to: bag.from, label: hit.label };
+    }
+    try {
+        if (typeof document === 'undefined' || typeof window === 'undefined')
+            return null;
+        const ref = document.referrer;
+        if (typeof ref !== 'string' || ref === '')
+            return null;
+        const url = new URL(ref, window.location.href);
+        if (url.origin !== window.location.origin)
+            return null;
+        const hit = labelForPath(url.pathname);
+        return hit === null ? null : { to: `${url.pathname}${url.search}`, label: hit.label };
+    }
+    catch {
+        return null;
+    }
+}
+/* --------------------------------------------------------------- styles */
 const pageStyle = {
     display: 'flex',
     flexDirection: 'column',
-    gap: SPACE.xl,
+    gap: SPACE.lg,
     fontFamily: cssVar('font-body'),
     color: cssVar('ink'),
 };
@@ -53,7 +126,7 @@ const titleStyle = {
     fontSize: cssVar('size-title'),
     lineHeight: cssVar('leading-title'),
 };
-const leadStyle = {
+const mutedStyle = {
     margin: `${SPACE.xs}px 0 0`,
     color: cssVar('muted-deep'),
     fontSize: cssVar('size-small'),
@@ -78,50 +151,97 @@ const inputStyle = {
     fontFamily: cssVar('font-body'),
     fontSize: cssVar('size-body'),
 };
-const listStyle = {
-    margin: 0,
+const jumpBarStyle = {
+    position: 'sticky',
+    top: 0,
+    zIndex: 2,
     display: 'flex',
-    flexDirection: 'column',
-    gap: SPACE.lg,
+    flexWrap: 'wrap',
+    gap: SPACE.xs,
+    padding: `${SPACE.sm}px 0`,
+    background: cssVar('paper'),
+    borderBottom: `${cssVar('border-width')} solid ${cssVar('border-color')}`,
+};
+const jumpBase = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 28,
+    minHeight: 28,
+    padding: `0 ${SPACE.xs}px`,
+    borderRadius: RADIUS.pill,
+    fontSize: cssVar('size-micro'),
+    lineHeight: cssVar('leading-micro'),
+    fontVariantNumeric: 'tabular-nums',
+};
+const jumpActive = { ...jumpBase, color: cssVar('ink'), textDecoration: 'none', fontWeight: 600 };
+const jumpMuted = { ...jumpBase, color: cssVar('muted'), opacity: 0.5 };
+const groupHeadingStyle = {
+    margin: 0,
+    fontFamily: cssVar('font-body'),
+    fontSize: cssVar('size-micro'),
+    lineHeight: cssVar('leading-micro'),
+    letterSpacing: '0.08em',
+    color: cssVar('muted-deep'),
+    fontWeight: 600,
+    scrollMarginTop: SPACE.xxl,
+};
+const gridStyle = {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+    gap: `${SPACE.md}px ${SPACE.xl}px`,
+    margin: `${SPACE.sm}px 0 0`,
 };
 const itemStyle = {
-    padding: SPACE.lg,
-    border: `${cssVar('border-width')} solid ${cssVar('border-color')}`,
-    borderRadius: RADIUS.card,
-    scrollMarginTop: SPACE.xl,
+    borderTop: `${cssVar('border-width')} solid ${cssVar('border-color')}`,
+    paddingTop: SPACE.sm,
+    scrollMarginTop: SPACE.xxl,
 };
 const termStyle = {
     fontFamily: cssVar('font-display'),
-    fontSize: cssVar('size-heading'),
-    lineHeight: cssVar('leading-heading'),
+    fontSize: cssVar('size-body'),
+    lineHeight: cssVar('leading-body'),
     fontWeight: 600,
 };
 const definitionStyle = {
-    margin: `${SPACE.sm}px 0 0`,
-    fontSize: cssVar('size-body'),
-    lineHeight: cssVar('leading-body'),
+    margin: `${SPACE.xs}px 0 0`,
+    fontSize: cssVar('size-small'),
+    lineHeight: cssVar('leading-small'),
 };
 const sourceStyle = {
     display: 'block',
-    marginTop: SPACE.sm,
+    marginTop: SPACE.xs,
     color: cssVar('muted-deep'),
     fontSize: cssVar('size-micro'),
     lineHeight: cssVar('leading-micro'),
+    fontStyle: 'normal',
 };
 /**
  * PRD 10 /glossary - searchable; also powers the tooltips.
  *
- * Stub frozen by W0-4. Unit C13 replaces this body only.
  * Route registration lives in src/App.tsx and is frozen.
  */
 export function GlossaryPage() {
     const state = useApi((client) => client.getGlossary(), []);
-    const [query, setQuery] = useState('');
+    const [params, setParams] = useSearchParams();
+    const location = useLocation();
     const searchId = useId();
     const statusId = useId();
+    const query = params.get('q') ?? '';
+    const back = useMemo(() => readBackLink(location.state), [location.state]);
     const entries = state.data?.entries ?? [];
     const visible = useMemo(() => filterEntries(entries, query), [entries, query]);
+    const groups = useMemo(() => groupByLetter(visible), [visible]);
+    const present = useMemo(() => new Set(groups.map((g) => g.letter)), [groups]);
     const trimmed = query.trim();
+    const onQuery = (value) => {
+        const next = new URLSearchParams(params);
+        if (value.trim() === '')
+            next.delete('q');
+        else
+            next.set('q', value);
+        setParams(next, { replace: true });
+    };
     let body;
     if (state.data === null && state.loading) {
         body = _jsx(Skeleton, { label: "Loading the glossary", lines: 6 });
@@ -135,14 +255,19 @@ export function GlossaryPage() {
     else if (visible.length === 0) {
         body = _jsxs("p", { children: ["No glossary term matches \u201C", trimmed, "\u201D."] });
     }
+    else if (trimmed.length > 0) {
+        // A search is ranked, not alphabetical: grouping it by letter would throw
+        // the ranking away, so the results stay one flat list.
+        body = (_jsx("dl", { style: gridStyle, "aria-label": "Glossary terms", children: visible.map((entry) => (_jsxs("div", { id: anchorFor(entry.term), style: itemStyle, children: [_jsx("dt", { style: termStyle, children: entry.term }), _jsxs("dd", { style: definitionStyle, children: [entry.definition, _jsx("cite", { style: sourceStyle, children: entry.source })] })] }, entry.term))) }));
+    }
     else {
-        body = (_jsx("dl", { style: listStyle, "aria-label": "Glossary terms", children: visible.map((entry) => (_jsxs("div", { id: anchorFor(entry.term), style: itemStyle, children: [_jsx("dt", { style: termStyle, children: entry.term }), _jsxs("dd", { style: definitionStyle, children: [entry.definition, _jsx("cite", { style: sourceStyle, children: entry.source })] })] }, entry.term))) }));
+        body = (_jsxs(_Fragment, { children: [_jsx("nav", { "aria-label": "Jump to a letter", style: jumpBarStyle, children: [...LETTERS, '#'].map((letter) => present.has(letter) ? (_jsx("a", { href: `#${letterAnchor(letter)}`, style: jumpActive, children: letter }, letter)) : (_jsx("span", { "aria-hidden": "true", style: jumpMuted, children: letter }, letter))) }), groups.map((group) => (_jsxs("section", { "aria-labelledby": letterAnchor(group.letter), children: [_jsx("h2", { id: letterAnchor(group.letter), style: groupHeadingStyle, children: group.letter }), _jsx("dl", { style: gridStyle, "aria-label": `Glossary terms starting with ${group.letter}`, children: group.entries.map((entry) => (_jsxs("div", { id: anchorFor(entry.term), style: itemStyle, children: [_jsx("dt", { style: termStyle, children: entry.term }), _jsxs("dd", { style: definitionStyle, children: [entry.definition, _jsx("cite", { style: sourceStyle, children: entry.source })] })] }, entry.term))) })] }, group.letter)))] }));
     }
     const status = state.data === null
         ? ''
         : trimmed.length === 0
             ? pluralize(entries.length, 'term')
             : `${pluralize(visible.length, 'term')} of ${entries.length} match “${trimmed}”`;
-    return (_jsxs("div", { style: pageStyle, children: [_jsxs("header", { children: [_jsx("h1", { style: titleStyle, children: "Glossary" }), _jsx("p", { style: leadStyle, children: "Terms from Federato\u2019s glossary. The same definitions appear as tooltips across the console." })] }), _jsxs("div", { role: "search", "aria-label": "Search the glossary", children: [_jsx("label", { htmlFor: searchId, style: labelStyle, children: "Search terms and definitions" }), _jsx("input", { id: searchId, type: "search", value: query, onChange: (event) => setQuery(event.target.value), "aria-describedby": statusId, autoComplete: "off", style: { ...inputStyle, marginTop: SPACE.xs, width: '100%', maxWidth: 480, boxSizing: 'border-box' } }), _jsx("p", { id: statusId, role: "status", "aria-live": "polite", style: leadStyle, children: status })] }), body] }));
+    return (_jsxs("div", { style: pageStyle, children: [_jsxs("header", { children: [back !== null ? (_jsx("p", { style: { margin: `0 0 ${SPACE.xs}px`, fontSize: cssVar('size-small') }, children: _jsx(Link, { to: back.to, children: `← Back to ${back.label}` }) })) : null, _jsx("h1", { style: titleStyle, children: "Glossary" })] }), _jsxs("div", { role: "search", "aria-label": "Search the glossary", children: [_jsx("label", { htmlFor: searchId, style: labelStyle, children: "Search terms and definitions" }), _jsx("input", { id: searchId, type: "search", value: query, onChange: (event) => onQuery(event.target.value), "aria-describedby": statusId, autoComplete: "off", style: { ...inputStyle, marginTop: SPACE.xs, width: '100%', maxWidth: 480, boxSizing: 'border-box' } }), _jsx("p", { id: statusId, role: "status", "aria-live": "polite", style: mutedStyle, children: status })] }), body, _jsx("p", { style: { ...mutedStyle, marginTop: SPACE.lg }, children: "Source: Federato\u2019s glossary. The same definitions appear as console tooltips." })] }));
 }
 //# sourceMappingURL=GlossaryPage.js.map
