@@ -1,5 +1,10 @@
 # Contract request — mobile-rework
 
+> **Both requests below were applied in `359e0d9`**, once the merge to `main` lifted the
+> do-not-touch constraints on `packages/engine` and `apps/console`. They are kept here as the
+> record of what was changed and why. Nothing in this file is outstanding.
+
+---
 **File:** `packages/engine/src/rules.tenant.test.ts` (two `describe('questions/tenant.json')` cases).
 
 **Change (additive to the data file, corrective to the test):** `questions/tenant.json` no longer
