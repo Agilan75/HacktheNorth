@@ -5,7 +5,6 @@ import type { HazardCostDto, SweepDto } from '@retrofit/contracts';
 
 import { describeApiError, getApi } from '@/lib/api';
 import { sessionStore, useSession } from '@/lib/session';
-import { markVerdict } from '@/lib/timing';
 import {
   Button,
   COLORS,
@@ -41,7 +40,7 @@ type Verdict = EngineResult['verdict']['verdict'];
 
 /** Whole dollars. Cents on a monthly renter premium are noise. */
 function money(n: number | null | undefined): string {
-  if (n === null || n === undefined || !Number.isFinite(n)) return '—';
+  if (n === null || n === undefined || !Number.isFinite(n)) return 'not priced';
   const whole = Math.round(Math.abs(n)).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return `${n < 0 ? '-' : ''}$${whole}`;
 }
@@ -257,11 +256,6 @@ function Quote({
   const question = sweep.pendingQuestion;
   const coverage = sweep.coverage;
   const short = coverage !== null && !coverage.sufficient;
-
-  // The budget instrument: launch to a price on screen. Removed before shipping.
-  useEffect(() => {
-    if (price.predictedMonthlyPremium !== null) markVerdict();
-  }, [price.predictedMonthlyPremium]);
 
   return (
     <Screen

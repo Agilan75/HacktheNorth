@@ -1,5 +1,5 @@
 /**
- * The Retrofit phone UI kit — unit M3. PRD §11 (inclusivity) and §13 (design).
+ * The Retrofit phone UI kit, unit M3. PRD §11 (inclusivity) and §13 (design).
  *
  * Every component here is built from `@retrofit/design` tokens and follows the
  * same four rules, so a screen that uses the kit cannot forget them:
@@ -86,7 +86,7 @@ const TONE_COLOR: Readonly<Record<TextTone, string>> = {
 };
 
 /**
- * One step of the type scale as an RN style, unscaled — RN applies the user's
+ * One step of the type scale as an RN style, unscaled. RN applies the user's
  * font scale itself. Size and leading come from the tokens; the family is the
  * face that carries that step's weight, because a phone cannot make a semibold
  * out of a regular.
@@ -158,7 +158,7 @@ export interface IconProps {
   readonly color?: string;
   /**
    * Icons here are always decoration next to real text (PRD §13: colour, and
-   * by extension a glyph, never carries meaning alone) — hidden from screen
+   * by extension a glyph, never carries meaning alone): hidden from screen
    * readers by default. Set true only for the rare icon-only control that
    * supplies its own accessibilityLabel on the wrapping Pressable.
    */
@@ -194,7 +194,7 @@ export interface ButtonProps extends Omit<PressableProps, 'children' | 'style'> 
   readonly loading?: boolean;
   /** Stretch to the container width (the default for primary actions). */
   readonly fullWidth?: boolean;
-  /** Decorative leading glyph — the label always carries the meaning on its own. */
+  /** Decorative leading glyph. The label always carries the meaning on its own. */
   readonly icon?: IconName;
   readonly accessibilityLabel?: string;
   readonly accessibilityHint?: string;
@@ -408,7 +408,7 @@ export interface BrandProps {
 
 /**
  * The Retrofit lockup: a flat accent mark and, optionally, the wordmark. One
- * colour, no gradient. Always decorative — every screen that shows it has its
+ * colour, no gradient. Always decorative: every screen that shows it has its
  * own real Heading, so this never carries the app's name on its own.
  */
 export function Brand({ size = 40, showWordmark = true, style }: BrandProps) {

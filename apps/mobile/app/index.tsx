@@ -18,7 +18,6 @@ import { captureReducer, initialCaptureState, summarize, uploadBearings } from '
 import type { PendingCapture } from '@/lib/capture';
 import { createLivePricer } from '@/lib/livePrice';
 import type { LivePricer } from '@/lib/livePrice';
-import { markLaunch } from '@/lib/timing';
 import { getSweepQueue } from '@/lib/queue';
 import { SESSION_PROBLEM_TEXT, buildCreateRequest, sessionStore, useSession } from '@/lib/session';
 import type { SessionFrame } from '@/lib/session';
@@ -135,12 +134,12 @@ export default function ViewfinderScreen() {
   const capturingRef = useRef(false);
   const alive = useRef(true);
 
-  useEffect(() => {
-    markLaunch();
-    return () => {
+  useEffect(
+    () => () => {
       alive.current = false;
-    };
-  }, []);
+    },
+    [],
+  );
 
   /* ------------------------------ permissions ----------------------------- */
 

@@ -160,7 +160,7 @@ describe('createSweepQueue', () => {
     expect(out.status).toBe('failed');
     if (out.status !== 'failed') throw new Error('unreachable');
     expect(out.error).toBeInstanceOf(ApiError);
-    expect(out.message).toMatch(/not accepted/i);
+    expect(out.message).toMatch(/would not accept/i);
     expect(q.getSnapshot().pendingCount).toBe(0);
   });
 
@@ -176,7 +176,7 @@ describe('createSweepQueue', () => {
 
     net.state.failWith = rejected;
     await advance(1_400);
-    await expect(delivered).rejects.toThrow(/not accepted/i);
+    await expect(delivered).rejects.toThrow(/would not accept/i);
     expect(q.getSnapshot().items[0]?.status).toBe('failed');
     expect(queueStatusMessage(q.getSnapshot())).toBe('One sweep could not be sent.');
     expect(pendingTimers()).toBe(0);

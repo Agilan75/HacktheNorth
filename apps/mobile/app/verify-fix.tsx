@@ -24,12 +24,12 @@ import {
 } from '@/ui';
 
 /**
- * Verify your fix — PRD §11 `/verify-fix` (unit M8).
+ * Verify your fix. PRD §11 `/verify-fix`, unit M8.
  *
  * ONE new photo of the fixed hazard (camera, or the photo library as an equal
  * alternative), POST /sweeps/:id/verify-fix, then the old and the new verdict
  * and estimate side by side. The API re-runs the engine; this screen does no
- * arithmetic on any number — it shows the before and after the API returned and
+ * arithmetic on any number. It shows the before and after the API returned, and
  * says in words whether the second is lower, higher or the same.
  *
  * Params: `id` (optional, sweep id; falls back to the session) and `hazard`
@@ -44,7 +44,7 @@ const UPLOAD_WIDTH = 1280;
 const UPLOAD_QUALITY = 0.7;
 
 /* -------------------------------------------------------------------------- */
-/* Private presentation helpers (formatting only — no arithmetic on numbers)  */
+/* Private presentation helpers: formatting only, no arithmetic on numbers    */
 /* -------------------------------------------------------------------------- */
 
 function money(n: number | null | undefined): string {
@@ -55,32 +55,32 @@ function money(n: number | null | undefined): string {
 }
 
 const VERDICT_WORDS: Readonly<Record<Verdict, string>> = {
-  FIT: 'Good to cover',
-  REFER: 'A person needs to review this',
-  DOES_NOT_FIT: 'Can’t be covered as it is',
+  FIT: 'Coverable',
+  REFER: 'Needs review',
+  DOES_NOT_FIT: 'Not coverable',
 };
 
 const HAZARD_NAMES: Readonly<Record<string, string>> = {
-  portableHeater: 'Portable heater',
-  heaterNearCombustible: 'Heater close to soft furnishings',
-  extensionCord: 'Extension cord in use',
+  portableHeater: 'Space heater',
+  heaterNearCombustible: 'Heater near fabric',
+  extensionCord: 'Extension cord',
   powerBarOverload: 'Overloaded power bar',
-  candle: 'Candle',
+  candle: 'Open flame',
   stove: 'Stove',
   blockedExit: 'Blocked exit',
-  windowAcUnit: 'Window air conditioner',
+  windowAcUnit: 'Window AC',
   waterHeater: 'Water heater',
-  highValueContents: 'High-value items',
+  highValueContents: 'High-value contents',
 };
 
 /** What a good "after" photo shows, per hazard. Plain language. */
 const PHOTO_TIPS: Readonly<Record<string, string>> = {
-  portableHeater: 'Photograph the spot where the heater was, showing it is gone or unplugged.',
-  heaterNearCombustible: 'Show the heater and the space around it, with curtains, bedding and fabric well away.',
-  extensionCord: 'Show the wall or outlet where the extension cord was.',
-  powerBarOverload: 'Show the power bar with only a few things plugged in.',
-  candle: 'Show the place where the candle was.',
-  blockedExit: 'Stand back and show the doorway clear from floor to top.',
+  portableHeater: 'Show where the heater was, gone or unplugged.',
+  heaterNearCombustible: 'Show the heater with fabric well clear of it.',
+  extensionCord: 'Show the outlet where the cord was.',
+  powerBarOverload: 'Show the power bar with few plugs in it.',
+  candle: 'Show where the candle was.',
+  blockedExit: 'Stand back. Show the doorway clear, floor to top.',
   windowAcUnit: 'Show the window where the unit was.',
 };
 
@@ -169,7 +169,7 @@ export default function VerifyFixScreen() {
 
   const fetchSweep = useCallback(() => {
     if (sweepId === null) {
-      setLoad({ kind: 'error', message: 'We don’t have a room scan to check. Start a new scan first.' });
+      setLoad({ kind: 'error', message: 'No scan to check.' });
       return undefined;
     }
     const controller = new AbortController();
@@ -178,7 +178,7 @@ export default function VerifyFixScreen() {
       .getSweep(sweepId, { signal: controller.signal })
       .then((sweep) => {
         if (sweep.result === null) {
-          setLoad({ kind: 'error', message: 'There’s no quote for this room yet, so there’s nothing to re-check.' });
+          setLoad({ kind: 'error', message: 'No quote for this room yet.' });
           return;
         }
         setLoad({ kind: 'ready', sweepId: sweep.id, result: sweep.result });
@@ -210,7 +210,7 @@ export default function VerifyFixScreen() {
       if (source === 'camera') {
         const perm = await ImagePicker.requestCameraPermissionsAsync();
         if (!perm.granted) {
-          setProblem('The camera is turned off for this app. Choose a photo from your library instead, or allow the camera in Settings.');
+          setProblem('Camera access is off. Pick a photo from your library, or allow it in Settings.');
           return;
         }
       }
@@ -225,13 +225,13 @@ export default function VerifyFixScreen() {
       const rendered = await ImageManipulator.manipulate(asset.uri).resize({ width: UPLOAD_WIDTH }).renderAsync();
       const saved = await rendered.saveAsync({ base64: true, compress: UPLOAD_QUALITY, format: SaveFormat.JPEG });
       if (saved.base64 === undefined || saved.base64.length === 0) {
-        setProblem('We couldn’t read that photo. Please try another one.');
+        setProblem('That photo could not be read. Try another.');
         return;
       }
       setPhoto({ uri: saved.uri, base64: stripDataUrl(saved.base64), capturedAt: new Date().toISOString() });
       setOutcome(null);
     } catch {
-      setProblem('We couldn’t get a photo. Please try again, or choose one from your library.');
+      setProblem('No photo. Try again, or pick one from your library.');
     } finally {
       setPicking(false);
     }
@@ -292,7 +292,7 @@ export default function VerifyFixScreen() {
         <Notice tone="error" actionLabel={sweepId !== null ? 'Try again' : undefined} onAction={sweepId !== null ? () => fetchSweep() : undefined}>
           {load.message}
         </Notice>
-        <Button label="Back to my quote" variant="secondary" onPress={backToQuote} />
+        <Button label="Back to the quote" variant="secondary" onPress={backToQuote} />
       </Screen>
     );
   }
@@ -300,8 +300,8 @@ export default function VerifyFixScreen() {
   if (hazards.length === 0 && outcome === null) {
     return (
       <Screen>
-        <Notice tone="info">We didn’t find anything in this room that raises your price, so there’s nothing to verify.</Notice>
-        <Button label="Back to my quote" onPress={backToQuote} />
+        <Notice tone="info">Nothing in this room raises the price.</Notice>
+        <Button label="Back to the quote" onPress={backToQuote} />
       </Screen>
     );
   }
@@ -313,26 +313,26 @@ export default function VerifyFixScreen() {
       footer={
         outcome === null ? (
           <Button
-            label={sending ? 'Checking your photo…' : 'Check my fix'}
+            label={sending ? 'Checking' : 'Check the fix'}
             loading={sending}
             disabled={photo === null || hazard === null}
-            accessibilityHint={photo === null ? 'Take or choose a photo first.' : 'Sends the photo and updates your estimate.'}
+            accessibilityHint={photo === null ? 'Take or choose a photo first.' : 'Sends the photo and reprices.'}
             onPress={() => {
               void send();
             }}
           />
         ) : (
-          <Button label="Back to my quote" onPress={backToQuote} accessibilityHint="Shows your quote with the updated estimate." />
+          <Button label="Back to the quote" onPress={backToQuote} accessibilityHint="Shows the updated price." />
         )
       }
     >
       <Text>
-        Fixed something? Take one clear photo of where it was. We’ll check it and update your estimate.
+        One clear photo of where it was. The price is recomputed from it.
       </Text>
 
       {hazards.length > 1 ? (
         <ChoiceGroup
-          label="What did you fix?"
+          label="What was fixed"
           choices={hazards.map((k) => ({ value: k, label: hazardName(k) }))}
           value={hazard}
           onChange={(v) => {
@@ -343,11 +343,11 @@ export default function VerifyFixScreen() {
           }}
         />
       ) : (
-        <Text weight="semibold">{`Checking: ${selectedName}`}</Text>
+        <Text weight="semibold">{`Checking  ${selectedName}`}</Text>
       )}
 
       {hazard !== null && PHOTO_TIPS[hazard] !== undefined ? (
-        <Text variant="small" tone="muted">{`Tip: ${PHOTO_TIPS[hazard]}`}</Text>
+        <Text variant="small" tone="muted">{PHOTO_TIPS[hazard]}</Text>
       ) : null}
 
       {/* Photo: camera and library are equal choices */}
@@ -356,14 +356,14 @@ export default function VerifyFixScreen() {
           source={{ uri: photo.uri }}
           accessible
           accessibilityRole="image"
-          accessibilityLabel={`Your new photo of ${selectedName.toLowerCase()}`}
+          accessibilityLabel={`New photo of the ${selectedName.toLowerCase()}`}
           resizeMode="cover"
           style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: RADIUS.card, backgroundColor: COLORS.muteTint }}
         />
       ) : null}
       <View style={{ gap: SPACE.sm }}>
         <Button
-          label={photo === null ? 'Take a photo' : 'Take a different photo'}
+          label={photo === null ? 'Take a photo' : 'Retake'}
           icon="camera-outline"
           variant={photo === null ? 'primary' : 'secondary'}
           fullWidth
@@ -375,12 +375,12 @@ export default function VerifyFixScreen() {
           }}
         />
         <Button
-          label="Choose a photo from my library"
+          label="Pick from library"
           icon="images-outline"
           variant="secondary"
           fullWidth
           disabled={sending || picking}
-          accessibilityHint="Pick a photo you already took."
+          accessibilityHint="Pick a photo already taken."
           onPress={() => {
             void takePhoto('library');
           }}
@@ -389,7 +389,7 @@ export default function VerifyFixScreen() {
 
       {sending ? (
         <Text variant="small" tone="muted" accessibilityLiveRegion="polite">
-          Checking your photo. This can take up to a minute.
+          Checking. Up to a minute.
         </Text>
       ) : null}
 
@@ -427,7 +427,7 @@ function Comparison({ outcome, hazardLabel }: { outcome: Outcome; hazardLabel: s
   const afterVerdict = response.after.verdict;
 
   const headline = response.stillPresent
-    ? `We can still see the ${hazardLabel.toLowerCase()}.`
+    ? `The ${hazardLabel.toLowerCase()} is still there.`
     : `The ${hazardLabel.toLowerCase()} is gone.`;
 
   return (
@@ -442,7 +442,7 @@ function Comparison({ outcome, hazardLabel }: { outcome: Outcome; hazardLabel: s
           accessibilityLabel={`Before: ${VERDICT_WORDS[beforeVerdict]}. ${money(beforeMonthly)} a month. ${money(response.before.predictedPremium)} a year.`}
         >
           <Text variant="small" weight="semibold" tone="muted">
-            BEFORE
+            Before
           </Text>
           <VerdictPill verdict={beforeVerdict} text={VERDICT_WORDS[beforeVerdict]} />
           <Text variant="heading" tone="muted" style={dir === 'lower' ? { textDecorationLine: 'line-through' } : undefined}>
@@ -465,7 +465,7 @@ function Comparison({ outcome, hazardLabel }: { outcome: Outcome; hazardLabel: s
             accessibilityLabel={`Now: ${VERDICT_WORDS[afterVerdict]}. ${money(afterMonthly)} a month. ${money(response.after.predictedPremium)} a year.${dir !== null ? ` That is ${dir} than before.` : ''}`}
           >
             <Text variant="small" weight="semibold">
-              NOW
+              Now
             </Text>
             <VerdictPill verdict={afterVerdict} text={VERDICT_WORDS[afterVerdict]} />
             <Text variant="title" weight="semibold">
@@ -478,25 +478,25 @@ function Comparison({ outcome, hazardLabel }: { outcome: Outcome; hazardLabel: s
 
       <Text weight="semibold">
         {dir === 'lower'
-          ? `↓ Your estimate went down, from ${money(beforeMonthly)} to ${money(afterMonthly)} a month.`
+          ? `Down. ${money(beforeMonthly)} to ${money(afterMonthly)} a month.`
           : dir === 'higher'
-            ? `↑ Your estimate went up, from ${money(beforeMonthly)} to ${money(afterMonthly)} a month.`
+            ? `Up. ${money(beforeMonthly)} to ${money(afterMonthly)} a month.`
             : dir === 'the same'
-              ? `= Your estimate stayed at ${money(afterMonthly)} a month.`
-              : 'We couldn’t compare the two estimates.'}
+              ? `Unchanged at ${money(afterMonthly)} a month.`
+              : 'The two prices could not be compared.'}
       </Text>
       {beforeVerdict !== afterVerdict ? (
-        <Text>{`Your result changed from “${VERDICT_WORDS[beforeVerdict]}” to “${VERDICT_WORDS[afterVerdict]}”.`}</Text>
+        <Text>{`${VERDICT_WORDS[beforeVerdict]} to ${VERDICT_WORDS[afterVerdict]}.`}</Text>
       ) : null}
       {response.stillPresent ? (
         <Text variant="small" tone="muted">
-          If you’ve fixed it, try another photo from a little further back, in good light.
+          If it is fixed, try again from further back, in better light.
         </Text>
       ) : null}
       <Text variant="small" tone="muted">
         {response.stillPresent
           ? 'Both are estimates.'
-          : 'Both are estimates. On your quote, this item’s factor is no longer in the breakdown, so you can check the change yourself.'}
+          : 'Both are estimates. This item no longer carries a price factor.'}
       </Text>
     </View>
   );

@@ -5,7 +5,7 @@
  *     heading has moved >= 10° from where the last frame was taken.
  *   - At most 15 frames.
  *   - Coverage: 36 panels of 10°. A panel fills when the (filtered) heading
- *     passes through it — not only where a frame was shot — so the ring keeps
+ *     passes through it, not only where a frame was shot, so the ring keeps
  *     filling after the 15-frame cap.
  *   - Finish is allowed at >= 75% coverage (27 of 36 panels) and >= 1 frame.
  *   - The largest uncovered arc and the shorter way to turn toward it.

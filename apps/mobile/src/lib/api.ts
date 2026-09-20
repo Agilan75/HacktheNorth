@@ -96,29 +96,29 @@ export function isOfflineError(error: unknown): boolean {
 }
 
 /**
- * One plain-language sentence for the UI. Never shows a status code or a stack
- * trace to the tenant.
+ * One line for the UI: what happened, and what to do. Never a status code, a
+ * stack trace, or a sentence that only reassures.
  */
 export function describeApiError(error: unknown): string {
-  if (!isApiError(error)) return 'Something went wrong. Please try again.';
+  if (!isApiError(error)) return 'Something went wrong. Try again.';
   switch (error.kind) {
     case 'network':
-      return "You seem to be offline. We'll try again when you're back online.";
+      return 'Offline. Sending resumes by itself.';
     case 'timeout':
-      return 'The connection is slow and the request timed out. We will try again.';
+      return 'The connection timed out. Retrying.';
     case 'config':
-      return 'The app is not connected to a server. Ask the person who set it up to add the server address.';
+      return 'No server address set. Ask whoever set this up.';
     case 'aborted':
       return 'Cancelled.';
     case 'parse':
-      return 'The server sent a reply we could not read. Please try again.';
+      return 'The server sent a reply that could not be read.';
     case 'http':
-      if (error.status === 404) return 'We could not find that. It may have expired.';
+      if (error.status === 404) return 'Not found. It may have expired.';
       if (error.status === 400 || error.status === 422) {
-        return 'Some of the information sent was not accepted. Please check it and try again.';
+        return 'The server would not accept that. Check it and try again.';
       }
-      if (error.status === 429) return 'The server is busy. Please wait a moment and try again.';
-      return 'The server had a problem. Please try again in a moment.';
+      if (error.status === 429) return 'The server is busy. Wait a moment.';
+      return 'The server had a problem. Try again.';
   }
 }
 

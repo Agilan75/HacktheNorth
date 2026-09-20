@@ -1,5 +1,5 @@
 /**
- * The AR store and the plane geometry. Pure, so it runs in node — which is
+ * The AR store and the plane geometry. Pure, so it runs in node, which is
  * also the point: nothing in `pose.viro.ts` touches the native module until
  * `hasViro()` says a build carries one.
  */

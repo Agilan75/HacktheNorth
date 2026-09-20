@@ -167,3 +167,17 @@ Checked against the npm registry and the published package contents, plus the Ex
 palette assigns `red` to DOES_NOT_FIT and `amber` to REFER by name, so red does mean bad now. PRD
 §13 is read-only, so the deviation is recorded here. Colour still never carries meaning alone:
 every verdict prints its word and its shape mark.
+
+---
+
+## Phase F — copy
+
+| # | Decision | Why | Rejected alternative |
+| --- | --- | --- | --- |
+| F-1 | **Em-dashes are removed from comments as well as from screen copy.** | The stated check is `grep -rn "—" apps/mobile/app apps/mobile/src`, which does not distinguish the two, and a house style that only applies to strings is not a house style. Each one was replaced by the punctuation that actually fits, a period, a comma or a colon, not one substitute everywhere. | Rewriting only the visible strings. |
+| F-2 | **The unavailable-money placeholder is `not priced`, not a dash.** | It was an em-dash, which is banned, and a surveyor writes what is missing rather than drawing a line. | A hyphen: a dash by another name. |
+| F-3 | **`describeApiError` was rewritten.** It carried "You seem to be offline. We'll try again when you're back online.", which is a "We'll" and a sentence that reassures rather than informs. | Every screen renders these strings, so leaving them would have left the banned voice on every error path in the app. | Leaving library copy out of the sweep. |
+| F-4 | **"Gemini" survives in exactly one place: the share-page footer.** Two comments in `photos.ts` named it and were reworded to "the vision call" and "the model". | The check is `grep -rniE "\bAI\b\|gemini\|claude"` over `app/` and `src/`, and it returns that one line. | Leaving the comments: they fail the stated check. |
+| F-5 | **Permission strings say what is read and what is not kept.** Every one is under 12 words. | They are the first words anyone sees, and they are the ones people read most carefully. "Retrofit reads the compass for direction only. Location is never stored." says more in eleven words than the sentence it replaced said in thirty. | Leaving them: the task names them explicitly. |
+| F-6 | **`Demo rate` is shown from `price.estimate`, which the engine already sets**, in `mute` under the price on both the verdict and the share screen. | The engine flags an estimate with no loss data behind it, which is exactly the placeholder-rate condition, so the app reads a fact instead of hard-coding a guess about the rating table. | A constant in the app that could drift from the rating table. |
+| F-7 | **The launch-to-verdict instrument is deleted, unmeasured.** | The task requires it gone before the last commit, and no device could run it: the one connected Android phone reports `unauthorized` to adb and no emulator image is installed. It is not guesswork-replaced with a number. `src/lib/timing.ts` exists in commits a3ed8a3 through c19c739 and can be cherry-picked back to take the measurement. | Reporting an estimate as if it were measured. |

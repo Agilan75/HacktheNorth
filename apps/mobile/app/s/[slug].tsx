@@ -8,7 +8,7 @@ import { describeApiError, getApi, isApiError } from '@/lib/api';
 import { Brand, Button, COLORS, Card, Heading, Notice, SPACE, Screen, SkeletonCard, Text, VerdictPill } from '@/ui';
 
 /**
- * Shared result — PRD §11 `/s/[slug]` (unit M9).
+ * Shared result. PRD §11 `/s/[slug]`, unit M9.
  *
  * The read-only result behind a share slug (GET /s/:slug): the verdict in
  * words and a glyph, the price, the plain explanation, the deciding rule with

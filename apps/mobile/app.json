@@ -15,10 +15,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "fit.retro.app",
       "infoPlist": {
-        "NSCameraUsageDescription": "Retrofit uses the camera to scan your room, so you can get a tenant quote without filling in a form.",
-        "NSMotionUsageDescription": "Retrofit reads device motion to tell how far you have turned, so it knows which parts of the room you have already scanned.",
-        "NSLocationWhenInUseUsageDescription": "Retrofit reads your compass heading while you scan, to map each photo to a direction in the room. Your location is never stored or shared.",
-        "NSPhotoLibraryUsageDescription": "Retrofit can use three photos from your library instead of a camera sweep, so a quote is still possible if scanning does not work for you.",
+        "NSCameraUsageDescription": "Retrofit reads the room through the camera. That is the whole quote.",
+        "NSMotionUsageDescription": "Retrofit reads motion to tell how far you have turned.",
+        "NSLocationWhenInUseUsageDescription": "Retrofit reads the compass for direction only. Location is never stored.",
+        "NSPhotoLibraryUsageDescription": "Retrofit reads three photos of the room if you prefer not to scan.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -36,32 +36,34 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Retrofit uses the camera to scan your room, so you can get a tenant quote without filling in a form."
+          "cameraPermission": "Retrofit reads the room through the camera. That is the whole quote."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Retrofit reads your compass heading while you scan, to map each photo to a direction in the room. Your location is never stored or shared."
+          "locationWhenInUsePermission": "Retrofit reads the compass for direction only. Location is never stored."
         }
       ],
       [
         "expo-sensors",
         {
-          "motionPermission": "Retrofit reads device motion to tell how far you have turned, so it knows which parts of the room you have already scanned."
+          "motionPermission": "Retrofit reads motion to tell how far you have turned."
         }
       ],
       [
         "@reactvision/react-viro",
         {
           "provider": "none",
-          "android": { "xRMode": "AR" },
+          "android": {
+            "xRMode": "AR"
+          },
           "ios": {
-            "cameraUsagePermission": "Retrofit uses the camera to scan your room, so you can get a tenant quote without filling in a form.",
-            "microphoneUsagePermission": "Retrofit does not record audio. The AR framework asks for this before it will start.",
-            "photosPermission": "Retrofit reads a photo you pick when you use the upload path instead of scanning.",
-            "savePhotosPermission": "Retrofit does not save photos to your library.",
-            "locationUsagePermission": "Retrofit reads your compass heading while you scan, to map each photo to a direction in the room. Your location is never stored or shared."
+            "cameraUsagePermission": "Retrofit reads the room through the camera. That is the whole quote.",
+            "microphoneUsagePermission": "Retrofit records no audio. The AR framework asks before it starts.",
+            "photosPermission": "Retrofit reads three photos of the room if you prefer not to scan.",
+            "savePhotosPermission": "Retrofit saves nothing to your library.",
+            "locationUsagePermission": "Retrofit reads the compass for direction only. Location is never stored."
           }
         }
       ]

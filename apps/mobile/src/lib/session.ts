@@ -4,7 +4,7 @@
  *
  * A tiny external store (no library), shared by /new, /sweep, /analyzing and
  * later screens. Pure apart from the `useSession` hook, which needs only
- * `react` — never `react-native` — so the store runs under vitest in node.
+ * `react`, never `react-native`, so the store runs under vitest in node.
  *
  * The store holds what the user gave us. It never computes a verdict, price or
  * hazard: those come back from the API.
