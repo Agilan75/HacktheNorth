@@ -44,10 +44,12 @@ engine, and the API reads it straight from the JSON file
 (`apps/api/src/services/sweep.ts`, `readObservableQuestionIds`) rather than widening the frozen
 `Question` type. The remaining 888 engine and API tests pass.
 
-**Also for the record, not a request:** three engine/api tests fail on Windows independently of
+**Also for the record, not a request:** four tests fail on Windows independently of
 this branch — `data.test.ts` "resolves data beside src/" (expects `/` path separators),
 `fixtures/golden.test.ts` "byte-for-byte" (expects LF, gets CRLF), and `scripts/backfill.test.ts`
-(reads the gitignored `apps/api/data/backfill`). All three fail identically on `build/retrofit`.
+(reads the gitignored `apps/api/data/backfill`), and `packages/verify/src/run-100k.test.ts`
+"parses flags with defaults". All four fail identically on `build/retrofit` with this branch
+stashed, verified by checking the base branch out and running them there.
 
 ---
 
