@@ -20,6 +20,7 @@ import type { PendingCapture } from '@/lib/capture';
 import { createLivePricer } from '@/lib/livePrice';
 import type { LivePricer } from '@/lib/livePrice';
 import { getSweepQueue } from '@/lib/queue';
+import { roomsStore } from '@/lib/rooms';
 import { SESSION_PROBLEM_TEXT, buildCreateRequest, sessionStore, useSession } from '@/lib/session';
 import type { SessionFrame } from '@/lib/session';
 import { Button, COLORS, Icon, MIN_TOUCH_TARGET, Notice, RADIUS, SPACE, Screen, Text } from '@/ui';
@@ -326,9 +327,27 @@ export default function SweepScreen() {
     }
     setSend({ kind: 'sending', count: built.request.frames.length });
     AccessibilityInfo.announceForAccessibility(`Sending ${built.request.frames.length} photos.`);
+
+    /**
+     * What this room is, captured now. The queued path below resolves long
+     * after this screen is gone and the session may belong to another room by
+     * then, so the room lists itself under the label and term it was actually
+     * sent with rather than whatever the session happens to hold on arrival.
+     */
+    const sent = sessionStore.getState();
+    const record = (sweepId: string): void => {
+      roomsStore.record({
+        sweepId,
+        roomLabel: sent.roomLabel,
+        termMonths: sent.termMonths,
+        source: sent.source,
+      });
+    };
+
     const result = await sweepQueue.submit(built.request);
     if (!alive.current) return;
     if (result.status === 'sent') {
+      record(result.sweep.id);
       sessionStore.setSweepId(result.sweep.id);
       // The photos are the server's now. Fifteen of them is six megabytes of
       // base64, and holding it through the analysis is headroom the phone needs
@@ -346,8 +365,14 @@ export default function SweepScreen() {
     sweepQueue
       .waitFor(result.queueId)
       .then((sweep) => {
+        // The room lists itself either way. The *session* is only re-pointed at
+        // this sweep while this screen is still the one on top: nothing cancels
+        // this promise, and writing the id after the user has moved on would
+        // aim the next room's camera at this room's findings.
+        record(sweep.id);
+        if (!alive.current) return;
         sessionStore.setSweepId(sweep.id);
-        if (alive.current) router.replace({ pathname: '/analyzing', params: { id: sweep.id } });
+        router.replace({ pathname: '/analyzing', params: { id: sweep.id } });
       })
       .catch(() => {
         if (alive.current) {

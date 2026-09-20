@@ -167,13 +167,56 @@ every push, where on cold launch that tick used to hide behind the splash screen
 compass permission read to shorten it. It deliberately does **not** warm the camera permission —
 requesting that is what raises the OS dialog, and keeping it off the launch path is half the point.
 
+## H13 — the rooms list is its own store, not a view of the session
+
+**Decision.** `src/lib/rooms.ts` holds the rooms already sent. The session store holds the room
+being scanned right now. They are separate, and the sweep records itself into the former.
+
+The first cut derived the list from the session: home subscribed to `sessionStore` and recorded a
+room whenever `sweepId` went non-null. That forced the offline-queued path in `scan.tsx` to write
+its id into the **live** session to get itself listed, on a promise nothing cancels, outside the
+`alive.current` guard. An adversarial review confirmed the consequence: finish a room offline, go
+home, start a second room, and when the network returns the first sweep's id lands in the shared
+session — which `/scan` subscribes to live — so the second room's camera shows the *first* room's
+hazard pins, and the first room gets listed under the second room's name and term.
+
+The two things were only ever conflated because the app could have one room in flight at a time.
+A sweep now records `{ sweepId, roomLabel, termMonths, source }` captured **before** the await, so
+it lists itself correctly however late it lands, and `setSweepId` is properly guarded — the session
+is re-pointed only while the camera is still the screen on top.
+
+This also removes the module-scope `sessionStore.subscribe` that was never unsubscribed, and gives
+the registry real tests (`src/lib/rooms.test.ts`, 11 cases, including the late-sweep case above),
+which a registry living inside a route file could never have had.
+
+**Rejected:** guarding `setSweepId` alone — correct, but the queued room then never appears on home
+at all. **Also rejected:** keeping the registry in `app/index.tsx` and importing it from
+`app/scan.tsx` — a route file exporting a non-component API, untestable under vitest.
+
+## H14 — room cards never fetch the photos
+
+**Decision.** Home's `getSweep` passes `{ images: false }`.
+
+A card draws a heading, a stage, a verdict pill and two lines of text. It draws no image. Without
+the flag it pulled every kept frame as a `data:image/jpeg;base64,…` string — about six megabytes a
+room — and parked the whole `SweepDto` in React state on the one screen that is never unmounted,
+re-fetching on every focus. That is the same cost `scan.tsx` calls `clearFrames()` to avoid, three
+lines away.
+
+Every other non-drawing reader already passed it (`verdict.tsx`, and the poller in `api.ts`). The
+two that omit it — `hazard/[id].tsx` and `verify-fix.tsx` — both actually render a frame. Home was
+the only non-drawing reader that omitted it.
+
 ---
 
 ## Verification
 
 `npx tsc --noEmit -p apps/mobile` — exit 0, all eight route files in the program.
 
-`vitest.config.ts` includes only `apps/mobile/src/**/*.test.ts(x)` and nothing under `src/` imports
-from `app/`, so no existing test covers any of this and none of them break. The rest is a device
-walk: all nine retargeted edges, both permission-denied gates, the offline queued path, a second
-room end to end, and a cold `retrofit://s/<slug>` link.
+`npx vitest run apps/mobile/src/lib/rooms.test.ts --project mobile` — 11 passed.
+
+`vitest.config.ts` includes only `apps/mobile/src/**/*.test.ts(x)`, so the route files themselves
+are covered by `tsc` and a device only. The rest is a device walk: all nine retargeted edges, both
+permission-denied gates, a second room end to end, a cold `retrofit://s/<slug>` link, and — for
+H13 specifically — finish a room in airplane mode, go home, start a second room, then restore the
+network and confirm the second room's camera shows no pins from the first.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Location from 'expo-location';
@@ -7,8 +7,10 @@ import type { SweepDto, SweepStageDto } from '@retrofit/contracts';
 import { describeApiError, getApi } from '@/lib/api';
 import { getSweepQueue, queueStatusMessage } from '@/lib/queue';
 import type { QueueSnapshot } from '@/lib/queue';
+import { useRooms } from '@/lib/rooms';
+import type { RoomEntry } from '@/lib/rooms';
 import { ROOM_LABEL_MAX, SESSION_PROBLEM_TEXT, TERM_OPTIONS, sessionStore } from '@/lib/session';
-import type { FrameSource, TermMonths } from '@/lib/session';
+import type { TermMonths } from '@/lib/session';
 import {
   Brand,
   Button,
@@ -37,11 +39,12 @@ import type { Choice, IconName } from '@/ui';
  * arrives after the user asked to scan instead of on launch, and the camera
  * and the 60 Hz motion listener no longer start at app launch.
  *
- * Under the form sits every room this launch has sent. There is no route that
- * lists sweeps (`packages/contracts` has createSweep and getSweep, no index),
- * so the list is a module-scope registry fed by the session store, and each
- * card loads its own sweep from GET /sweeps/:id. Nothing here is persisted:
- * closing the app empties it, which is what the last line on screen says.
+ * Under the form sits every room this launch has sent, from `lib/rooms`. There
+ * is no route that lists sweeps (`packages/contracts` has createSweep and
+ * getSweep, no index), so the list is what this launch recorded as it sent, and
+ * each card loads its own sweep from GET /sweeps/:id — without the frame
+ * images, which no card draws. Nothing here is persisted: closing the app
+ * empties it, which is what the last line on screen says.
  *
  * This screen does no arithmetic. It shows the stage and the verdict the API
  * returned and never a price — `money()` is private to the verdict screen and
@@ -49,51 +52,6 @@ import type { Choice, IconName } from '@/ui';
  */
 
 const sendSweep = getSweepQueue((req) => getApi().createSweep(req));
-
-/* -------------------------------------------------------------------------- */
-/* Rooms registry (module scope, in memory, this launch only)                 */
-/* -------------------------------------------------------------------------- */
-
-interface RoomEntry {
-  readonly sweepId: string;
-  readonly roomLabel: string;
-  readonly termMonths: TermMonths;
-  readonly source: FrameSource | null;
-}
-
-let rooms: readonly RoomEntry[] = [];
-const roomListeners = new Set<() => void>();
-
-/**
- * Records the session's sweep the moment it gains an id. `/scan` sets that id
- * with no `alive` guard, so a sweep that lands after the camera unmounted —
- * the offline-queued one — still registers itself here.
- *
- * It reads `source` before the camera clears the frames, because setting the
- * id is what fires this, and the first write wins: a second call for an id
- * already listed returns at the guard.
- */
-function recordFromSession(): void {
-  const s = sessionStore.getState();
-  if (s.sweepId === null || rooms.some((r) => r.sweepId === s.sweepId)) return;
-  rooms = [
-    { sweepId: s.sweepId, roomLabel: s.roomLabel.trim(), termMonths: s.termMonths, source: s.source },
-    ...rooms,
-  ];
-  for (const l of [...roomListeners]) l();
-}
-
-recordFromSession();
-sessionStore.subscribe(recordFromSession);
-
-function subscribeRooms(listener: () => void): () => void {
-  roomListeners.add(listener);
-  return () => {
-    roomListeners.delete(listener);
-  };
-}
-
-const getRooms = (): readonly RoomEntry[] => rooms;
 
 /* -------------------------------------------------------------------------- */
 /* Words                                                                      */
@@ -146,7 +104,7 @@ function termWords(months: number): string {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const list = useSyncExternalStore(subscribeRooms, getRooms, getRooms);
+  const list = useRooms();
 
   /**
    * The form is local state, never `useSession`. `sessionStore.reset()` runs on
@@ -325,7 +283,10 @@ function RoomCard({ entry, refreshKey }: { readonly entry: RoomEntry; readonly r
   useEffect(() => {
     const controller = new AbortController();
     getApi()
-      .getSweep(entry.sweepId, { signal: controller.signal })
+      // Never the images. A card draws a stage and a verdict, and fifteen
+      // frames is about six megabytes of base64 that this screen would then
+      // hold for the life of the app: home is never unmounted.
+      .getSweep(entry.sweepId, { images: false, signal: controller.signal })
       .then((sweep) => setLoad({ kind: 'ok', sweep }))
       .catch((error: unknown) => {
         if (!controller.signal.aborted) setLoad({ kind: 'error', message: describeApiError(error) });

@@ -2,10 +2,19 @@
 
 **File:** `docs/contracts/OWNERSHIP.json` (and `UNITS.json` if the unit's `owns` list mirrors it).
 
-**Change (additive):** map `apps/mobile/app/scan.tsx` to unit **M6**, and retire the four entries
-that name files deleted in commit `a3ed8a3` — `apps/mobile/app/new.tsx` (M5),
-`apps/mobile/app/sweep.tsx` (M6), `apps/mobile/app/confirm.tsx` (M7),
-`apps/mobile/app/questions.tsx` (M7).
+**Change (additive):** map `apps/mobile/app/scan.tsx` and `apps/mobile/src/lib/rooms.ts` (plus its
+test) to unit **M6**, and retire the four entries that name files deleted in commit `a3ed8a3` —
+`apps/mobile/app/new.tsx` (M5), `apps/mobile/app/sweep.tsx` (M6), `apps/mobile/app/confirm.tsx`
+(M7), `apps/mobile/app/questions.tsx` (M7).
+
+**On `src/lib/rooms.ts` and AGENTS.md §7.** §7 forbids inventing shared helpers. This is not a
+helper module: it is a store, a peer of `src/lib/session.ts` and `src/lib/queue.ts`, and it
+duplicates nothing that already exists. It was necessary rather than convenient — deriving the
+rooms list from the session store forced an offline-queued sweep to write its id into the *live*
+session to get itself listed, which re-pointed a running scan at the wrong sweep (the second room's
+camera showing the first room's hazard pins). Splitting "rooms already sent" from "the room being
+scanned" is what fixes that class of bug, and it is recorded in
+`docs/decisions/mobile-home-flow.md` §H13.
 
 **Why:** the camera and the sweep moved out of `apps/mobile/app/index.tsx` into a route of its own
 so that `/` could become the app's opening screen. `index.tsx` keeps its M5 mapping and is now
