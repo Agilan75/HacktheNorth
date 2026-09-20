@@ -18,8 +18,8 @@ import { Button, Text } from '@/ui';
 /** Coverage at which Finish unlocks. The engine's MIN_COVERAGE_PCT. */
 export const FINISH_COVERAGE_PCT = 75;
 
-/** Dark plate, so paper-coloured text reads over any camera image. */
-const SCRIM = 'rgba(31,30,27,0.72)';
+/** Ink at 72%, so bone text reads over any camera image. Not a second dark. */
+const SCRIM = 'rgba(25, 25, 25, 0.72)';
 
 export interface HudProps {
   /** 0..100, floored, so 74.9 never reads as 75. */
@@ -123,7 +123,7 @@ function LockedFinish({ reason }: { readonly reason: string }) {
           borderRadius: RADIUS.pill,
           borderWidth: 2,
           borderStyle: 'dashed',
-          borderColor: COLORS.paper,
+          borderColor: COLORS.bone,
           backgroundColor: SCRIM,
         }}
       >

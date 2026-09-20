@@ -6,8 +6,8 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "backgroundColor": "#FAF8F2",
-    "primaryColor": "#E4002B",
+    "backgroundColor": "#F4EFE6",
+    "primaryColor": "#D97757",
     "assetBundlePatterns": [
       "**/*"
     ],

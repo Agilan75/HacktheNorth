@@ -206,7 +206,7 @@ function HazardDetail({
           <View
             accessible
             accessibilityLabel={`From the insurer's rules, ${firedRule.citation.section}: ${firedRule.citation.quote}`}
-            style={{ gap: SPACE.xs, borderLeftWidth: 3, borderLeftColor: COLORS.muted, paddingLeft: SPACE.md }}
+            style={{ gap: SPACE.xs, borderLeftWidth: 3, borderLeftColor: COLORS.mute, paddingLeft: SPACE.md }}
           >
             <Text variant="small" tone="muted">
               {`The insurer's rule (${firedRule.citation.section}):`}
@@ -276,14 +276,14 @@ function StatusLine({ status, hazardKey }: { readonly status: ReturnType<typeof 
           gap: SPACE.xs,
           borderWidth: 2,
           borderColor: COLORS.ink,
-          backgroundColor: status === 'present' ? COLORS.ink : COLORS.paper,
+          backgroundColor: status === 'present' ? COLORS.ink : COLORS.bone,
           borderRadius: RADIUS.pill,
           paddingHorizontal: SPACE.md,
           paddingVertical: SPACE.xs,
         }}
       >
-        <Icon name={STATUS_ICON[status]} size={14} color={status === 'present' ? COLORS.paper : COLORS.ink} />
-        <Text variant="small" weight="semibold" style={{ color: status === 'present' ? COLORS.paper : COLORS.ink }}>
+        <Icon name={STATUS_ICON[status]} size={14} color={status === 'present' ? COLORS.bone : COLORS.ink} />
+        <Text variant="small" weight="semibold" style={{ color: status === 'present' ? COLORS.bone : COLORS.ink }}>
           {word}
         </Text>
       </View>
@@ -413,7 +413,7 @@ function FramedImage({
         borderWidth: BORDER.width,
         borderColor: BORDER.color,
         overflow: 'hidden',
-        backgroundColor: COLORS.mutedTint,
+        backgroundColor: COLORS.muteTint,
       }}
     >
       <Image source={{ uri }} resizeMode="contain" style={{ width: '100%', height: '100%' }} />
@@ -430,7 +430,7 @@ function FramedImage({
             height: `${Math.abs(box[2] - box[0]) / 10}%`,
             width: `${Math.abs(box[3] - box[1]) / 10}%`,
             borderWidth: 3,
-            borderColor: COLORS.paper,
+            borderColor: COLORS.bone,
             borderRadius: 6,
           }}
         >

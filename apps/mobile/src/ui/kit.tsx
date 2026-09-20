@@ -41,7 +41,6 @@ import type {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { Edge } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
   BORDER,
   COLORS,
@@ -73,12 +72,17 @@ const CAPPED_STEPS: ReadonlySet<FontSizeToken> = new Set(['display', 'title']);
 
 export type TextTone = 'ink' | 'muted' | 'accent' | 'inverse';
 
-/** `muted` text uses Muted deep: plain Muted fails AA at body sizes (D01-1). */
+/**
+ * `accent` is the one tone that does not read at body size: 2.73:1 on bone. It
+ * is for the price on the verdict screen, at the display step, and nothing
+ * else. `muted` is 3.24:1, AA-large, so it is for secondary lines beside
+ * something ink already says. Body text is always ink.
+ */
 const TONE_COLOR: Readonly<Record<TextTone, string>> = {
   ink: COLORS.ink,
-  muted: COLORS.mutedDeep,
-  accent: COLORS.redDeep,
-  inverse: COLORS.paper,
+  muted: COLORS.mute,
+  accent: COLORS.accent,
+  inverse: COLORS.bone,
 };
 
 /**
@@ -197,12 +201,35 @@ export interface ButtonProps extends Omit<PressableProps, 'children' | 'style'> 
   readonly style?: StyleProp<ViewStyle>;
 }
 
+/**
+ * Accent fills the primary button and ink sits on it, which is 5.63:1. A press
+ * keeps the fill and takes an ink border rather than darkening: with seven
+ * colours there is no darker accent, and a border is a shape, not a shade.
+ */
 const BUTTON_COLORS: Readonly<
-  Record<ButtonVariant, { bg: string; bgPressed: string; border: string; text: string }>
+  Record<ButtonVariant, { bg: string; bgPressed: string; border: string; borderPressed: string; text: string }>
 > = {
-  primary: { bg: COLORS.red, bgPressed: COLORS.redDeep, border: COLORS.red, text: COLORS.paper },
-  secondary: { bg: COLORS.paper, bgPressed: COLORS.mutedTint, border: COLORS.ink, text: COLORS.ink },
-  quiet: { bg: 'transparent', bgPressed: COLORS.mutedTint, border: 'transparent', text: COLORS.ink },
+  primary: {
+    bg: COLORS.accent,
+    bgPressed: COLORS.accent,
+    border: COLORS.accent,
+    borderPressed: COLORS.ink,
+    text: COLORS.ink,
+  },
+  secondary: {
+    bg: COLORS.bone,
+    bgPressed: COLORS.muteTint,
+    border: COLORS.ink,
+    borderPressed: COLORS.ink,
+    text: COLORS.ink,
+  },
+  quiet: {
+    bg: 'transparent',
+    bgPressed: COLORS.muteTint,
+    border: 'transparent',
+    borderPressed: 'transparent',
+    text: COLORS.ink,
+  },
 };
 
 /** A 44pt-minimum button whose height grows with the user's text size. */
@@ -242,11 +269,11 @@ export function Button({
           paddingVertical: SPACE.md,
           borderRadius: RADIUS.pill,
           borderWidth: 2,
-          borderColor: inactive ? COLORS.mutedTint : c.border,
+          borderColor: inactive ? COLORS.muteTint : pressed ? c.borderPressed : c.border,
           backgroundColor: inactive
             ? variant === 'quiet'
               ? 'transparent'
-              : COLORS.mutedTint
+              : COLORS.muteTint
             : pressed
               ? c.bgPressed
               : c.bg,
@@ -258,19 +285,19 @@ export function Button({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'primary' ? COLORS.mutedDeep : COLORS.ink}
+          color={COLORS.ink}
           accessibilityElementsHidden
           importantForAccessibility="no"
         />
       ) : icon ? (
-        <Icon name={icon} size={18} color={inactive ? COLORS.mutedDeep : c.text} />
+        <Icon name={icon} size={18} color={inactive ? COLORS.mute : c.text} />
       ) : null}
       <Text
         variant="body"
         weight="semibold"
         align="center"
         style={{
-          color: inactive ? COLORS.mutedDeep : c.text,
+          color: inactive ? COLORS.mute : c.text,
           textDecorationLine: variant === 'quiet' ? 'underline' : 'none',
           flexShrink: 1,
         }}
@@ -287,10 +314,21 @@ export function Button({
 
 export type CardTone = 'plain' | 'muted' | 'accent';
 
+/**
+ * Three surfaces, two fills. `accent` keeps the bone fill and takes an accent
+ * border instead: with one accent there is no accent tint to fill with, and a
+ * border separates the card without putting body text on a low-contrast ground.
+ */
 const CARD_BG: Readonly<Record<CardTone, string>> = {
-  plain: COLORS.paper,
-  muted: COLORS.mutedTint,
-  accent: COLORS.redTint,
+  plain: COLORS.bone,
+  muted: COLORS.muteTint,
+  accent: COLORS.bone,
+};
+
+const CARD_BORDER: Readonly<Record<CardTone, { color: string; width: number }>> = {
+  plain: { color: COLORS.muteTint, width: BORDER.width },
+  muted: { color: COLORS.muteTint, width: BORDER.width },
+  accent: { color: COLORS.accent, width: 2 },
 };
 
 export interface CardProps extends ViewProps {
@@ -316,7 +354,14 @@ export function Card({
   style,
   ...rest
 }: CardProps) {
-  const base: ViewStyle = { ...cardStyle(padding), backgroundColor: CARD_BG[tone], gap: SPACE.sm };
+  const edge = CARD_BORDER[tone];
+  const base: ViewStyle = {
+    ...cardStyle(padding),
+    backgroundColor: CARD_BG[tone],
+    borderColor: edge.color,
+    borderWidth: edge.width,
+    gap: SPACE.sm,
+  };
   if (onPress) {
     return (
       <Pressable
@@ -351,69 +396,20 @@ export function Card({
 }
 
 /* -------------------------------------------------------------------------- */
-/* Hero                                                                       */
-/* -------------------------------------------------------------------------- */
-
-export type HeroTone = 'ink' | 'blue' | 'red' | 'green';
-
-/**
- * Gradient pairs are existing tokens only — never a new colour. Red stays the
- * verdict-pill colour elsewhere (PRD §13); `red` here is only used behind a
- * FIT verdict, so it still reads as "this is the verdict colour", not as a
- * decorative choice unrelated to the pill beside it.
- */
-const HERO_GRADIENT: Readonly<Record<HeroTone, readonly [string, string]>> = {
-  ink: [COLORS.ink, COLORS.mutedDeep],
-  blue: [COLORS.blue, COLORS.blueDeep],
-  red: [COLORS.red, COLORS.redDeep],
-  green: [COLORS.green, COLORS.greenDeep],
-};
-
-export interface HeroProps {
-  readonly tone?: HeroTone;
-  readonly padding?: SpaceToken;
-  readonly children?: ReactNode;
-  readonly accessibilityLabel?: string;
-  readonly accessibilityRole?: AccessibilityRole;
-  readonly style?: StyleProp<ViewStyle>;
-}
-
-/**
- * A gradient surface with no shadow (PRD §13: elevation is a border, never a
- * shadow) for the handful of places that deserve real visual weight — a price,
- * a verdict, a welcome banner. Text inside should use `tone="inverse"`.
- */
-export function Hero({ tone = 'ink', padding = 'xl', children, accessibilityLabel, accessibilityRole, style }: HeroProps) {
-  const [from, to] = HERO_GRADIENT[tone];
-  return (
-    <LinearGradient
-      colors={[from, to]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole={accessibilityRole}
-      style={[{ borderRadius: RADIUS.card, padding: SPACE[padding], gap: SPACE.sm }, style]}
-    >
-      {children}
-    </LinearGradient>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
 /* Brand                                                                      */
 /* -------------------------------------------------------------------------- */
 
 export interface BrandProps {
-  /** Badge diameter in points. Default 40. */
+  /** Mark diameter in points. Default 40. */
   readonly size?: number;
   readonly showWordmark?: boolean;
   readonly style?: StyleProp<ViewStyle>;
 }
 
 /**
- * The Retrofit lockup: a gradient badge and, optionally, the wordmark. Always
- * decorative — every screen that shows it also has its own real Heading, so
- * this never has to carry the app's name to a screen reader by itself.
+ * The Retrofit lockup: a flat accent mark and, optionally, the wordmark. One
+ * colour, no gradient. Always decorative — every screen that shows it has its
+ * own real Heading, so this never carries the app's name on its own.
  */
 export function Brand({ size = 40, showWordmark = true, style }: BrandProps) {
   return (
@@ -422,73 +418,23 @@ export function Brand({ size = 40, showWordmark = true, style }: BrandProps) {
       importantForAccessibility="no-hide-descendants"
       style={[{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }, style]}
     >
-      <LinearGradient
-        colors={[COLORS.red, COLORS.redDeep]}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+      <View
         style={{
           width: size,
           height: size,
           borderRadius: size / 2,
+          backgroundColor: COLORS.accent,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
-        <Ionicons name="home" size={Math.round(size * 0.5)} color={COLORS.paper} />
-      </LinearGradient>
+        <Ionicons name="home" size={Math.round(size * 0.5)} color={COLORS.ink} />
+      </View>
       {showWordmark ? (
         <Text variant="heading" weight="semibold">
           Retrofit
         </Text>
       ) : null}
-    </View>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
-/* Badge                                                                      */
-/* -------------------------------------------------------------------------- */
-
-export type BadgeTone = 'neutral' | 'info' | 'positive' | 'attention';
-
-const BADGE_COLOR: Readonly<Record<BadgeTone, { bg: string; text: string }>> = {
-  neutral: { bg: COLORS.mutedTint, text: COLORS.mutedDeep },
-  info: { bg: COLORS.blueTint, text: COLORS.blueDeep },
-  positive: { bg: COLORS.greenTint, text: COLORS.greenDeep },
-  attention: { bg: COLORS.redTint, text: COLORS.redDeep },
-};
-
-export interface BadgeProps {
-  readonly label: string;
-  /** Decoration only — the label text always carries the meaning (PRD §13). */
-  readonly tone?: BadgeTone;
-  readonly icon?: IconName;
-  readonly style?: StyleProp<ViewStyle>;
-}
-
-/** A small pill of status text — mirrors the console's Badge tones (info = blue, positive = green). */
-export function Badge({ label, tone = 'neutral', icon, style }: BadgeProps) {
-  const c = BADGE_COLOR[tone];
-  return (
-    <View
-      style={[
-        {
-          flexDirection: 'row',
-          alignItems: 'center',
-          alignSelf: 'flex-start',
-          gap: SPACE.xs,
-          paddingHorizontal: SPACE.md,
-          paddingVertical: SPACE.xs,
-          borderRadius: RADIUS.pill,
-          backgroundColor: c.bg,
-        },
-        style,
-      ]}
-    >
-      {icon ? <Icon name={icon} size={14} color={c.text} /> : null}
-      <Text variant="small" weight="semibold" style={{ color: c.text }}>
-        {label}
-      </Text>
     </View>
   );
 }
@@ -638,7 +584,7 @@ export function Skeleton({ lines = 3, variant = 'body', accessibilityLabel = 'Lo
             height: Math.round(lineHeight * 0.75),
             width: i === count - 1 && count > 1 ? '60%' : '100%',
             borderRadius: SPACE.xs,
-            backgroundColor: COLORS.mutedTint,
+            backgroundColor: COLORS.muteTint,
             opacity: pulse,
           }}
         />
@@ -663,10 +609,15 @@ export function SkeletonCard({ accessibilityLabel = 'Loading', lines = 2 }: Pick
 
 export type NoticeTone = 'info' | 'error' | 'success';
 
-const NOTICE: Readonly<Record<NoticeTone, { word: string; bg: string; border: string }>> = {
-  info: { word: 'Note', bg: COLORS.mutedTint, border: COLORS.mutedTint },
-  error: { word: 'Problem', bg: COLORS.redTint, border: COLORS.redDeep },
-  success: { word: 'Done', bg: COLORS.paper, border: COLORS.ink },
+/**
+ * The word is the signal; the border is the emphasis. Red appears on one of
+ * the three, because a problem is the only thing here that warrants it, and
+ * even then the text says "Problem" before any colour is read.
+ */
+const NOTICE: Readonly<Record<NoticeTone, { word: string; bg: string; border: string; width: number }>> = {
+  info: { word: 'Note', bg: COLORS.muteTint, border: COLORS.muteTint, width: BORDER.width },
+  error: { word: 'Problem', bg: COLORS.bone, border: COLORS.red, width: 2 },
+  success: { word: 'Done', bg: COLORS.bone, border: COLORS.ink, width: 2 },
 };
 
 export interface NoticeProps {
@@ -691,7 +642,7 @@ export function Notice({ tone = 'info', children, actionLabel, onAction, style }
         {
           backgroundColor: n.bg,
           borderColor: n.border,
-          borderWidth: BORDER.width,
+          borderWidth: n.width,
           borderRadius: RADIUS.card,
           padding: SPACE.lg,
           gap: SPACE.sm,
@@ -747,7 +698,7 @@ export function TextField({ label, help, error, style, accessibilityLabel, acces
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityHint={[help, error ? `Problem: ${error}` : null, accessibilityHint].filter(Boolean).join('. ') || undefined}
         allowFontScaling
-        placeholderTextColor={COLORS.mutedDeep}
+        placeholderTextColor={COLORS.mute}
         {...rest}
         onFocus={(e) => {
           setFocused(true);
@@ -765,8 +716,8 @@ export function TextField({ label, help, error, style, accessibilityLabel, acces
             paddingVertical: SPACE.sm,
             borderRadius: RADIUS.card,
             borderWidth: focused || error ? 2 : BORDER.width,
-            borderColor: error ? COLORS.redDeep : focused ? COLORS.ink : COLORS.muted,
-            backgroundColor: COLORS.paper,
+            borderColor: error ? COLORS.red : focused ? COLORS.ink : COLORS.mute,
+            backgroundColor: COLORS.bone,
           },
         ]}
       />
@@ -838,8 +789,8 @@ export function ChoiceGroup<V extends string | number | boolean>({
                   paddingVertical: SPACE.md,
                   borderRadius: RADIUS.card,
                   borderWidth: selected ? 2 : BORDER.width,
-                  borderColor: selected ? COLORS.ink : COLORS.muted,
-                  backgroundColor: selected ? COLORS.ink : pressed ? COLORS.mutedTint : COLORS.paper,
+                  borderColor: selected ? COLORS.ink : COLORS.mute,
+                  backgroundColor: selected ? COLORS.ink : pressed ? COLORS.muteTint : COLORS.bone,
                   flexGrow: direction === 'row' ? 1 : 0,
                 },
               ]}
@@ -849,11 +800,11 @@ export function ChoiceGroup<V extends string | number | boolean>({
                 weight="semibold"
                 importantForAccessibility="no"
                 accessibilityElementsHidden
-                style={{ color: selected ? COLORS.paper : COLORS.mutedDeep, minWidth: 16 }}
+                style={{ color: selected ? COLORS.bone : COLORS.mute, minWidth: 16 }}
               >
                 {selected ? '✓' : '○'}
               </Text>
-              <Text variant="body" style={{ color: selected ? COLORS.paper : COLORS.ink, flexShrink: 1 }}>
+              <Text variant="body" style={{ color: selected ? COLORS.bone : COLORS.ink, flexShrink: 1 }}>
                 {choice.label}
               </Text>
             </Pressable>
@@ -907,7 +858,7 @@ export function Screen({
     <SafeAreaView
       edges={edges}
       accessibilityLabel={accessibilityLabel}
-      style={{ flex: 1, backgroundColor: COLORS.paper }}
+      style={{ flex: 1, backgroundColor: COLORS.bone }}
     >
       {scroll ? (
         <ScrollView
@@ -934,7 +885,7 @@ export function Screen({
             gap: SPACE.sm,
             borderTopWidth: BORDER.width,
             borderTopColor: BORDER.color,
-            backgroundColor: COLORS.paper,
+            backgroundColor: COLORS.bone,
           }}
         >
           {footer}

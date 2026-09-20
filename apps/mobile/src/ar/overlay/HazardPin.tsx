@@ -62,12 +62,12 @@ export function HazardPin({
         paddingVertical: SPACE.xs,
         borderRadius: RADIUS.pill,
         borderWidth: 2,
-        borderColor: COLORS.paper,
+        borderColor: COLORS.bone,
         backgroundColor: COLORS.ink,
       }}
     >
       <View style={{ width: DOT, height: DOT, borderRadius: DOT / 2, backgroundColor: COLORS.red }} />
-      {icon !== undefined ? <Icon name={icon} size={14} color={COLORS.paper} /> : null}
+      {icon !== undefined ? <Icon name={icon} size={14} color={COLORS.bone} /> : null}
       <Text variant="small" weight="semibold" tone="inverse" numberOfLines={1}>
         {words}
       </Text>

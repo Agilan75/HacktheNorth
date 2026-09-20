@@ -358,7 +358,7 @@ export default function VerifyFixScreen() {
           accessibilityRole="image"
           accessibilityLabel={`Your new photo of ${selectedName.toLowerCase()}`}
           resizeMode="cover"
-          style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: RADIUS.card, backgroundColor: COLORS.mutedTint }}
+          style={{ width: '100%', aspectRatio: 4 / 3, borderRadius: RADIUS.card, backgroundColor: COLORS.muteTint }}
         />
       ) : null}
       <View style={{ gap: SPACE.sm }}>

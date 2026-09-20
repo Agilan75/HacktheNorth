@@ -96,39 +96,35 @@ function check(foreground: string, background: string): ContrastCheck {
 }
 
 /**
- * Every foreground/background pair the design system actually uses.
+ * Every foreground/background pair the phone app actually uses.
  *
- * Surfaces are Paper (page), Muted tint (table header, chip) and Red tint
- * (highlighted row). Verdict pills are derived from VERDICT_STYLES; an
- * outlined (transparent) pill sits on Paper. `muted` on Paper is listed
- * because it is used, and it is AA-large only: it is for 22px+ or decorative
- * text, and small secondary text must use `mutedDeep`.
+ * Bone is every background and muteTint is what a card is filled with. Ink is
+ * all text; `mute` is secondary text and is AA-large only, so it belongs at
+ * 22px and up or beside something ink already says. Accent is never text on
+ * bone except at display size, where it carries the price and nothing else,
+ * and it is listed here so that fact is measured rather than assumed. Amber and
+ * red are never text at all: they are verdict fills, and both carry ink or bone
+ * on top.
  *
- * Blue and Green are the accent family (never a verdict): Blue Deep and
- * Green Deep are the text pairings (on Paper and on their own Tint, for
- * badges and chips); Blue is also used as a filled surface (primary button,
- * chart marks) with Paper text on top, mirroring how Red is used for FIT.
+ * The console's legacy aliases are not listed. They point at these same seven
+ * colours, so every pair they can form is already here.
  */
 export function contrastMatrix(): readonly ContrastCheck[] {
   const pairs: Array<readonly [string, string]> = [
-    [COLORS.ink, COLORS.paper],
-    [COLORS.mutedDeep, COLORS.paper],
-    [COLORS.muted, COLORS.paper],
-    [COLORS.red, COLORS.paper],
-    [COLORS.redDeep, COLORS.paper],
-    [COLORS.ink, COLORS.mutedTint],
-    [COLORS.mutedDeep, COLORS.mutedTint],
-    [COLORS.ink, COLORS.redTint],
-    [COLORS.redDeep, COLORS.redTint],
-    [COLORS.blueDeep, COLORS.paper],
-    [COLORS.paper, COLORS.blue],
-    [COLORS.blueDeep, COLORS.blueTint],
-    [COLORS.greenDeep, COLORS.paper],
-    [COLORS.greenDeep, COLORS.greenTint],
+    [COLORS.ink, COLORS.bone],
+    [COLORS.mute, COLORS.bone],
+    [COLORS.red, COLORS.bone],
+    [COLORS.accent, COLORS.bone],
+    [COLORS.ink, COLORS.muteTint],
+    [COLORS.ink, COLORS.accent],
+    [COLORS.ink, COLORS.amber],
+    [COLORS.bone, COLORS.ink],
+    [COLORS.bone, COLORS.red],
   ];
+  // Every verdict is a filled pill now, but the check stays: an outlined one
+  // would sit on bone, and its text has to be measured against that.
   for (const style of Object.values(VERDICT_STYLES)) {
-    const background = style.fill === 'transparent' ? COLORS.paper : style.fill;
-    pairs.push([style.text, background]);
+    pairs.push([style.text, style.fill === 'transparent' ? COLORS.bone : style.fill]);
   }
 
   const seen = new Set<string>();
@@ -141,3 +137,18 @@ export function contrastMatrix(): readonly ContrastCheck[] {
   }
   return out;
 }
+
+/**
+ * The pairs that are allowed to fall short of AA, and why. Everything else in
+ * the matrix must pass, and the contrast test asserts exactly that.
+ *
+ * `accent` on `bone` is 2.73:1. It is the price on the verdict screen: one
+ * number, at the 34pt display step, with the same figure repeated in ink
+ * underneath and read out in full to a screen reader. `mute` on `bone` is
+ * 3.24:1, AA-large: secondary lines only, never a label that has to be read on
+ * its own.
+ */
+export const CONTRAST_EXEMPTIONS: readonly (readonly [string, string])[] = [
+  [COLORS.accent, COLORS.bone],
+  [COLORS.mute, COLORS.bone],
+];

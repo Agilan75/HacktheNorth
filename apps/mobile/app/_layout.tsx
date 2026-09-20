@@ -49,9 +49,9 @@ export default function RootLayout() {
           headerShown: true,
           headerBackTitle: 'Back',
           headerTintColor: COLORS.ink,
-          headerStyle: { backgroundColor: COLORS.paper },
+          headerStyle: { backgroundColor: COLORS.bone },
           headerTitleStyle: { fontFamily: FONT_FAMILIES.display },
-          contentStyle: { backgroundColor: COLORS.paper },
+          contentStyle: { backgroundColor: COLORS.bone },
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />

@@ -67,7 +67,7 @@ export function ValueTag({
           paddingHorizontal: SPACE.sm,
           paddingVertical: 2,
           borderRadius: RADIUS.pill,
-          backgroundColor: COLORS.paper,
+          backgroundColor: COLORS.bone,
         },
         style,
       ]}

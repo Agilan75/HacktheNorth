@@ -406,7 +406,7 @@ function HazardRow({ cost, onPress }: { readonly cost: HazardCostDto; readonly o
       accessibilityHint="Shows the photo and what fixing it does."
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
-        <Icon name={HAZARD_ICON[cost.hazardKey] ?? 'warning-outline'} size={18} color={COLORS.mutedDeep} />
+        <Icon name={HAZARD_ICON[cost.hazardKey] ?? 'warning-outline'} size={18} color={COLORS.mute} />
         <Text weight="semibold" style={{ flex: 1 }}>
           {name}
         </Text>

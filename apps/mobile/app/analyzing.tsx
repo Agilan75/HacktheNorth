@@ -276,7 +276,7 @@ function StepBar({ finished, failed }: { readonly finished: number; readonly fai
               flex: 1,
               height: 4,
               borderRadius: 2,
-              backgroundColor: i < finished ? COLORS.ink : COLORS.mutedTint,
+              backgroundColor: i < finished ? COLORS.ink : COLORS.muteTint,
             }}
           />
         ))}
@@ -309,12 +309,12 @@ function FindingCard({ finding }: { readonly finding: Finding }) {
               width: 32,
               height: 32,
               borderRadius: RADIUS.pill,
-              backgroundColor: COLORS.mutedTint,
+              backgroundColor: COLORS.muteTint,
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Icon name={finding.icon} size={16} color={COLORS.mutedDeep} />
+            <Icon name={finding.icon} size={16} color={COLORS.mute} />
           </View>
           <Text weight="semibold" style={{ flex: 1 }}>
             {finding.name}

@@ -5,8 +5,7 @@ import * as Linking from 'expo-linking';
 import type { ShareDto } from '@retrofit/contracts';
 
 import { describeApiError, getApi, isApiError } from '@/lib/api';
-import { Brand, COLORS, Button, Card, Heading, Hero, Notice, SPACE, Screen, SkeletonCard, Text, VerdictPill } from '@/ui';
-import type { HeroTone } from '@/ui';
+import { Brand, Button, COLORS, Card, Heading, Notice, SPACE, Screen, SkeletonCard, Text, VerdictPill } from '@/ui';
 
 /**
  * Shared result — PRD §11 `/s/[slug]` (unit M9).
@@ -17,20 +16,11 @@ import type { HeroTone } from '@/ui';
  * API's; this screen formats, it never computes.
  *
  * This is the one screen a stranger might open cold from a text message, with
- * no other Retrofit context on screen — it gets the same Hero/Brand treatment
- * as `/verdict` so it reads as a real result from a real product, not a bare
- * data dump.
+ * no other Retrofit context on screen, so it carries the mark and the same
+ * price-first layout the verdict screen uses.
  */
 
 type Verdict = ShareDto['verdict'];
-
-/** Same mapping as `/verdict`: FIT keeps red (the pill's own fill), REFER
- * moves to blue so a filled red Hero stays reserved for FIT (PRD §13). */
-const HERO_TONE_BY_VERDICT: Readonly<Record<Verdict, HeroTone>> = {
-  FIT: 'red',
-  REFER: 'blue',
-  DOES_NOT_FIT: 'ink',
-};
 
 /** Tenant-facing words; commercial results keep the kit's underwriting labels. */
 const TENANT_VERDICT_WORDS: Readonly<Record<Verdict, string>> = {
@@ -175,32 +165,29 @@ function SharedResult({ share }: { readonly share: ShareDto }) {
 
       {shareError ? <Notice tone="error">{shareError}</Notice> : null}
 
-      <Hero
-        tone={HERO_TONE_BY_VERDICT[share.verdict]}
+      <View
+        accessible
+        accessibilityRole="summary"
         accessibilityLabel={`Result: ${verdictText ?? share.verdict}.${priceLine ? ` ${priceLine}` : ''}`}
+        style={{ gap: SPACE.sm }}
       >
-        {/* REFER's pill is outlined (transparent fill); it only has the
-            contrast its text needs against Paper, never a gradient — same
-            fix as `/verdict`. */}
-        <View style={{ backgroundColor: COLORS.paper, borderRadius: 999, alignSelf: 'flex-start' }}>
-          <VerdictPill verdict={share.verdict} {...(verdictText ? { text: verdictText } : {})} size="large" />
-        </View>
         {priceLine ? (
-          <Text variant="heading" weight="semibold" tone="inverse">
+          <Text variant="display" weight="semibold" tone="accent">
             {priceLine}
           </Text>
         ) : (
-          <Text tone="inverse">No price yet: some details were missing.</Text>
+          <Text>No price: details were missing.</Text>
         )}
+        <VerdictPill verdict={share.verdict} {...(verdictText ? { text: verdictText } : {})} size="large" />
         {price.estimate ? (
-          <Text variant="small" tone="inverse" style={{ opacity: 0.85 }}>
-            This price is an estimate.
+          <Text variant="small" tone="muted">
+            Demo rate
           </Text>
         ) : null}
-        <Text variant="small" tone="inverse" style={{ opacity: 0.85 }}>
-          {`Match with the insurer's guidelines: ${Math.round(share.appetiteScore)} out of 100.`}
+        <Text variant="small" tone="muted">
+          {`Guideline match ${Math.round(share.appetiteScore)} of 100.`}
         </Text>
-      </Hero>
+      </View>
 
       {share.explanation ? (
         <Card>
@@ -215,7 +202,7 @@ function SharedResult({ share }: { readonly share: ShareDto }) {
           <View
             accessible
             accessibilityLabel={`${share.decidingRule.citation.doc}, ${share.decidingRule.citation.section}: ${share.decidingRule.citation.quote}`}
-            style={{ gap: SPACE.xs, borderLeftWidth: 3, borderLeftColor: COLORS.muted, paddingLeft: SPACE.md }}
+            style={{ gap: SPACE.xs, borderLeftWidth: 3, borderLeftColor: COLORS.mute, paddingLeft: SPACE.md }}
           >
             <Text variant="small" tone="muted">
               {`${share.decidingRule.citation.doc}, ${share.decidingRule.citation.section}`}

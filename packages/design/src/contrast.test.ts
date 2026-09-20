@@ -1,18 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CONTRAST_EXEMPTIONS,
   contrastMatrix,
   contrastRatio,
   relativeLuminance,
   renderTokenStylesheet,
 } from './css';
 import { cardStyle, textStyle, touchTargetStyle, verdictPillStyle } from './rn';
-import { COLORS, VERDICT_MARKS, VERDICT_STYLES, cssVariableBlock } from './tokens';
+import {
+  COLORS,
+  MOBILE_COLOR_TOKENS,
+  VERDICT_MARKS,
+  VERDICT_STYLES,
+  cssVariableBlock,
+} from './tokens';
 
 const find = (fg: string, bg: string) => {
   const hit = contrastMatrix().find((c) => c.foreground === fg && c.background === bg);
   if (!hit) throw new Error(`pair ${fg} on ${bg} not in matrix`);
   return hit;
 };
+
+const exempt = (fg: string, bg: string): boolean =>
+  CONTRAST_EXEMPTIONS.some(([f, b]) => f === fg && b === bg);
 
 describe('relativeLuminance / contrastRatio (WCAG 2.x)', () => {
   it('pins the endpoints', () => {
@@ -35,45 +45,76 @@ describe('relativeLuminance / contrastRatio (WCAG 2.x)', () => {
     expect(() => relativeLuminance('#12345')).toThrow();
   });
 
-  it('computes the design-system ratios', () => {
-    expect(contrastRatio(COLORS.ink, COLORS.paper)).toBeCloseTo(15.696, 2);
-    expect(contrastRatio(COLORS.paper, COLORS.red)).toBeCloseTo(4.563, 2);
-    expect(contrastRatio(COLORS.redDeep, COLORS.paper)).toBeCloseTo(6.46, 2);
-    expect(contrastRatio(COLORS.mutedDeep, COLORS.paper)).toBeCloseTo(5.819, 2);
-    expect(contrastRatio(COLORS.muted, COLORS.paper)).toBeCloseTo(3.808, 2);
-    expect(contrastRatio(COLORS.redDeep, COLORS.redTint)).toBeCloseTo(5.629, 2);
-    // Accent family (blue, green): Deep pairs with Paper and its own Tint;
-    // Blue's mid tone is also a filled surface, so Paper-on-Blue is checked.
-    expect(contrastRatio(COLORS.blueDeep, COLORS.paper)).toBeCloseTo(11.638, 2);
-    expect(contrastRatio(COLORS.paper, COLORS.blue)).toBeCloseTo(5.161, 2);
-    expect(contrastRatio(COLORS.blueDeep, COLORS.blueTint)).toBeCloseTo(10.204, 2);
-    expect(contrastRatio(COLORS.greenDeep, COLORS.paper)).toBeCloseTo(7.346, 2);
-    expect(contrastRatio(COLORS.greenDeep, COLORS.greenTint)).toBeCloseTo(6.6, 2);
+  it('measures the palette, including the two pairs that fall short', () => {
+    expect(contrastRatio(COLORS.ink, COLORS.bone)).toBeCloseTo(15.351, 2);
+    expect(contrastRatio(COLORS.red, COLORS.bone)).toBeCloseTo(4.759, 2);
+    expect(contrastRatio(COLORS.mute, COLORS.bone)).toBeCloseTo(3.244, 2);
+    expect(contrastRatio(COLORS.accent, COLORS.bone)).toBeCloseTo(2.726, 2);
+    expect(contrastRatio(COLORS.amber, COLORS.bone)).toBeCloseTo(2.112, 2);
+    expect(contrastRatio(COLORS.ink, COLORS.muteTint)).toBeCloseTo(13.877, 2);
+    // Accent and amber only work because ink goes on top of them.
+    expect(contrastRatio(COLORS.ink, COLORS.accent)).toBeCloseTo(5.632, 2);
+    expect(contrastRatio(COLORS.ink, COLORS.amber)).toBeCloseTo(7.268, 2);
+    expect(contrastRatio(COLORS.bone, COLORS.red)).toBeCloseTo(4.759, 2);
+  });
+});
+
+describe('the palette', () => {
+  it('is seven colours, plus aliases the phone app may not name', () => {
+    expect(MOBILE_COLOR_TOKENS).toHaveLength(7);
+    for (const token of MOBILE_COLOR_TOKENS) {
+      expect(COLORS[token], token).toMatch(/^#[0-9A-F]{6}$/);
+    }
+    // Every alias resolves to one of the seven; none is a colour of its own.
+    const real = new Set(MOBILE_COLOR_TOKENS.map((t) => COLORS[t]));
+    for (const [name, value] of Object.entries(COLORS)) {
+      expect(real.has(value), `${name} is not one of the seven`).toBe(true);
+    }
+  });
+
+  it('gives each verdict its own fill, and never colour alone', () => {
+    expect(VERDICT_STYLES.FIT.fill).toBe(COLORS.accent);
+    expect(VERDICT_STYLES.REFER.fill).toBe(COLORS.amber);
+    expect(VERDICT_STYLES.DOES_NOT_FIT.fill).toBe(COLORS.red);
+    const fills = Object.values(VERDICT_STYLES).map((s) => s.fill);
+    expect(new Set(fills).size).toBe(3);
+    for (const style of Object.values(VERDICT_STYLES)) {
+      expect(style.label.length).toBeGreaterThan(0);
+      expect(style.short.length).toBeGreaterThan(0);
+    }
   });
 });
 
 describe('contrastMatrix', () => {
-  it('covers every verdict pill, on Paper when outlined', () => {
-    expect(find(COLORS.paper, COLORS.red).passesAA).toBe(true); // FIT
-    expect(find(COLORS.redDeep, COLORS.paper).passesAA).toBe(true); // REFER
-    expect(find(COLORS.paper, COLORS.ink).passesAA).toBe(true); // DOES_NOT_FIT
+  it('reads every verdict pill at AA', () => {
+    expect(find(COLORS.ink, COLORS.accent).passesAA).toBe(true); // FIT
+    expect(find(COLORS.ink, COLORS.amber).passesAA).toBe(true); // REFER
+    expect(find(COLORS.bone, COLORS.red).passesAA).toBe(true); // DOES_NOT_FIT
   });
 
-  it('every pair except Muted-on-Paper passes AA; Muted passes AA-large only', () => {
+  it('passes AA everywhere except the two documented exemptions', () => {
     const matrix = contrastMatrix();
-    expect(matrix.length).toBeGreaterThanOrEqual(11);
+    expect(matrix.length).toBeGreaterThanOrEqual(9);
     for (const c of matrix) {
       expect(c.ratio).toBeGreaterThanOrEqual(1);
       expect(c.ratio).toBeLessThanOrEqual(21);
-      expect(c.passesAALarge).toBe(true);
       expect(c.passesAA).toBe(c.ratio >= 4.5);
-      if (!(c.foreground === COLORS.muted && c.background === COLORS.paper)) {
-        expect(c.passesAA, `${c.foreground} on ${c.background} = ${c.ratio}`).toBe(true);
-      }
+      if (exempt(c.foreground, c.background)) continue;
+      expect(c.passesAALarge, `${c.foreground} on ${c.background} = ${c.ratio}`).toBe(true);
+      expect(c.passesAA, `${c.foreground} on ${c.background} = ${c.ratio}`).toBe(true);
     }
-    const muted = find(COLORS.muted, COLORS.paper);
-    expect(muted.passesAA).toBe(false);
-    expect(muted.passesAALarge).toBe(true);
+  });
+
+  it('holds the exemptions to what they claim: one AA-large, one display-only', () => {
+    const mute = find(COLORS.mute, COLORS.bone);
+    expect(mute.passesAA).toBe(false);
+    expect(mute.passesAALarge).toBe(true);
+    // Accent on bone does not even reach AA-large. It is the price and nothing
+    // else: display size, with the same figure repeated in ink beneath it.
+    const accent = find(COLORS.accent, COLORS.bone);
+    expect(accent.passesAA).toBe(false);
+    expect(accent.passesAALarge).toBe(false);
+    expect(CONTRAST_EXEMPTIONS).toHaveLength(2);
   });
 
   it('has no duplicate pairs', () => {
@@ -87,9 +128,18 @@ describe('renderTokenStylesheet', () => {
     const css = renderTokenStylesheet();
     expect(css.startsWith('/*\n')).toBe(true);
     expect(css.endsWith(cssVariableBlock(':root'))).toBe(true);
-    expect(css).toContain('  --rf-red-deep: #B80022;');
+    expect(css).toContain('  --rf-bone: #F4EFE6;');
+    expect(css).toContain('  --rf-accent: #D97757;');
+    expect(css).toContain('  --rf-mute-tint: #E9E4DA;');
     expect(css).toContain('  --rf-min-touch-target: 44px;');
     expect(css).toContain('  --rf-shadow-none: none;');
+  });
+
+  it('keeps every legacy variable the console already references', () => {
+    const css = renderTokenStylesheet();
+    for (const name of ['paper', 'muted', 'muted-deep', 'muted-tint', 'red-deep', 'red-tint', 'blue', 'green']) {
+      expect(css, name).toContain(`  --rf-${name}: #`);
+    }
   });
 
   it('honours selector and banner, and cannot be broken by a */ in the banner', () => {
@@ -127,11 +177,11 @@ describe('React Native helpers', () => {
     }
   });
 
-  it('cardStyle is radius 16, 1px Muted-tint border, no shadow', () => {
+  it('cardStyle is radius 16, a 1px muteTint border, no shadow', () => {
     expect(cardStyle()).toEqual({
-      backgroundColor: COLORS.paper,
+      backgroundColor: COLORS.bone,
       borderWidth: 1,
-      borderColor: COLORS.mutedTint,
+      borderColor: COLORS.muteTint,
       borderRadius: 16,
       padding: 16,
     });
@@ -139,7 +189,7 @@ describe('React Native helpers', () => {
     expect(Object.keys(cardStyle()).some((k) => /shadow|elevation/i.test(k))).toBe(false);
   });
 
-  it('verdictPillStyle always carries label and mark; red never means bad', () => {
+  it('verdictPillStyle always carries its label and its mark', () => {
     for (const v of ['FIT', 'REFER', 'DOES_NOT_FIT'] as const) {
       const pill = verdictPillStyle(v);
       expect(pill.label).toBe(VERDICT_STYLES[v].label);
@@ -148,10 +198,9 @@ describe('React Native helpers', () => {
       expect(pill.container.borderRadius).toBe(999);
       expect(pill.text.color).toBe(VERDICT_STYLES[v].text);
     }
-    expect(verdictPillStyle('FIT').container.backgroundColor).toBe(COLORS.red);
-    expect(verdictPillStyle('REFER').container.backgroundColor).toBe('transparent');
-    expect(verdictPillStyle('REFER').container.borderColor).toBe(COLORS.red);
-    expect(verdictPillStyle('DOES_NOT_FIT').container.backgroundColor).toBe(COLORS.ink);
+    expect(verdictPillStyle('FIT').container.backgroundColor).toBe(COLORS.accent);
+    expect(verdictPillStyle('REFER').container.backgroundColor).toBe(COLORS.amber);
+    expect(verdictPillStyle('DOES_NOT_FIT').container.backgroundColor).toBe(COLORS.red);
   });
 
   it('touchTargetStyle never goes below 44', () => {
