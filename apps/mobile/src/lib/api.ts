@@ -445,7 +445,15 @@ export function isRestingStage(stage: SweepStageDto): boolean {
  * the app out, so it is dropped here too, the moment it lands, whatever the
  * server chose to send. Nothing that polls ever draws a frame.
  */
-function dropFrameImages(sweep: SweepDto): SweepDto {
+function dropFrameImages(raw: SweepDto): SweepDto {
+  // A sweep still in flight, or one from an older server, can arrive without
+  // its list fields; every screen reads them with .filter, so default them here.
+  const sweep: SweepDto = {
+    ...raw,
+    frames: raw.frames ?? [],
+    observations: raw.observations ?? [],
+    hazardCosts: raw.hazardCosts ?? [],
+  };
   if (!sweep.frames.some((f) => f.imageRef !== null)) return sweep;
   return { ...sweep, frames: sweep.frames.map((f) => (f.imageRef === null ? f : { ...f, imageRef: null })) };
 }
