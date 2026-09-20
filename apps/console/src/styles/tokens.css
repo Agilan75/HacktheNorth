@@ -1,23 +1,27 @@
 /*
- * Retrofit design tokens (PRD 13). GENERATED from @retrofit/design cssVariableBlock()
- * by unit C02. Do not hand-edit values; change packages/design/src/tokens.ts and
- * regenerate. atoms.test.tsx fails if this block drifts from the token source.
+ * Retrofit design tokens (PRD 13). GENERATED from @retrofit/design renderTokenStylesheet().
+ * Do not hand-edit values; change packages/design/src/tokens.ts and regenerate.
  */
 :root {
-  --rf-paper: #FAF8F2;
-  --rf-ink: #1F1E1B;
-  --rf-red: #E4002B;
-  --rf-red-deep: #B80022;
-  --rf-red-tint: #FBE3E6;
-  --rf-muted: #7C8073;
-  --rf-muted-deep: #5E6357;
-  --rf-muted-tint: #EDEFE8;
-  --rf-blue: #2C6E9E;
-  --rf-blue-deep: #1D3557;
-  --rf-blue-tint: #E4EAF1;
-  --rf-green: #2E7050;
-  --rf-green-deep: #265C42;
-  --rf-green-tint: #E3EFE7;
+  --rf-bone: #F4EFE6;
+  --rf-ink: #191919;
+  --rf-accent: #D97757;
+  --rf-amber: #C9A227;
+  --rf-red: #B5443A;
+  --rf-mute: #8A8478;
+  --rf-mute-tint: #E9E4DA;
+  --rf-paper: #F4EFE6;
+  --rf-muted: #8A8478;
+  --rf-muted-deep: #8A8478;
+  --rf-muted-tint: #E9E4DA;
+  --rf-red-deep: #B5443A;
+  --rf-red-tint: #E9E4DA;
+  --rf-blue: #D97757;
+  --rf-blue-deep: #191919;
+  --rf-blue-tint: #E9E4DA;
+  --rf-green: #8A8478;
+  --rf-green-deep: #191919;
+  --rf-green-tint: #E9E4DA;
   --rf-font-display: 'Fraunces Variable', Fraunces, Georgia, 'Times New Roman', serif;
   --rf-font-body: 'Inter Variable', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --rf-size-display: 34px;
@@ -47,7 +51,7 @@
   --rf-radius-card: 16px;
   --rf-radius-pill: 999px;
   --rf-border-width: 1px;
-  --rf-border-color: #EDEFE8;
+  --rf-border-color: #E9E4DA;
   --rf-shadow-none: none;
   --rf-min-touch-target: 44px;
 }

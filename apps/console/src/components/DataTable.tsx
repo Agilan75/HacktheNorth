@@ -71,10 +71,11 @@ const tableStyle: CSSProperties = {
 
 const captionStyle: CSSProperties = {
   textAlign: 'left',
-  padding: `${SPACE.sm}px 0`,
+  padding: `${SPACE.md}px ${SPACE.lg}px`,
   fontFamily: cssVar('font-display'),
   fontSize: cssVar('size-heading'),
   lineHeight: cssVar('leading-heading'),
+  fontWeight: 600,
 };
 
 const cellBase: CSSProperties = {
@@ -256,6 +257,7 @@ export function DataTable<Row>(props: DataTableProps<Row>): ReactElement {
     });
   }
 
+  // Layout only: the ledger skin (styles/ledger.css) owns border and ground.
   return (
     <div
       className="rf-ledger"

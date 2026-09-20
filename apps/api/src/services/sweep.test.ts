@@ -248,8 +248,12 @@ describe('sweep pipeline', () => {
     // Frame 1 is at 45°; the detector's box centre x = 510 -> +0.6°.
     expect(byLabel('smoke_detector').bearingDeg).toBeCloseTo(45.6, 9);
 
-    // Only the halved candle waits for the user (< 0.6).
+    // The halved candle is still reported as low-confidence, but it no longer
+    // holds the sweep open: nothing asks the renter to confirm it. The one
+    // stage left is the single optional question, which is the year built.
     expect(sweep.needsConfirmation.map((o) => o.id)).toEqual([byLabel('candle').id]);
+    expect(sweep.stage).toBe('questions');
+    expect(sweep.result!.voi.nextQuestion?.id).toBe('q-year-built');
 
     // One ceiling marker per ceiling-visible frame (frames 1..5 of 8 = 0.625).
     expect(sweep.observations.filter((o) => o.id.startsWith('ceiling:')).map((o) => o.frameIndex)).toEqual([1, 2, 3, 4, 5]);
@@ -269,9 +273,17 @@ describe('sweep pipeline', () => {
     expect(facts.get('hazards.smokeDetectorCount')).toMatchObject({ value: 1, provenance: { confidence: 0.74 } });
     // A 100% sweep records an unseen stove as absent at coverage confidence 1.
     expect(facts.get('hazards.stove')).toMatchObject({ value: false, provenance: { confidence: 1 } });
-    // The pending candle holds its slot open instead of recording it absent.
-    expect(facts.has('hazards.candle')).toBe(false);
+    // The halved candle is scored at its own confidence rather than held out:
+    // with no confirmation step, holding it out would record "no candle".
+    expect(facts.get('hazards.candle')).toMatchObject({ value: true });
+    expect(facts.get('hazards.candle')?.provenance.confidence).toBeCloseTo(0.45, 12);
     expect(facts.get('hazards.ceilingObserved')?.value).toBe(true);
+    // Contents are derived from the sweep, never asked: nothing was priced here,
+    // so the limit sits on the $15,000 floor.
+    expect(facts.get('exposure.contentsLimit')).toMatchObject({
+      value: 15_000,
+      provenance: { source: 'sweep' },
+    });
     // Observations never reach merge directly (no double counting), and asOf is the clock's day.
     const input = engineInputs[engineInputs.length - 1]!;
     expect(input.observations).toEqual([]);
@@ -282,15 +294,16 @@ describe('sweep pipeline', () => {
     // The stored result is the engine's, with merge having written those facts.
     const result = sweep.result!;
     expect(result.canonical.hazards.present.heaterNearCombustible?.map((f) => f.value)).toEqual([true]);
-    expect(result.canonical.hazards.present.candle).toBeUndefined();
+    expect(result.canonical.hazards.present.candle?.map((f) => f.value)).toEqual([true]);
+    expect(result.canonical.exposure.contentsLimit?.map((f) => f.value)).toEqual([15_000]);
     expect(result.voi.askedCount).toBe(0);
     expect(sweep.skippedCount).toBe(result.voi.skipped.length);
   });
 
-  it('marks the sweep failed when no frame passes the quality gate, and drops a duplicate frame', async () => {
+  it('reinstates the best frame when none passes the quality gate, and drops a duplicate frame', async () => {
     const deps = depsWith();
     const dark = await blackJpeg();
-    const failed = await createSweep(deps, {
+    const weak = await createSweep(deps, {
       roomLabel: 'Hall',
       termMonths: 4,
       frames: [
@@ -298,12 +311,16 @@ describe('sweep pipeline', () => {
         { bearingDeg: 90, capturedAt: NOW, imageBase64: dark },
       ],
     });
-    const after = await advanceSweep(deps, failed.id);
-    expect(after.stage).toBe('failed');
-    expect(after.error).toMatch(/quality/);
-    expect(after.frames.every((f) => f.dropped && f.imageRef === null)).toBe(true);
-    // A failed sweep does not advance further.
-    expect((await advanceSweep(deps, failed.id)).stage).toBe('failed');
+    // A scan whose frames all grade low is carried on with its best one rather
+    // than stopped: the read is poor, but the room still gets a price.
+    const after = await advanceSweep(deps, weak.id);
+    expect(after.stage).toBe('quality_gate');
+    expect(after.error).toBeNull();
+    const kept = after.frames.filter((f) => !f.dropped);
+    expect(kept).toHaveLength(1);
+    expect(kept[0]!.imageRef).not.toBeNull();
+    // Only the rescued frame survives; the rest keep their drop reason.
+    expect(after.frames.filter((f) => f.dropped).every((f) => f.imageRef === null)).toBe(true);
 
     const same = await frameJpeg(3);
     const dup = await createSweep(deps, {
@@ -323,7 +340,7 @@ describe('sweep pipeline', () => {
     expect(gated.coverage?.sufficient).toBe(false);
   });
 
-  it('on an insufficient sweep leaves unseen hazards unknown instead of absent', async () => {
+  it('on an insufficient sweep still records unseen hazards absent, at the covered fraction', async () => {
     const deps = depsWith();
     const req = await eightFrameRequest();
     // Frames 0 and 1 only: [-30°, 30°) and [15°, 75°) -> panels 33..35 + 0..7 = 11 of 36.
@@ -333,8 +350,43 @@ describe('sweep pipeline', () => {
     expect(sweep.coverage?.coveragePct).toBeCloseTo((11 * 100) / 36, 9);
     expect(sweep.coverage?.sufficient).toBe(false);
     const facts = lastSweepFacts();
-    expect(facts.has('hazards.stove')).toBe(false);
+    // Nothing asks the renter about what the camera looked at, so a slot the
+    // sweep could not settle is recorded absent at the confidence the engine
+    // gives its own negative evidence: the fraction of the room covered.
+    expect(facts.get('hazards.stove')).toMatchObject({ value: false });
+    expect(facts.get('hazards.stove')?.provenance.confidence).toBeCloseTo(11 / 36, 9);
+    expect(facts.get('hazards.stove')?.provenance.sourceDetail).toMatch(/^unseen:coverage=/);
     expect(facts.get('hazards.portableHeater')?.value).toBe(true);
+    // The smoke detector's zero rides the same rule, as a count rather than a flag.
+    expect(facts.get('hazards.smokeDetectorCount')?.value).toBe(1);
+    // Not one hazard question survives, even on a sweep this short: the only
+    // thing left to ask about is the year built, which no camera can see.
+    const askable = sweep.result!.voi.ranked.map((c) => c.question.id);
+    expect(askable.filter((id) => id.startsWith('q-') && id !== 'q-year-built')).toEqual([]);
+  });
+
+  it('derives the contents limit from the sweep, rounded up to $5,000 over a $15,000 floor', async () => {
+    const deps = depsWith();
+    const req = await eightFrameRequest();
+    const created = await createSweep(deps, { ...req, contentsEstimateUsd: 21_300 });
+    await driveToRest(deps, created);
+    const facts = lastSweepFacts();
+    expect(facts.get('exposure.contentsLimit')).toMatchObject({
+      value: 25_000,
+      provenance: { source: 'sweep', sourceDetail: 'contents:21300' },
+    });
+    // The estimate survives the observe stage, which replaces the observation list.
+    const sweep = (await getSweep(deps, created.id))!;
+    expect(sweep.observations.some((o) => o.id === 'contents:21300')).toBe(true);
+  });
+
+  it('defaults the room label and the term when the phone sends neither', async () => {
+    const deps = depsWith();
+    const req = await eightFrameRequest();
+    const { roomLabel: _label, termMonths: _term, ...bare } = req;
+    const created = await createSweep(deps, bare);
+    expect(created.roomLabel).toBe('Room');
+    expect(created.termMonths).toBe(12);
   });
 
   it('fails the sweep with the stage named when the observe call errors', async () => {
@@ -392,58 +444,77 @@ describe('questions and verify-fix', () => {
     expect(facts.get('hazards.heaterNearCombustible')?.value).toBe(false);
   });
 
-  it('records answers, coerces them by question type, and counts asked and skipped', async () => {
+  it('asks at most one question, and never one the camera answered', async () => {
     const deps = depsWith();
     const sweep = await scoredSweep(deps);
-    const candle = sweep.needsConfirmation[0]!;
-
-    const dismissed = await submitAnswers(deps, sweep.id, {
-      answers: [],
-      confirmations: [{ observationId: candle.id, confirmed: false }],
-    });
-    expect(dismissed.needsConfirmation).toEqual([]);
-    expect(lastSweepFacts().get('hazards.candle')?.value).toBe(false);
 
     const first = await nextQuestion(deps, sweep.id);
     expect(nextQuestionResponseSchema.safeParse(first).success).toBe(true);
     expect(first.askedCount).toBe(0);
-    expect(first.question?.id).toBe(dismissed.result!.voi.nextQuestion?.id);
-    expect(first.skipped).toEqual(dismissed.result!.voi.skipped);
-    expect(dismissed.skippedCount).toBe(first.skipped.length);
+    // Year built is the only field a camera cannot settle and the engine still
+    // wants: the term has its default and every hazard came from the sweep.
+    expect(first.question?.id).toBe('q-year-built');
+    expect(first.done).toBe(false);
     expect(first.skipped.every((s) => s.reason.length > 0)).toBe(true);
+    expect(sweep.skippedCount).toBe(sweep.result!.voi.skipped.length);
 
     const answered = await submitAnswers(deps, sweep.id, {
       answers: [
         { questionId: 'q-year-built', field: 'buildings[0].yearBuilt', value: '1995' },
-        { questionId: 'q-contents-limit', field: 'exposure.contentsLimit', value: '50000' },
         { questionId: 'q-candle', field: 'hazards.candle', value: 'nope' },
-        { questionId: 'q-term-months', field: 'exposure.termMonths', value: null, skipped: true },
         { questionId: 'q-no-such-question', field: 'x', value: 1 },
       ],
     });
-    // Unknown question ids are ignored; invalid and skipped answers count as asked.
-    expect(answered.askedQuestionIds).toEqual(['q-year-built', 'q-contents-limit', 'q-candle', 'q-term-months']);
+    // Unknown question ids are ignored; an uncoercible answer still counts as asked.
+    expect(answered.askedQuestionIds).toEqual(['q-year-built', 'q-candle']);
     expect(lastAnswers().map((a) => [a.canonicalPath, a.value, a.provenance.source, a.provenance.sourceDetail])).toEqual([
       ['buildings.unit.yearBuilt', 1995, 'answer', 'question:q-year-built'],
-      ['exposure.contentsLimit', 50000, 'answer', 'question:q-contents-limit'],
     ]);
-    const year = answered.result!.canonical.buildings[0]!.yearBuilt ?? [];
-    expect(year.map((f) => f.value)).toEqual([1995]);
-    expect(answered.result!.canonical.exposure.contentsLimit?.map((f) => f.value)).toEqual([50000]);
+    expect(answered.result!.canonical.buildings[0]!.yearBuilt?.map((f) => f.value)).toEqual([1995]);
 
+    // One question has now been shown, so there is never another.
     const after = await nextQuestion(deps, sweep.id);
-    expect(after.askedCount).toBe(4);
-    const asked = after.skipped.filter((s) => s.reason === 'Already asked earlier in this sweep.').map((s) => s.field);
-    expect(asked).toEqual(['hazards.candle', 'buildings[0].yearBuilt', 'exposure.contentsLimit', 'exposure.termMonths']);
-    expect(after.question?.id ?? null).not.toBe('q-year-built');
-    expect(after.done).toBe(after.question === null);
-    expect(answered.stage).toBe(after.done ? 'done' : 'questions');
+    expect(after.question).toBeNull();
+    expect(after.done).toBe(true);
+    expect(answered.stage).toBe('done');
 
     // A re-answer replaces the earlier answer for the same question.
     await submitAnswers(deps, sweep.id, {
       answers: [{ questionId: 'q-year-built', field: 'buildings[0].yearBuilt', value: 1962 }],
     });
     expect(lastAnswers().find((a) => a.canonicalPath === 'buildings.unit.yearBuilt')?.value).toBe(1962);
+  });
+
+  it('edits correct a derived field inline and rescore, latest edit winning', async () => {
+    const deps = depsWith();
+    const sweep = await scoredSweep(deps);
+    expect(sweep.result!.canonical.exposure.contentsLimit?.map((f) => f.value)).toEqual([15_000]);
+    const contentsOf = (s: SweepDto) => s.result!.canonical.exposure.contentsLimit ?? [];
+
+    const edited = await submitAnswers(deps, sweep.id, {
+      answers: [],
+      edits: [
+        { field: 'exposure.contentsLimit', value: '48000' },
+        // A component key addresses the same field, and the later edit wins.
+        { field: 'contentsLimit', value: 52_000 },
+        // Uncoercible and unknown edits are dropped rather than stored.
+        { field: 'buildings[0].yearBuilt', value: 'not a year' },
+        { field: 'no.such.field', value: 1 },
+      ],
+    });
+    const answerFacts = lastAnswers();
+    expect(answerFacts.map((a) => [a.canonicalPath, a.value, a.provenance.sourceDetail])).toEqual([
+      ['exposure.contentsLimit', 52_000, 'edit:exposure.contentsLimit'],
+    ]);
+    // Nothing overwrites anything (PRD §6.2): the sweep's own figure is still
+    // on the field, with the renter's correction after it and outranking it.
+    expect(contentsOf(edited).map((f) => [f.value, f.provenance.source])).toEqual([
+      [15_000, 'sweep'],
+      [52_000, 'answer'],
+    ]);
+    // An edit is not a question, so it never uses up the one question allowed.
+    expect(edited.askedQuestionIds).toEqual([]);
+    expect((await nextQuestion(deps, sweep.id)).question?.id).toBe('q-year-built');
   });
 
   it('a credited fix replaces the hazard with false, persists, and reports before and after', async () => {

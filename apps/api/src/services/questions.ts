@@ -1,21 +1,30 @@
-/** The VOI question loop, with the skipped counter and its reasons. Unit A18. */
+/**
+ * The VOI question loop, with the skipped counter and its reasons. Unit A18.
+ *
+ * Since the mobile rework the loop asks at most one question per sweep, and
+ * never about anything a camera sweep of the room can answer for itself
+ * (`qualifyingQuestion` in `./sweep`). Everything else the sweep derived or
+ * defaulted is corrected inline on the verdict screen through `edits`, which
+ * take the same rescore path an answer does.
+ */
 import type {
   NextQuestionResponseDto,
   SweepAnswersRequestDto,
   SweepDto,
 } from '@retrofit/contracts';
 import { MIN_OBSERVATION_CONFIDENCE, SOURCE_CONFIDENCE, math } from '@retrofit/engine';
-import type { Observation, Question } from '@retrofit/engine';
+import type { Observation, Question, VectorComponentSpec, VectorSpec } from '@retrofit/engine';
 import { createRepos } from '../db/repos';
 import type { SweepRow } from '../db/schema';
 import {
   askedQuestionIdsOf,
   loadTenantConfig,
+  qualifyingQuestion,
   scoreSweep,
   sessionOf,
   toSweepDto,
 } from './sweep';
-import type { AnswerEvent, SessionEvent } from './sweep';
+import type { AnswerEvent, EditEvent, SessionEvent } from './sweep';
 import type { Deps } from './types';
 
 /** Confidence a sighting takes once the user confirms it: the user-answer source value. */
@@ -69,6 +78,40 @@ function coerce(question: Question, value: string | number | boolean | null): st
 }
 
 /* -------------------------------------------------------------------------- */
+/* Edit coercion — an edit names a field, not a question                      */
+/* -------------------------------------------------------------------------- */
+
+/** The vector component a field spelling addresses, by component key or source path. */
+function componentFor(spec: VectorSpec, field: string): VectorComponentSpec | null {
+  return spec.components.find((c) => c.key === field || c.source === field) ?? null;
+}
+
+/**
+ * The typed value an inline edit carries, or null when it does not fit the
+ * component it names. Code checks every edit exactly as it checks an answer:
+ * the renter can correct a derived number, never widen its type.
+ */
+function coerceEdit(
+  component: VectorComponentSpec,
+  value: string | number | boolean | null,
+): string | number | boolean | null {
+  if (value === null) return null;
+  if (component.type === 'binary') {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return value === 1 ? true : value === 0 ? false : null;
+    const s = value.trim().toLowerCase();
+    return YES.has(s) ? true : NO.has(s) ? false : null;
+  }
+  const n = typeof value === 'number' ? value : typeof value === 'string' ? Number(value.trim()) : NaN;
+  if (!Number.isFinite(n) || n < 0) return null;
+  // `min`/`max` on a component are the min-max SCALING bounds, not input
+  // validation: `smokeDetectorCount` maxes at 4 for scaling, and a fifth
+  // detector is still a true answer. Only the year gets a range of its own.
+  if (component.type === 'year') return n >= 1000 && n <= 9999 ? Math.round(n) : null;
+  return component.type === 'count' ? Math.round(n) : n;
+}
+
+/* -------------------------------------------------------------------------- */
 /* Service                                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -80,13 +123,16 @@ export async function nextQuestion(deps: Deps, sweepId: string): Promise<NextQue
     // Not scored yet: nothing to ask, and not done either.
     return { question: null, askedCount: asked.length, skipped: [], done: row.stage === 'failed' };
   }
-  const pending = row.observations.some(isPending);
-  const question = result.voi.nextQuestion;
+  const { observableQuestionIds } = await loadTenantConfig();
+  // At most one question, never about something the camera saw. A sighting
+  // waiting under MIN_OBSERVATION_CONFIDENCE no longer holds the sweep open
+  // either: it is scored at its own confidence instead of being confirmed.
+  const question = qualifyingQuestion(result, asked, observableQuestionIds);
   return {
     question,
     askedCount: asked.length,
     skipped: result.voi.skipped.map((s) => ({ field: s.field, reason: s.reason })),
-    done: question === null && !pending,
+    done: question === null,
   };
 }
 
@@ -120,16 +166,17 @@ export async function submitAnswers(
       );
   }
 
+  const edits = request.edits ?? [];
   const scored = SCORED_STAGES.has(row.stage) && row.result !== null && row.result !== undefined;
   if (!scored) {
-    if (request.answers.length > 0) {
+    if (request.answers.length > 0 || edits.length > 0) {
       throw new Error(`sweep "${sweepId}" is at stage "${row.stage}" and cannot take answers yet`);
     }
     const saved = repos.sweeps.update(sweepId, { observations, updatedAt: now });
     return toSweepDto(saved);
   }
 
-  const { questions } = await loadTenantConfig();
+  const { questions, config } = await loadTenantConfig();
   const byId = new Map(questions.map((q) => [q.id, q] as const));
   const events: SessionEvent[] = sessionOf(row.result ?? null);
   for (const a of request.answers) {
@@ -144,6 +191,21 @@ export async function submitAnswers(
       skipped,
       at: now,
     };
+    events.push(event);
+  }
+
+  // Inline corrections from the verdict screen. An edit addresses a vector
+  // component directly, so a field the sweep derived and no question covers
+  // (`exposure.contentsLimit`) is still the renter's to change.
+  for (const edit of edits) {
+    const component = componentFor(config.spec, edit.field);
+    if (component === null) continue;
+    const value = coerceEdit(component, edit.value);
+    if (value === null) continue;
+    // Stored as the component's canonical source, so the caller may name a
+    // field either way (`contentsLimit` or `exposure.contentsLimit`) and the
+    // merge stage always sees the one spelling it understands.
+    const event: EditEvent = { kind: 'edit', field: component.source, value, at: now };
     events.push(event);
   }
 

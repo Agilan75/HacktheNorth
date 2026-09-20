@@ -9,7 +9,9 @@ import {
 
 describe('data loaders read every packaged data file', () => {
   it('resolves data beside src/, not inside it', () => {
-    const p = dataFilePath('vectors', 'commercial');
+    // `fileURLToPath` hands back the platform's own separator, so the shape of
+    // the path is what matters here, not which slash Windows happens to use.
+    const p = dataFilePath('vectors', 'commercial').replace(/\\/g, '/');
     expect(p).toMatch(/packages\/engine\/vectors\/commercial\.json$/);
     expect(p).not.toMatch(/\/src\//);
   });

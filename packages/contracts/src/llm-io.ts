@@ -1,6 +1,8 @@
 /**
- * The input and output types for the EIGHT permitted Gemini calls (PRD §9.2).
- * FROZEN after Run 0 (W0-3). There is no ninth call and no agent loop.
+ * The input and output types for the permitted Gemini calls (PRD §9.2): the
+ * eight of Run 0, plus `identify`, the live sweep's per-frame item listing,
+ * added when the pricing path moved off the Anthropic SDK. There is no agent
+ * loop.
  *
  * The rule these types exist to enforce: **no LLM decides a verdict, a score or
  * a dollar amount.** Gemini turns prose into typed values and typed values into
@@ -25,6 +27,7 @@ export const LLM_CALLS = [
   'draft-request',
   'extract-reply',
   'second-opinion',
+  'identify',
 ] as const;
 
 export type LlmCallName = (typeof LLM_CALLS)[number];
@@ -33,7 +36,30 @@ export type LlmCallName = (typeof LLM_CALLS)[number];
 export const VERIFICATION_ONLY_CALLS: readonly LlmCallName[] = ['second-opinion'];
 
 /** Calls that send image parts. Everything else is text-only. */
-export const VISION_CALLS: readonly LlmCallName[] = ['observe', 'verify-fix'];
+export const VISION_CALLS: readonly LlmCallName[] = ['observe', 'verify-fix', 'identify'];
+
+/* -------------------------------------------------------------------------- */
+/* identify — one live sweep frame, the belongings in it                      */
+/* -------------------------------------------------------------------------- */
+
+export interface IdentifyInput {
+  /** One downscaled JPEG frame from the sweep. */
+  readonly imageBase64: string;
+}
+
+export interface IdentifyItem {
+  /** A key of the API's price table, never free text. Code drops anything else. */
+  readonly label: string;
+  /** Short plain description, e.g. "grey three-seat fabric sofa". */
+  readonly name: string;
+  readonly brand: string | null;
+  readonly model: string | null;
+  readonly confidence: number;
+}
+
+export interface IdentifyOutput {
+  readonly items: readonly IdentifyItem[];
+}
 
 /* -------------------------------------------------------------------------- */
 /* observe — up to 15 quality-passed frames with bearings, ONE request        */
@@ -275,6 +301,7 @@ export interface LlmCallIo {
   'draft-request': { input: DraftRequestInput; output: DraftRequestOutput };
   'extract-reply': { input: ExtractReplyInput; output: ExtractReplyOutput };
   'second-opinion': { input: SecondOpinionInput; output: SecondOpinionOutput };
+  identify: { input: IdentifyInput; output: IdentifyOutput };
 }
 
 export type LlmCallInput<N extends LlmCallName> = LlmCallIo[N]['input'];

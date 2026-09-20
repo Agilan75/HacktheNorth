@@ -139,7 +139,8 @@ describe('verify CLI flags', () => {
     expect(d.config.chunkSize).toBe(10_000);
     expect(d.config.maxDisagreements).toBe(0);
     expect(d.config.workers).toBeLessThanOrEqual(6);
-    expect(d.config.outDir.endsWith('/packages/verify/out')).toBe(true);
+    // The path carries the platform's own separator; its shape is the claim.
+    expect(d.config.outDir.replace(/\\/g, '/').endsWith('/packages/verify/out')).toBe(true);
 
     const p = parseArgs(['--total', '100_000', '--seed=7', '--workers', '3', '--chunk', '500', '--max-disagreements', '9']);
     if ('error' in p) throw new Error(p.error);

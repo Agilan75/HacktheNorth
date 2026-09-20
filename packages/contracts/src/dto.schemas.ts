@@ -421,10 +421,14 @@ export const sweepFrameInputSchema = z.object({
   imageBase64: z.string().min(1),
 });
 
+/** A contents estimate above this is a bug, not a room. */
+const MAX_CONTENTS_ESTIMATE_USD = 10_000_000;
+
 export const sweepCreateRequestSchema = z.object({
-  roomLabel: z.string().min(1).max(120),
-  termMonths: z.union([z.literal(4), z.literal(8), z.literal(12)]),
+  roomLabel: z.string().min(1).max(120).optional(),
+  termMonths: z.union([z.literal(4), z.literal(8), z.literal(12)]).optional(),
   submissionId: idSchema.optional(),
+  contentsEstimateUsd: z.number().nonnegative().max(MAX_CONTENTS_ESTIMATE_USD).optional(),
   /** Cap 15 frames (PRD §11). */
   frames: z.array(sweepFrameInputSchema).min(1).max(15),
 });
@@ -438,6 +442,14 @@ export const sweepAnswersRequestSchema = z.object({
       skipped: z.boolean().optional(),
     }),
   ),
+  edits: z
+    .array(
+      z.object({
+        field: z.string().min(1).max(120),
+        value: z.union([z.string(), z.number(), z.boolean(), z.null()]),
+      }),
+    )
+    .optional(),
   confirmations: z
     .array(z.object({ observationId: idSchema, confirmed: z.boolean() }))
     .optional(),
@@ -562,6 +574,12 @@ export const sweepFrameSchema = z.object({
   imageRef: z.string().nullable(),
 });
 
+export const hazardCostSchema = z.object({
+  hazardKey: z.string().min(1),
+  factor: z.number(),
+  monthlyDelta: z.number().nullable(),
+});
+
 export const sweepSchema: z.ZodType<SweepDto> = z.object({
   id: idSchema,
   submissionId: idSchema.nullable(),
@@ -573,6 +591,8 @@ export const sweepSchema: z.ZodType<SweepDto> = z.object({
   observations: z.array(observationSchema),
   needsConfirmation: z.array(observationSchema),
   result: engineResultSchema.nullable(),
+  hazardCosts: z.array(hazardCostSchema),
+  pendingQuestion: questionSchema.nullable(),
   askedQuestionIds: z.array(idSchema),
   skippedCount: z.number().int().nonnegative(),
   error: z.string().nullable(),

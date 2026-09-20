@@ -55,7 +55,14 @@ const CHECKING: BannerCopy = {
   glyph: '○',
 };
 
+/**
+ * The phone kit's emphasis rule: live is bone with a 2px accent edge — the
+ * "on" state, the same shape `Card tone="accent"` takes — and everything else
+ * is a plain mute-tint fill. Amber and red are spoken for by the verdicts and
+ * never appear here. The words say which source it is either way (PRD §13).
+ */
 function bannerStyle(kind: AdapterKind): CSSProperties {
+  const live = kind === 'live';
   return {
     display: 'inline-flex',
     alignItems: 'center',
@@ -63,8 +70,8 @@ function bannerStyle(kind: AdapterKind): CSSProperties {
     minHeight: 32,
     padding: `${SPACE.xs}px ${SPACE.md}px`,
     borderRadius: RADIUS.pill,
-    border: `1px solid ${kind === 'live' ? cssVar('red') : cssVar('muted')}`,
-    background: kind === 'live' ? cssVar('red-tint') : cssVar('muted-tint'),
+    border: live ? `2px solid ${cssVar('accent')}` : `1px solid ${cssVar('mute')}`,
+    background: live ? cssVar('bone') : cssVar('mute-tint'),
     color: cssVar('ink'),
     fontFamily: cssVar('font-body'),
     fontSize: cssVar('size-micro'),

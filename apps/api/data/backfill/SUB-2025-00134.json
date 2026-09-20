@@ -1,7 +1,6 @@
 {
   "externalId": "SUB-2025-00134",
-  "targetVerdict": "DOES_NOT_FIT",
-  "rationale": "The only risk location is Waco, TX, and Texas is neither a target nor an acceptable state, so primary risk state is Not Acceptable and knocks the account out. Every other factor ($31.2M TIV, $118.7K premium, 1998 joisted masonry, $46K loss) would otherwise be within appetite.",
+  "rationale": "Federato returned no Policy for this submission, so no location, building or premium reached the canonical record. The insured's headquarters (Location 28, Austin TX) and its one building are in the snapshot, and every value here but the premium is read from them: total insured value is the sum of those buildings ($24,302,000), the year built is their value-weighted mean, the construction class is the one holding the most value on the majority side of the acceptable/not split (100% acceptable), sprinklered follows the value-weighted majority (100%), and the five-year incurred loss is the 5 claims on the insured's other policies dated 2020-08-31 to 2025-08-31. The premium is the only figure with no source: it is this account's value at 0.432% of TIV, the median rate of the book's 6 full-value property placements. The merge grammar carries one reported building and one reported location, so the portfolio is summarised into a single entry.",
   "values": [
     {
       "canonicalPath": "submissionType",
@@ -13,19 +12,23 @@
     },
     {
       "canonicalPath": "locations.*.city",
-      "value": "Waco"
+      "value": "Austin"
+    },
+    {
+      "canonicalPath": "locations.*.postalCode",
+      "value": "78701"
     },
     {
       "canonicalPath": "locations.*.protectionClass",
-      "value": 4
+      "value": 6
     },
     {
-      "canonicalPath": "buildings.*.tiv",
-      "value": 31200000
+      "canonicalPath": "rollup.totalTiv",
+      "value": 24302000
     },
     {
       "canonicalPath": "buildings.*.yearBuilt",
-      "value": 1998
+      "value": 1997
     },
     {
       "canonicalPath": "buildings.*.constructionType",
@@ -33,23 +36,31 @@
     },
     {
       "canonicalPath": "buildings.*.sprinklered",
-      "value": false
+      "value": true
     },
     {
       "canonicalPath": "buildings.*.stories",
-      "value": 1
+      "value": 6
+    },
+    {
+      "canonicalPath": "buildings.*.roofYear",
+      "value": 1998
     },
     {
       "canonicalPath": "buildings.*.occupancy",
-      "value": "Discount general merchandise store"
+      "value": "Retail"
     },
     {
-      "canonicalPath": "pricing.quotedPremium",
-      "value": 118700
+      "canonicalPath": "buildings.*.protectionClass",
+      "value": 6
     },
     {
       "canonicalPath": "rollup.fiveYearLoss",
-      "value": 46000
+      "value": 1227300
+    },
+    {
+      "canonicalPath": "pricing.quotedPremium",
+      "value": 105000
     }
   ]
 }

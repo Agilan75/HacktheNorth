@@ -55,18 +55,24 @@ function request(label: string): SweepCreateRequestDto {
   };
 }
 
+/** The server's defaults for the two fields the phone no longer collects. */
+const labelOf = (req: SweepCreateRequestDto): string => req.roomLabel ?? 'Room';
+const termOf = (req: SweepCreateRequestDto): number => req.termMonths ?? 12;
+
 function sweepFor(req: SweepCreateRequestDto): SweepDto {
   return {
-    id: `sw_${req.roomLabel}`,
+    id: `sw_${labelOf(req)}`,
     submissionId: null,
-    roomLabel: req.roomLabel,
-    termMonths: req.termMonths,
+    roomLabel: labelOf(req),
+    termMonths: termOf(req),
     stage: 'received',
     frames: [],
     coverage: null,
     observations: [],
     needsConfirmation: [],
     result: null,
+    hazardCosts: [],
+    pendingQuestion: null,
     askedQuestionIds: [],
     skippedCount: 0,
     error: null,
@@ -80,7 +86,7 @@ function network() {
   const state = { online: true, failWith: null as (() => unknown) | null };
   const sent: string[] = [];
   const send = async (req: SweepCreateRequestDto): Promise<SweepDto> => {
-    sent.push(req.roomLabel);
+    sent.push(labelOf(req));
     if (state.failWith !== null) throw state.failWith();
     if (!state.online) throw offline();
     return sweepFor(req);
@@ -154,7 +160,7 @@ describe('createSweepQueue', () => {
     expect(out.status).toBe('failed');
     if (out.status !== 'failed') throw new Error('unreachable');
     expect(out.error).toBeInstanceOf(ApiError);
-    expect(out.message).toMatch(/not accepted/i);
+    expect(out.message).toMatch(/would not accept/i);
     expect(q.getSnapshot().pendingCount).toBe(0);
   });
 
@@ -170,7 +176,7 @@ describe('createSweepQueue', () => {
 
     net.state.failWith = rejected;
     await advance(1_400);
-    await expect(delivered).rejects.toThrow(/not accepted/i);
+    await expect(delivered).rejects.toThrow(/would not accept/i);
     expect(q.getSnapshot().items[0]?.status).toBe('failed');
     expect(queueStatusMessage(q.getSnapshot())).toBe('One sweep could not be sent.');
     expect(pendingTimers()).toBe(0);

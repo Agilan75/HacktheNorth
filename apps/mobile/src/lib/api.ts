@@ -96,29 +96,29 @@ export function isOfflineError(error: unknown): boolean {
 }
 
 /**
- * One plain-language sentence for the UI. Never shows a status code or a stack
- * trace to the tenant.
+ * One line for the UI: what happened, and what to do. Never a status code, a
+ * stack trace, or a sentence that only reassures.
  */
 export function describeApiError(error: unknown): string {
-  if (!isApiError(error)) return 'Something went wrong. Please try again.';
+  if (!isApiError(error)) return 'Something went wrong. Try again.';
   switch (error.kind) {
     case 'network':
-      return "You seem to be offline. We'll try again when you're back online.";
+      return 'Offline. Sending resumes by itself.';
     case 'timeout':
-      return 'The connection is slow and the request timed out. We will try again.';
+      return 'The connection timed out. Retrying.';
     case 'config':
-      return 'The app is not connected to a server. Ask the person who set it up to add the server address.';
+      return 'No server address set. Ask whoever set this up.';
     case 'aborted':
       return 'Cancelled.';
     case 'parse':
-      return 'The server sent a reply we could not read. Please try again.';
+      return 'The server sent a reply that could not be read.';
     case 'http':
-      if (error.status === 404) return 'We could not find that. It may have expired.';
+      if (error.status === 404) return 'Not found. It may have expired.';
       if (error.status === 400 || error.status === 422) {
-        return 'Some of the information sent was not accepted. Please check it and try again.';
+        return 'The server would not accept that. Check it and try again.';
       }
-      if (error.status === 429) return 'The server is busy. Please wait a moment and try again.';
-      return 'The server had a problem. Please try again in a moment.';
+      if (error.status === 429) return 'The server is busy. Wait a moment.';
+      return 'The server had a problem. Try again.';
   }
 }
 
@@ -187,6 +187,12 @@ export interface CallOptions {
   readonly signal?: AbortSignal;
   /** Override the client's retry policy for this call (e.g. `{ maxAttempts: 1 }`). */
   readonly retry?: Partial<RetryPolicy>;
+  /**
+   * `false` asks `GET /sweeps/:id` to leave the frame images out. Fifteen of
+   * them is about six megabytes, and a poll that never draws one should not be
+   * carrying them: a minute of polling is otherwise enough to end the app.
+   */
+  readonly images?: boolean;
 }
 
 export interface ApiClient {
@@ -395,7 +401,13 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     baseUrl,
     createSweep: (body, opts) =>
       request<SweepDto>('POST', API_PATHS.createSweep(), body, uploadTimeoutMs, opts),
-    getSweep: (id, opts) => request<SweepDto>('GET', API_PATHS.getSweep(id), undefined, timeoutMs, opts),
+    getSweep: (id, opts) =>
+      opts?.images === false
+        ? request<SweepDto>('GET', `${API_PATHS.getSweep(id)}?images=0`, undefined, timeoutMs, opts).then(
+            // A server older than `?images=0` ignores it and sends them anyway.
+            dropFrameImages,
+          )
+        : request<SweepDto>('GET', API_PATHS.getSweep(id), undefined, timeoutMs, opts),
     nextQuestion: (id, opts) =>
       request<NextQuestionResponseDto>('GET', API_PATHS.nextQuestion(id), undefined, timeoutMs, opts),
     submitAnswers: (id, body, opts) =>
@@ -424,6 +436,28 @@ export function isRestingStage(stage: SweepStageDto): boolean {
   return RESTING_STAGES.includes(stage);
 }
 
+/**
+ * Drops the frame images from a polled sweep.
+ *
+ * `?images=0` already asks the server not to send them, but a server older than
+ * that parameter ignores it and sends all fifteen anyway — about six megabytes,
+ * every poll. Holding that in state while the next one arrives is what takes
+ * the app out, so it is dropped here too, the moment it lands, whatever the
+ * server chose to send. Nothing that polls ever draws a frame.
+ */
+function dropFrameImages(raw: SweepDto): SweepDto {
+  // A sweep still in flight, or one from an older server, can arrive without
+  // its list fields; every screen reads them with .filter, so default them here.
+  const sweep: SweepDto = {
+    ...raw,
+    frames: raw.frames ?? [],
+    observations: raw.observations ?? [],
+    hazardCosts: raw.hazardCosts ?? [],
+  };
+  if (!sweep.frames.some((f) => f.imageRef !== null)) return sweep;
+  return { ...sweep, frames: sweep.frames.map((f) => (f.imageRef === null ? f : { ...f, imageRef: null })) };
+}
+
 export interface PollOptions {
   readonly intervalMs?: number;
   /** Give up after this long; rejects with an ApiError of kind `timeout`. */
@@ -444,8 +478,10 @@ export async function pollSweep(client: ApiClient, id: string, opts: PollOptions
   const started = now();
   for (;;) {
     if (opts.signal?.aborted) throw new ApiError({ kind: 'aborted', message: 'polling cancelled' });
-    const callOpts: CallOptions = opts.signal === undefined ? {} : { signal: opts.signal };
-    const sweep = await client.getSweep(id, callOpts);
+    // Never the images: this runs every 1.2 s and nothing on the way draws one.
+    const callOpts: CallOptions =
+      opts.signal === undefined ? { images: false } : { images: false, signal: opts.signal };
+    const sweep = dropFrameImages(await client.getSweep(id, callOpts));
     opts.onUpdate?.(sweep);
     if (isRestingStage(sweep.stage)) return sweep;
     if (now() - started >= limitMs) {

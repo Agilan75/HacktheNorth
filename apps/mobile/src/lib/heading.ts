@@ -3,14 +3,14 @@
  *
  * Pure: no React Native, no Expo import. Runs in node under vitest.
  *
+ * The smoothing that used to live here is now the complementary filter in
+ * `src/ar/pose.gyro.ts`, which blends the compass with the motion sensor.
+ *
  * Angles are degrees clockwise in [0, 360). Every subtraction goes through
  * `signedDelta`, so 359° -> 1° is a +2° step, never a -358° one.
  */
 
 export const FULL_CIRCLE = 360;
-
-/** Default smoothing factor: weight of the newest reading. */
-export const DEFAULT_HEADING_ALPHA = 0.25;
 
 /** Wraps any finite angle into [0, 360). */
 export function normalizeDeg(deg: number): number {
@@ -57,40 +57,4 @@ export function headingFromReading(reading: HeadingReading): number | null {
   if (isValidHeading(reading.magHeading)) return normalizeDeg(reading.magHeading);
   if (isValidHeading(reading.trueHeading)) return normalizeDeg(reading.trueHeading);
   return null;
-}
-
-export interface HeadingFilter {
-  /** Feeds a raw heading; returns the filtered one. Invalid input returns the last value. */
-  push(rawDeg: number): number | null;
-  /** The current filtered heading, or null before the first valid reading. */
-  value(): number | null;
-  reset(): void;
-}
-
-/**
- * Exponential filter over a circular quantity.
- *
- *   next = normalize(prev + alpha * signedDelta(prev, raw))
- *
- * Filtering the wrapped delta (not the raw number) is what makes 359° -> 1°
- * smooth: the naive average of 359 and 1 is 180, the opposite wall.
- * The first valid reading seeds the filter unfiltered.
- */
-export function createHeadingFilter(alpha: number = DEFAULT_HEADING_ALPHA): HeadingFilter {
-  if (!(alpha > 0 && alpha <= 1)) {
-    throw new RangeError(`heading filter alpha must be in (0, 1], got ${alpha}`);
-  }
-  let current: number | null = null;
-  return {
-    push(rawDeg: number): number | null {
-      if (!Number.isFinite(rawDeg)) return current;
-      const raw = normalizeDeg(rawDeg);
-      current = current === null ? raw : normalizeDeg(current + alpha * signedDelta(current, raw));
-      return current;
-    },
-    value: () => current,
-    reset() {
-      current = null;
-    },
-  };
 }

@@ -86,7 +86,7 @@ export function textStyle(token: FontSizeToken, fontScale?: number): RnTextStyle
 /** A card surface: radius 16, 1px Muted-tint border, no shadow. */
 export function cardStyle(padding: SpaceToken = 'lg'): RnViewStyle {
   return {
-    backgroundColor: COLORS.paper,
+    backgroundColor: COLORS.bone,
     borderWidth: BORDER.width,
     borderColor: BORDER.color,
     borderRadius: RADIUS.card,

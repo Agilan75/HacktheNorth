@@ -11,9 +11,10 @@ import type { Context, Hono } from 'hono';
 import { z } from 'zod';
 import type { ApiEnv, RouteRegistrar } from '../app';
 import { getEnv } from '../env';
+import type { LlmProvider } from '../llm/types';
 import { captureError } from '../observability/index';
 import { createPricer } from '../pricing/live';
-import type { Pricer } from '../pricing/live';
+import type { Pricer, PricingClient } from '../pricing/live';
 import { PRICE_LABELS } from '../pricing/table';
 
 /** ~768px JPEG from the phone is ~100-200 KB of base64; anything far past that is not a frame. */
@@ -27,15 +28,19 @@ const lookupBody = z.object({
   model: z.string().max(80).nullable(),
 });
 
-function defaultPricer(): Pricer | null {
+/** Identify runs on the routed vision provider; the web-search lookup only when an Anthropic key is set. */
+function defaultPricer(llm: LlmProvider): Pricer | null {
+  if (!llm.configured) return null;
   const env = getEnv();
-  if (env.ANTHROPIC_API_KEY === undefined) return null;
-  const workspaceId = env.ANTHROPIC_WORKSPACE_ID?.trim();
-  const client = new Anthropic({
-    apiKey: env.ANTHROPIC_API_KEY,
-    ...(workspaceId ? { defaultHeaders: { 'anthropic-workspace-id': workspaceId } } : {}),
-  });
-  return createPricer(client, () => Date.now());
+  let anthropic: PricingClient | undefined;
+  if (env.ANTHROPIC_API_KEY !== undefined) {
+    const workspaceId = env.ANTHROPIC_WORKSPACE_ID?.trim();
+    anthropic = new Anthropic({
+      apiKey: env.ANTHROPIC_API_KEY,
+      ...(workspaceId ? { defaultHeaders: { 'anthropic-workspace-id': workspaceId } } : {}),
+    });
+  }
+  return createPricer({ llm, ...(anthropic !== undefined ? { anthropic } : {}) }, () => Date.now());
 }
 
 async function body<S extends z.ZodType>(c: Context<ApiEnv>, schema: S): Promise<z.output<S> | Response> {
@@ -59,15 +64,18 @@ function upstreamError(c: Context<ApiEnv>, err: unknown): Response {
   return c.json({ error: { code: 'UPSTREAM', message } }, 502);
 }
 
-/** `pricer` is injected in tests; the server builds one from the env on first use. */
+const UNAVAILABLE = { error: { code: 'LLM_UNAVAILABLE', message: 'no vision model is configured (GEMINI_API_KEY is unset)' } };
+
+/** `pricer` is injected in tests; the server builds one from `deps.llm` on first use. */
 export function createPriceRoutes(pricer?: Pricer): RouteRegistrar {
   let resolved: Pricer | null | undefined = pricer;
-  const get = (): Pricer | null => (resolved === undefined ? (resolved = defaultPricer()) : resolved);
 
-  return (app: Hono<ApiEnv>) => {
+  return (app: Hono<ApiEnv>, deps) => {
+    const get = (): Pricer | null => (resolved === undefined ? (resolved = defaultPricer(deps.llm)) : resolved);
+
     app.post('/price/identify', async (c) => {
       const p = get();
-      if (p === null) return c.json({ error: { code: 'LLM_UNAVAILABLE', message: 'ANTHROPIC_API_KEY is not set' } }, 503);
+      if (p === null) return c.json(UNAVAILABLE, 503);
       const parsed = await body(c, identifyBody);
       if (parsed instanceof Response) return parsed;
       try {
@@ -79,7 +87,7 @@ export function createPriceRoutes(pricer?: Pricer): RouteRegistrar {
 
     app.post('/price/lookup', async (c) => {
       const p = get();
-      if (p === null) return c.json({ error: { code: 'LLM_UNAVAILABLE', message: 'ANTHROPIC_API_KEY is not set' } }, 503);
+      if (p === null) return c.json(UNAVAILABLE, 503);
       const parsed = await body(c, lookupBody);
       if (parsed instanceof Response) return parsed;
       try {

@@ -1,12 +1,12 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
-import { Link, NavLink } from 'react-router';
+import { NavLink } from 'react-router';
 import { cssVar, MIN_TOUCH_TARGET, RADIUS, SPACE } from '@retrofit/design';
 const MAIN_ID = 'rf-main';
 const shellStyle = {
     minHeight: '100vh',
     display: 'flex',
     flexDirection: 'column',
-    background: cssVar('paper'),
+    background: cssVar('bone'),
     color: cssVar('ink'),
     fontFamily: cssVar('font-body'),
 };
@@ -16,25 +16,26 @@ const skipLinkStyle = {
     top: -100,
     padding: SPACE.sm,
     background: cssVar('ink'),
-    color: cssVar('paper'),
+    color: cssVar('bone'),
     borderRadius: RADIUS.card,
-    zIndex: 10,
+    zIndex: 20,
 };
+/**
+ * Sticky, because the adapter banner rides in it and PRD §10 says the banner
+ * is never hidden — scrolling a long queue should not take it off screen.
+ */
 const headerStyle = {
+    position: 'sticky',
+    top: 0,
+    zIndex: 10,
     display: 'flex',
     flexWrap: 'wrap',
     alignItems: 'center',
     gap: SPACE.lg,
     padding: `${SPACE.md}px ${SPACE.xl}px`,
     minWidth: 0,
-    borderBottom: `1px solid ${cssVar('muted-tint')}`,
-    background: cssVar('paper'),
-};
-const brandStyle = {
-    fontFamily: cssVar('font-display'),
-    fontSize: cssVar('size-heading'),
-    lineHeight: cssVar('leading-heading'),
-    margin: 0,
+    borderBottom: `1px solid ${cssVar('mute-tint')}`,
+    background: cssVar('bone'),
 };
 const navListStyle = {
     display: 'flex',
@@ -44,18 +45,22 @@ const navListStyle = {
     margin: 0,
     padding: 0,
 };
+/**
+ * The phone kit's ChoiceGroup, in a header: the one you are on fills with ink
+ * and flips to bone words. Weight and `aria-current` say the same thing, so
+ * colour is never the only signal (PRD §13).
+ */
 function navLinkStyle({ isActive }) {
     return {
         display: 'inline-flex',
         alignItems: 'center',
         minHeight: MIN_TOUCH_TARGET,
-        padding: `0 ${SPACE.md}px`,
+        padding: `0 ${SPACE.lg}px`,
         borderRadius: RADIUS.pill,
-        textDecoration: isActive ? 'underline' : 'none',
-        textUnderlineOffset: 4,
+        textDecoration: 'none',
         fontWeight: isActive ? 600 : 400,
-        color: cssVar('ink'),
-        background: isActive ? cssVar('muted-tint') : 'transparent',
+        color: isActive ? cssVar('bone') : cssVar('ink'),
+        background: isActive ? cssVar('ink') : 'transparent',
     };
 }
 const mainStyle = {
@@ -67,6 +72,15 @@ const mainStyle = {
     boxSizing: 'border-box',
 };
 /**
+ * The Retrofit lockup, the same one the phone app opens with: a flat accent
+ * disc carrying a house glyph, then the wordmark in the display face. One
+ * colour, no gradient. The mark is decoration — the wordmark beside it is the
+ * real text — so it is hidden from screen readers.
+ */
+function Brand() {
+    return (_jsxs("p", { className: "rf-brand", children: [_jsx("span", { className: "rf-brand__mark", "aria-hidden": "true", children: _jsxs("svg", { width: "18", height: "18", viewBox: "0 0 24 24", fill: "none", "aria-hidden": "true", focusable: "false", children: [_jsx("path", { d: "M3.5 11.2 12 4l8.5 7.2", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" }), _jsx("path", { d: "M5.8 10.2V19a1 1 0 0 0 1 1h10.4a1 1 0 0 0 1-1v-8.8", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" })] }) }), _jsx("span", { className: "rf-brand__word", children: "Retrofit" })] }));
+}
+/**
  * Console shell: skip link, header (brand, primary nav, adapter banner), main.
  * The banner is rendered unconditionally in the header on every route —
  * PRD §10 "Never hidden".
@@ -77,6 +91,6 @@ export function Layout(props) {
                     event.currentTarget.style.top = `${SPACE.sm}px`;
                 }, onBlur: (event) => {
                     event.currentTarget.style.top = '-100px';
-                }, children: "Skip to content" }), _jsxs("header", { style: headerStyle, children: [_jsx("p", { style: brandStyle, children: _jsx(Link, { to: "/", className: "rf-brand-link", "aria-label": "Retrofit \u2014 home", children: "Retrofit" }) }), _jsx("nav", { "aria-label": "Primary", style: { flex: '1 1 auto' }, children: _jsx("ul", { style: navListStyle, children: nav.map((item) => (_jsx("li", { children: _jsx(NavLink, { to: item.to, className: "rf-nav-link", style: navLinkStyle, children: item.label }) }, item.to))) }) }), _jsx("div", { "data-testid": "adapter-banner-slot", children: banner })] }), _jsx("main", { id: MAIN_ID, className: "rf-main", tabIndex: -1, style: mainStyle, children: children })] }));
+                }, children: "Skip to content" }), _jsxs("header", { style: headerStyle, children: [_jsx(Brand, {}), _jsx("nav", { "aria-label": "Primary", style: { flex: '1 1 auto' }, children: _jsx("ul", { style: navListStyle, children: nav.map((item) => (_jsx("li", { children: _jsx(NavLink, { to: item.to, className: "rf-nav-link", style: navLinkStyle, children: item.label }) }, item.to))) }) }), _jsx("div", { "data-testid": "adapter-banner-slot", children: banner })] }), _jsx("main", { id: MAIN_ID, className: "rf-main", tabIndex: -1, style: mainStyle, children: children })] }));
 }
 //# sourceMappingURL=Layout.js.map

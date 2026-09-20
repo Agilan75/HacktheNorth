@@ -64,10 +64,10 @@ const stageStyle: CSSProperties = {
   position: 'relative',
   height: 'min(72vh, 760px)',
   minHeight: 420,
-  border: `1px solid ${cssVar('muted-tint')}`,
+  border: `1px solid ${cssVar('mute-tint')}`,
   borderRadius: RADIUS.card,
   overflow: 'hidden',
-  background: cssVar('paper'),
+  background: cssVar('bone'),
 };
 
 const tooltipStyle: CSSProperties = {
@@ -75,9 +75,10 @@ const tooltipStyle: CSSProperties = {
   pointerEvents: 'none',
   maxWidth: 280,
   padding: `${SPACE.sm}px ${SPACE.md}px`,
-  background: cssVar('paper'),
-  border: `1px solid ${cssVar('ink')}`,
-  borderRadius: 8,
+  background: cssVar('bone'),
+  // A 2px ink edge on the card radius, the same surface the phone kit raises.
+  border: `2px solid ${cssVar('ink')}`,
+  borderRadius: RADIUS.card,
   fontSize: cssVar('size-micro'),
   lineHeight: 1.45,
   color: cssVar('ink'),

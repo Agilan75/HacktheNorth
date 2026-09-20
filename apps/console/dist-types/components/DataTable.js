@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useMemo, useState } from 'react';
-import { cssVar, MIN_TOUCH_TARGET, SPACE } from '@retrofit/design';
+import { cssVar, MIN_TOUCH_TARGET, RADIUS, SPACE } from '@retrofit/design';
 /** Number of placeholder rows rendered while loading (PRD §13: skeletons for every list). */
 const LOADING_ROWS = 5;
 /** Visually hidden but read by screen readers (private; base.css belongs to C02). */
@@ -25,10 +25,25 @@ const tableStyle = {
 };
 const captionStyle = {
     textAlign: 'left',
-    padding: `${SPACE.sm}px 0`,
+    padding: `${SPACE.md}px ${SPACE.lg}px`,
     fontFamily: cssVar('font-display'),
     fontSize: cssVar('size-heading'),
     lineHeight: cssVar('leading-heading'),
+    fontWeight: 600,
+};
+/**
+ * The table sits in the same frame a card does — radius 16, one mute-tint
+ * hairline, no shadow — so a page of tables reads like a page of the phone
+ * app's cards rather than a page of loose rules.
+ */
+const frameStyle = {
+    position: 'relative',
+    width: '100%',
+    maxWidth: '100%',
+    overflowX: 'auto',
+    border: `1px solid ${cssVar('mute-tint')}`,
+    borderRadius: RADIUS.card,
+    background: cssVar('bone'),
 };
 const cellBase = {
     padding: `${SPACE.sm}px ${SPACE.md}px`,
@@ -108,19 +123,9 @@ function nextSort(current, key) {
  */
 export function DataTable(props) {
     const { caption, columns, rows, rowKey, emptyLabel, loading = false, onRowClick } = props;
-    const [ownSort, setOwnSort] = useState(null);
-    const controlled = props.onSortChange !== undefined;
-    const sort = controlled ? (props.sort ?? null) : ownSort;
-    const applySort = (key) => {
-        const next = nextSort(sort, key);
-        if (props.onSortChange)
-            props.onSortChange(next);
-        else
-            setOwnSort(next);
-    };
+    const [sort, setSort] = useState(null);
     const sortedRows = useMemo(() => {
-        // Controlled: the owner hands us the rows already in order.
-        if (controlled || sort === null)
+        if (sort === null)
             return rows;
         const column = columns.find((c) => c.key === sort.key);
         const sortValue = column?.sortValue;
@@ -131,7 +136,7 @@ export function DataTable(props) {
             .map((row, index) => ({ row, index, value: sortValue(row) }))
             .sort((a, b) => compareSortValues(a.value, b.value, sort.direction) || a.index - b.index)
             .map((entry) => entry.row);
-    }, [rows, columns, sort, controlled]);
+    }, [rows, columns, sort]);
     const handleRowKeyDown = (event, row) => {
         if (!onRowClick)
             return;
@@ -152,7 +157,7 @@ export function DataTable(props) {
     else {
         body = sortedRows.map((row) => {
             const clickable = onRowClick !== undefined;
-            return (_jsx("tr", { role: clickable ? 'button' : undefined, tabIndex: clickable ? 0 : undefined, onClick: clickable ? () => onRowClick(row) : undefined, onKeyDown: clickable ? (event) => handleRowKeyDown(event, row) : undefined, style: clickable ? { cursor: 'pointer' } : undefined, "data-clickable": clickable ? 'true' : undefined, children: columns.map((column) => (_jsx("td", { "data-align": column.align ?? 'left', style: {
+            return (_jsx("tr", { role: clickable ? 'button' : undefined, tabIndex: clickable ? 0 : undefined, onClick: clickable ? () => onRowClick(row) : undefined, onKeyDown: clickable ? (event) => handleRowKeyDown(event, row) : undefined, style: clickable ? { cursor: 'pointer' } : undefined, "data-clickable": clickable ? 'true' : undefined, children: columns.map((column) => (_jsx("td", { style: {
                         ...cellBase,
                         textAlign: column.align ?? 'left',
                         ...(column.minWidth !== undefined ? { minWidth: column.minWidth } : {}),
@@ -168,7 +173,7 @@ export function DataTable(props) {
                         }, children: column.render(row) })) : (column.render(row)) }, column.key))) }, rowKey(row)));
         });
     }
-    return (_jsx("div", { className: "rf-ledger", style: { position: 'relative', width: '100%', maxWidth: '100%', overflowX: 'auto' }, children: _jsxs("table", { style: tableStyle, "aria-busy": loading ? 'true' : undefined, children: [_jsxs("caption", { style: captionStyle, children: [caption, loading ? _jsx("span", { style: srOnly, children: " (loading)" }) : null] }), _jsx("thead", { children: _jsx("tr", { children: columns.map((column) => {
+    return (_jsx("div", { style: frameStyle, children: _jsxs("table", { style: tableStyle, "aria-busy": loading ? 'true' : undefined, children: [_jsxs("caption", { style: captionStyle, children: [caption, loading ? _jsx("span", { style: srOnly, children: " (loading)" }) : null] }), _jsx("thead", { children: _jsx("tr", { children: columns.map((column) => {
                             const align = column.align ?? 'left';
                             const active = sort !== null && sort.key === column.key;
                             const ariaSort = !column.sortValue
@@ -178,7 +183,7 @@ export function DataTable(props) {
                                         ? 'ascending'
                                         : 'descending'
                                     : 'none';
-                            return (_jsx("th", { scope: "col", title: column.headerTitle, "aria-sort": ariaSort, style: { ...headerCellBase, textAlign: align }, children: column.sortValue ? (_jsxs("button", { type: "button", style: { ...sortButtonStyle, justifyContent: align === 'right' ? 'flex-end' : 'flex-start' }, onClick: () => applySort(column.key), children: [column.header, _jsx("span", { "aria-hidden": "true", children: active ? (sort.direction === 'asc' ? '▲' : '▼') : '↕' })] })) : (column.header) }, column.key));
+                            return (_jsx("th", { scope: "col", title: column.headerTitle, "aria-sort": ariaSort, style: { ...headerCellBase, textAlign: align }, children: column.sortValue ? (_jsxs("button", { type: "button", style: { ...sortButtonStyle, justifyContent: align === 'right' ? 'flex-end' : 'flex-start' }, onClick: () => setSort((current) => nextSort(current, column.key)), children: [column.header, _jsx("span", { "aria-hidden": "true", children: active ? (sort.direction === 'asc' ? '▲' : '▼') : '↕' })] })) : (column.header) }, column.key));
                         }) }) }), _jsx("tbody", { children: body })] }) }));
 }
 //# sourceMappingURL=DataTable.js.map

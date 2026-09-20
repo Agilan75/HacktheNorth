@@ -58,21 +58,24 @@ const fieldStyle: CSSProperties = {
   color: cssVar('muted-deep'),
 };
 
+/** The phone kit's TextField: card radius, a 1px mute edge, bone inside. */
 const controlStyle: CSSProperties = {
   minHeight: MIN_TOUCH_TARGET,
   padding: `0 ${SPACE.md}px`,
-  border: `1px solid ${cssVar('muted-tint')}`,
+  border: `1px solid ${cssVar('mute')}`,
   borderRadius: RADIUS.card,
-  background: cssVar('paper'),
+  background: cssVar('bone'),
   color: cssVar('ink'),
   font: 'inherit',
   fontSize: cssVar('size-small'),
 };
 
+/** A button, so it takes the pill and the 2px ink edge every button has. */
 const resetStyle: CSSProperties = {
-  ...controlStyle,
+  minHeight: MIN_TOUCH_TARGET,
+  padding: `0 ${SPACE.lg}px`,
+  fontSize: cssVar('size-small'),
   cursor: 'pointer',
-  borderRadius: RADIUS.pill,
 };
 
 function isVerdict(value: string): value is Verdict {

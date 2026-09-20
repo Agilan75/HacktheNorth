@@ -5,9 +5,9 @@
  *     heading has moved >= 10° from where the last frame was taken.
  *   - At most 15 frames.
  *   - Coverage: 36 panels of 10°. A panel fills when the (filtered) heading
- *     passes through it — not only where a frame was shot — so the ring keeps
+ *     passes through it, not only where a frame was shot, so the ring keeps
  *     filling after the 15-frame cap.
- *   - Finish is allowed at >= 75% coverage (27 of 36 panels) and >= 1 frame.
+ *   - Finish is allowed at >= 25% coverage (9 of 36 panels) and >= 1 frame.
  *   - The largest uncovered arc and the shorter way to turn toward it.
  *
  * All bearings are RELATIVE to the heading at sweep start (0° = where the
@@ -26,7 +26,7 @@ export const MIN_ADVANCE_DEG = 10;
 export const MAX_FRAMES = 15;
 export const PANEL_COUNT = 36;
 export const PANEL_WIDTH_DEG = 10;
-export const FINISH_COVERAGE_PCT = 75;
+export const FINISH_COVERAGE_PCT = 25;
 /**
  * A heading step larger than this between two samples is treated as a compass
  * glitch, not a turn: only the landing panel fills, nothing in between.

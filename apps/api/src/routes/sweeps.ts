@@ -16,7 +16,7 @@ import {
 import type { ApiEnv } from '../app';
 import { captureError } from '../observability/index';
 import { nextQuestion, submitAnswers } from '../services/questions';
-import { advanceSweep, createSweep, getSweep } from '../services/sweep';
+import { advanceSweep, createSweep, getSweep, withoutFrameImages } from '../services/sweep';
 import type { Deps } from '../services/types';
 import { verifyFix } from '../services/verify-fix';
 
@@ -131,7 +131,9 @@ export function registerSweepRoutes(app: Hono<ApiEnv>, deps: Deps): void {
     const sweep = await getSweep(deps, id);
     if (sweep === null) return notFound(c, id);
     kick(sweep);
-    return c.json(sweep, 200);
+    // `?images=0` leaves the frame images out. The polling screen never draws
+    // one, and sending them costs six megabytes a poll.
+    return c.json(c.req.query('images') === '0' ? withoutFrameImages(sweep) : sweep, 200);
   });
 
   app.post(ROUTES.answerSweep.path, async (c) => {

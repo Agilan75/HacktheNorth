@@ -129,6 +129,12 @@ export const CANNED_RESPONSES: Readonly<Record<LlmCallName, unknown>> = {
     reasoning:
       'At least one building predates 1990, which the guidelines flag for referral.',
   },
+  identify: {
+    items: [
+      { label: 'sofa', name: 'grey three-seat fabric sofa', brand: null, model: null, confidence: 0.9 },
+      { label: 'tv', name: 'wall-mounted TV', brand: 'Samsung', model: null, confidence: 0.8 },
+    ],
+  },
 };
 
 export interface RecordedCall {

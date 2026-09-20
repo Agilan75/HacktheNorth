@@ -353,6 +353,10 @@ function sweepFromRow(row: SweepRow): SweepDto {
     observations: row.observations,
     needsConfirmation: row.observations.filter((o) => o.confidence < CONFIRM_BELOW),
     result: row.result,
+    // Phone-only fields. The console's attached-sweep panel reads neither, and
+    // leaves them empty exactly as it already does for the question counters.
+    hazardCosts: [],
+    pendingQuestion: null,
     askedQuestionIds: [],
     skippedCount: 0,
     error: row.error,

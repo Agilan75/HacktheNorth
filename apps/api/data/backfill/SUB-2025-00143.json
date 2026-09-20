@@ -1,7 +1,6 @@
 {
   "externalId": "SUB-2025-00143",
-  "targetVerdict": "DOES_NOT_FIT",
-  "rationale": "The only location is in Bellevue, WA, which is outside both the target and acceptable state lists, so primary risk state is Not Acceptable and knocks the submission out; every other factor (new business, $24.6M TIV, $71,500 premium, acceptable construction, no losses) is within appetite.",
+  "rationale": "Federato returned no Policy for this submission, so no location, building or premium reached the canonical record. The insured's headquarters (Location 27, Seattle WA) and its one building are in the snapshot, and every value here but the premium is read from them: total insured value is the sum of those buildings ($26,254,000), the year built is their value-weighted mean, the construction class is the one holding the most value on the majority side of the acceptable/not split (100% acceptable), sprinklered follows the value-weighted majority (0%), and the five-year incurred loss is the 0 claims on the insured's other policies dated 2020-08-19 to 2025-08-19. The premium is the only figure with no source: it is this account's value at 0.432% of TIV, the median rate of the book's 6 full-value property placements. The merge grammar carries one reported building and one reported location, so the portfolio is summarised into a single entry.",
   "values": [
     {
       "canonicalPath": "submissionType",
@@ -13,47 +12,51 @@
     },
     {
       "canonicalPath": "locations.*.city",
-      "value": "Bellevue"
+      "value": "Seattle"
     },
     {
       "canonicalPath": "locations.*.postalCode",
-      "value": "98004"
+      "value": "98104"
     },
     {
       "canonicalPath": "locations.*.protectionClass",
-      "value": 2
+      "value": 8
     },
     {
-      "canonicalPath": "buildings.*.tiv",
-      "value": 24600000
+      "canonicalPath": "rollup.totalTiv",
+      "value": 26254000
     },
     {
       "canonicalPath": "buildings.*.yearBuilt",
-      "value": 2008
+      "value": 2010
     },
     {
       "canonicalPath": "buildings.*.constructionType",
-      "value": "non_combustible"
+      "value": "steel"
     },
     {
       "canonicalPath": "buildings.*.sprinklered",
-      "value": true
+      "value": false
     },
     {
       "canonicalPath": "buildings.*.stories",
-      "value": 4
+      "value": 5
     },
     {
       "canonicalPath": "buildings.*.occupancy",
-      "value": "Software engineering offices with on-site server room"
+      "value": "Computer Systems Design"
     },
     {
-      "canonicalPath": "pricing.quotedPremium",
-      "value": 71500
+      "canonicalPath": "buildings.*.protectionClass",
+      "value": 8
     },
     {
       "canonicalPath": "rollup.fiveYearLoss",
       "value": 0
+    },
+    {
+      "canonicalPath": "pricing.quotedPremium",
+      "value": 113400
     }
   ]
 }

@@ -3,9 +3,13 @@
  * to the property submissions Federato holds no Policy for (no buildings, no
  * locations, no pricing), then re-score the book and route them.
  *
- * The values were written by Claude Code agents from each account's industry,
- * revenue and state, calibrated against the fully populated peers. No LLM API
- * is called, here or at runtime. Every value lands with `answer` provenance and
+ * Every value but one is read from `packages/federato/snapshot/snapshot.json`:
+ * the submission's insured, its headquarters location, that location's
+ * buildings, and the claims on the insured's other policies. Federato returns
+ * none of it for these eleven submissions, because the query reaches buildings
+ * through a Policy record they do not have. The premium is the one figure with
+ * no source; each file's `rationale` says how it was derived. No LLM API is
+ * called, here or at runtime. Every value lands with `answer` provenance and
  * `sourceDetail: 'synthetic:backfill-v1'`, so the console labels it synthetic;
  * the engine still does all the arithmetic (appetite, verdict, adequacy).
  *

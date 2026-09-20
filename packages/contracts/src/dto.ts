@@ -673,9 +673,17 @@ export interface SweepFrameDto {
 }
 
 export interface SweepCreateRequestDto {
-  readonly roomLabel: string;
-  readonly termMonths: 4 | 8 | 12;
+  /** Defaults to `Room` server-side: the phone reaches the camera before it can ask for a name. */
+  readonly roomLabel?: string;
+  /** Defaults to 12 server-side (PRD §11 term; the phone no longer asks). */
+  readonly termMonths?: 4 | 8 | 12;
   readonly submissionId?: string;
+  /**
+   * Replacement value of the contents the sweep priced, in whole USD. The
+   * server rounds it into `exposure.contentsLimit`; the renter is never asked
+   * to value their own belongings.
+   */
+  readonly contentsEstimateUsd?: number;
   readonly frames: readonly {
     readonly bearingDeg: number;
     readonly pitchDeg?: number;
@@ -683,6 +691,21 @@ export interface SweepCreateRequestDto {
     /** base64 JPEG/PNG, one per captured frame, at most 15. */
     readonly imageBase64: string;
   }[];
+}
+
+/**
+ * What one priced hazard adds to the monthly premium, at the price the engine
+ * just returned. The engine composes a tenant premium as
+ * `base x PI(factors)`, so removing one factor is a division, not an estimate.
+ * Computed in the API beside the other numbers, never on a phone.
+ */
+export interface HazardCostDto {
+  /** `portableHeater`, matching the `hazard.<key>` rating factor. */
+  readonly hazardKey: string;
+  /** The rating multiplier the engine applied. */
+  readonly factor: number;
+  /** Dollars per month this hazard adds. Null when there is no price. */
+  readonly monthlyDelta: number | null;
 }
 
 export interface SweepDto {
@@ -694,9 +717,16 @@ export interface SweepDto {
   readonly frames: readonly SweepFrameDto[];
   readonly coverage: CoverageResult | null;
   readonly observations: readonly Observation[];
-  /** Observations under 0.6 waiting for the user to confirm or dismiss. */
+  /** Observations under 0.6. Reported, but they no longer hold the sweep open. */
   readonly needsConfirmation: readonly Observation[];
   readonly result: EngineResult | null;
+  /** Priced hazards, dearest first. The verdict screen shows the top three. */
+  readonly hazardCosts: readonly HazardCostDto[];
+  /**
+   * The one question still worth asking, or null. Never about anything a
+   * camera sweep can answer, and never more than one per sweep.
+   */
+  readonly pendingQuestion: Question | null;
   readonly askedQuestionIds: readonly string[];
   readonly skippedCount: number;
   readonly error: string | null;
@@ -712,7 +742,17 @@ export interface SweepAnswersRequestDto {
     /** True when the user skipped rather than answered. */
     readonly skipped?: boolean;
   }[];
-  /** Observations the user confirmed or dismissed on `/confirm`. */
+  /**
+   * Corrections to a field the sweep derived or defaulted, made inline on the
+   * verdict screen. An edit names the canonical field directly, because a
+   * derived field has no question to answer. Latest edit per field wins, and an
+   * edit outranks the sweep's own value exactly as an answer does.
+   */
+  readonly edits?: readonly {
+    readonly field: string;
+    readonly value: string | number | boolean | null;
+  }[];
+  /** Observations the user confirmed or dismissed. */
   readonly confirmations?: readonly {
     readonly observationId: string;
     readonly confirmed: boolean;

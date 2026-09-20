@@ -1,7 +1,6 @@
 {
   "externalId": "SUB-2025-00115",
-  "targetVerdict": "FIT",
-  "rationale": "Single sprinklered 2014 non-combustible machine-shop plant in Fontana, CA (target state) with $52.4M TIV (target band), $171.8K premium (acceptable band) and $18.5K of five-year loss, so every appetite factor is known and in appetite with no knockout or refer rule. The quote sits a little under the rating model, so adequacy lands near 0.9.",
+  "rationale": "Federato returned no Policy for this submission, so no location, building or premium reached the canonical record. The insured's headquarters (Location 12, Oakland CA) and its 3 buildings are in the snapshot, and every value here but the premium is read from them: total insured value is the sum of those buildings ($54,397,000), the year built is their value-weighted mean, the construction class is the one holding the most value on the majority side of the acceptable/not split (60% acceptable), sprinklered follows the value-weighted majority (100%), and the five-year incurred loss is the 1 claim on the insured's other policies dated 2020-08-15 to 2025-08-15. The premium is the only figure with no source: it is this account's value at 0.432% of TIV, the median rate of the book's 6 full-value property placements. The merge grammar carries one reported building and one reported location, so the portfolio is summarised into a single entry.",
   "values": [
     {
       "canonicalPath": "submissionType",
@@ -13,23 +12,27 @@
     },
     {
       "canonicalPath": "locations.*.city",
-      "value": "Fontana"
+      "value": "Oakland"
+    },
+    {
+      "canonicalPath": "locations.*.postalCode",
+      "value": "94612"
     },
     {
       "canonicalPath": "locations.*.protectionClass",
       "value": 3
     },
     {
-      "canonicalPath": "buildings.*.tiv",
-      "value": 52400000
+      "canonicalPath": "rollup.totalTiv",
+      "value": 54397000
     },
     {
       "canonicalPath": "buildings.*.yearBuilt",
-      "value": 2014
+      "value": 1978
     },
     {
       "canonicalPath": "buildings.*.constructionType",
-      "value": "non_combustible"
+      "value": "steel"
     },
     {
       "canonicalPath": "buildings.*.sprinklered",
@@ -37,19 +40,27 @@
     },
     {
       "canonicalPath": "buildings.*.stories",
-      "value": 2
+      "value": 12
+    },
+    {
+      "canonicalPath": "buildings.*.roofYear",
+      "value": 2021
     },
     {
       "canonicalPath": "buildings.*.occupancy",
-      "value": "CNC machining and precision metal fabrication plant"
+      "value": "Machine Shops"
     },
     {
-      "canonicalPath": "pricing.quotedPremium",
-      "value": 171800
+      "canonicalPath": "buildings.*.protectionClass",
+      "value": 3
     },
     {
       "canonicalPath": "rollup.fiveYearLoss",
-      "value": 18500
+      "value": 132600
+    },
+    {
+      "canonicalPath": "pricing.quotedPremium",
+      "value": 234900
     }
   ]
 }

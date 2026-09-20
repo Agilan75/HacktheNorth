@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useEffect, useId, useState } from 'react';
-import { cssVar, SPACE } from '@retrofit/design';
+import { cssVar, RADIUS, SPACE } from '@retrofit/design';
 import { useApiClient } from '../api/useApi.js';
 /*
  * One GET /glossary per client for the whole console, however many tooltips
@@ -53,6 +53,7 @@ const wrapperStyle = {
 const triggerStyle = {
     textDecorationLine: 'underline',
     textDecorationStyle: 'dotted',
+    textDecorationColor: cssVar('mute'),
     textUnderlineOffset: '3px',
     cursor: 'help',
 };
@@ -65,10 +66,11 @@ const bubbleStyle = {
     width: 'max-content',
     maxWidth: 320,
     padding: `${SPACE.sm}px ${SPACE.md}px`,
-    background: cssVar('paper'),
+    background: cssVar('bone'),
     color: cssVar('ink'),
-    border: `${cssVar('border-width')} solid ${cssVar('ink')}`,
-    borderRadius: SPACE.sm,
+    // A 2px ink edge on the card radius: the phone kit's emphasised surface.
+    border: `2px solid ${cssVar('ink')}`,
+    borderRadius: RADIUS.card,
     fontFamily: cssVar('font-body'),
     fontSize: cssVar('size-small'),
     lineHeight: cssVar('leading-small'),

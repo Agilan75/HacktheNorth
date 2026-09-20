@@ -1,55 +1,110 @@
 /**
- * FROZEN (W0-4) — the Retrofit design tokens, PRD §13, verbatim.
+ * FROZEN (W0-4), with one authorised exception: the `feat/ar-sweep` mobile
+ * rework replaced the colour palette and added a third registered font face.
+ * Everything else here is still PRD §13 verbatim, and still frozen.
+ * The reasoning, and what it cost the console, is in
+ * `docs/decisions/mobile-rework.md` (Phase E).
  *
  * Plain TypeScript constants with no runtime dependency, so both consumers can
  * read them: the console (via the generated CSS custom properties) and the
  * Expo app (via plain numbers and strings in StyleSheet objects).
- *
- * Nothing here is a stub. Unit D01 adds `css.ts` (the CSS export and its
- * contrast test) and `rn.ts` (React Native helpers) on top of this file.
  */
 
 /* ---------------------------------------------------------------- colour */
 
+/**
+ * Seven colours. Bone is every background and ink is all text; accent is the
+ * only accent and carries the price, the buttons and the coverage wash; amber
+ * and red each mean exactly one verdict and nothing else; mute is secondary
+ * text and dividers, and muteTint is what a card is filled with.
+ *
+ * Measured against bone: ink 15.35:1, red 4.76:1, mute 3.24:1, accent 2.73:1,
+ * amber 2.11:1. So body text is always ink, never accent and never amber, and
+ * anything filled with accent or amber carries ink on top (5.63:1 and 7.27:1).
+ */
 export const COLORS = {
-  paper: '#FAF8F2',
-  ink: '#1F1E1B',
-  red: '#E4002B',
-  redDeep: '#B80022',
-  redTint: '#FBE3E6',
-  muted: '#7C8073',
-  mutedDeep: '#5E6357',
-  mutedTint: '#EDEFE8',
+  /** Every background. */
+  bone: '#F4EFE6',
+  /** All text. */
+  ink: '#191919',
+  /** The price, buttons, the AR wash, active states. The only accent. */
+  accent: '#D97757',
+  /** REFER only. */
+  amber: '#C9A227',
+  /** DOES_NOT_FIT only. */
+  red: '#B5443A',
+  /** Secondary text, dividers. */
+  mute: '#8A8478',
+  /** Card fills, hairlines. */
+  muteTint: '#E9E4DA',
+
+  /* ---------------------------------------------- console compatibility */
   /**
-   * Accent family, added on top of the frozen Paper/Ink/Red/Muted system.
-   * Red stays reserved for the verdict pills (PRD §13: "red never means bad");
-   * blue is the informational/primary-action accent (charts, primary buttons,
-   * chips) and green marks a positive completion (sent, available, moved up).
-   * Neither ever stands alone: every use still carries a word or a mark.
+   * Below this line are aliases, not colours.
+   *
+   * The console was built against the previous palette and is a separate
+   * product that this rework was told not to restyle. Keeping its token names
+   * and pointing them at the nearest new colour lets it compile, and lets the
+   * generated stylesheet keep every `--rf-*` its CSS already references, with
+   * no change to a single console component. It does change the console's
+   * colours; that was the trade, and it is recorded in
+   * `docs/decisions/mobile-rework.md`.
+   *
+   * Nothing in `apps/mobile` may name any of these. The phone app uses the
+   * seven above and nothing else.
    */
-  blue: '#2C6E9E',
-  blueDeep: '#1D3557',
-  blueTint: '#E4EAF1',
-  green: '#2E7050',
-  greenDeep: '#265C42',
-  greenTint: '#E3EFE7',
+  paper: '#F4EFE6',
+  muted: '#8A8478',
+  mutedDeep: '#8A8478',
+  mutedTint: '#E9E4DA',
+  redDeep: '#B5443A',
+  redTint: '#E9E4DA',
+  blue: '#D97757',
+  blueDeep: '#191919',
+  blueTint: '#E9E4DA',
+  green: '#8A8478',
+  greenDeep: '#191919',
+  greenTint: '#E9E4DA',
 } as const;
 
 export type ColorToken = keyof typeof COLORS;
 
+/** The seven the phone app is allowed to name. The rest of `COLORS` is legacy. */
+export const MOBILE_COLOR_TOKENS: readonly ColorToken[] = [
+  'bone',
+  'ink',
+  'accent',
+  'amber',
+  'red',
+  'mute',
+  'muteTint',
+];
+
 /**
- * `red` is a placeholder for Intact's brand red and is the only token expected
- * to be swapped. Swap it in this file; every consumer follows.
+ * `accent` stands in for Intact's brand colour and is the one token expected to
+ * be swapped. Swap it here; every consumer follows.
  */
-export const BRAND_RED_IS_PLACEHOLDER = true;
+export const BRAND_ACCENT_IS_PLACEHOLDER = true;
 
 /* ------------------------------------------------------------ typography */
 
+/**
+ * The registered font families.
+ *
+ * One name per FACE, not per family: a phone cannot synthesise a weight for a
+ * custom font the way a browser can, so every weight the app uses has to be
+ * loaded and named in its own right. The Expo app registers exactly these three
+ * with `useFonts`; the console maps them through `FONT_STACKS` instead.
+ *
+ * Display text is always semibold in this system, so `display` is that face.
+ */
 export const FONT_FAMILIES = {
-  /** Display and verdict text. */
+  /** Display and verdict text: Fraunces SemiBold. */
   display: 'Fraunces',
-  /** Body text, tables, labels. */
+  /** Body text, tables, labels: Inter Regular. */
   body: 'Inter',
+  /** Body text at semibold: Inter SemiBold, a separate face. */
+  bodyStrong: 'Inter-SemiBold',
 } as const;
 
 /** Web font stacks (console). The Expo app registers the same two families. */
@@ -114,7 +169,7 @@ export const RADIUS = {
 
 export const BORDER = {
   width: 1,
-  color: COLORS.mutedTint,
+  color: COLORS.muteTint,
 } as const;
 
 /** PRD §13: no shadows anywhere. Elevation is a border, never a shadow. */
@@ -134,29 +189,45 @@ export const MIN_TOUCH_TARGET = 44;
  * next to the colour. A component that renders `fill`/`border` without `label`
  * is a bug; the C02 and M3 tests assert the label is present.
  */
-export const VERDICT_STYLES = {
+export interface VerdictStyle {
+  readonly label: string;
+  readonly short: string;
+  /** A colour, or `transparent` for an outlined pill. */
+  readonly fill: string;
+  readonly text: string;
+  readonly border: string;
+  readonly variant: 'filled' | 'outlined';
+}
+
+/**
+ * Typed rather than `as const`, so `fill` stays `string`: consumers compare it
+ * against `'transparent'` to tell an outlined pill from a filled one, and a
+ * literal union would make every one of those comparisons a type error the
+ * moment all three verdicts happen to be filled.
+ */
+export const VERDICT_STYLES: Readonly<Record<'FIT' | 'REFER' | 'DOES_NOT_FIT', VerdictStyle>> = {
   FIT: {
     label: 'Fits appetite',
     short: 'FIT',
-    fill: COLORS.red,
-    text: COLORS.paper,
-    border: COLORS.red,
+    fill: COLORS.accent,
+    text: COLORS.ink,
+    border: COLORS.accent,
     variant: 'filled',
   },
   REFER: {
     label: 'Refer to underwriter',
     short: 'REFER',
-    fill: 'transparent',
-    text: COLORS.redDeep,
-    border: COLORS.red,
-    variant: 'outlined',
+    fill: COLORS.amber,
+    text: COLORS.ink,
+    border: COLORS.amber,
+    variant: 'filled',
   },
   DOES_NOT_FIT: {
     label: 'Outside appetite',
     short: 'DOES NOT FIT',
-    fill: COLORS.ink,
-    text: COLORS.paper,
-    border: COLORS.ink,
+    fill: COLORS.red,
+    text: COLORS.bone,
+    border: COLORS.red,
     variant: 'filled',
   },
 } as const;

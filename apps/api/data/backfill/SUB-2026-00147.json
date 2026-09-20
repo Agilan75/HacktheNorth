@@ -1,7 +1,6 @@
 {
   "externalId": "SUB-2026-00147",
-  "targetVerdict": "REFER",
-  "rationale": "Flagship lodge-style restaurant and event hall in Cashiers, NC (acceptable state, 2017 joisted masonry, $11.2M TIV, $56.8K quote, one $18.5K kitchen hood fire) clears every appetite factor, but the rural site is unsprinklered with protection class 9, which fires the unprotected-PPC referral rule. Quote is about 13% above the rated premium to load for the fire protection gap.",
+  "rationale": "Federato returned no Policy for this submission, so no location, building or premium reached the canonical record. The insured's headquarters (Location 58, Nashville TN) and its one building are in the snapshot, and every value here but the premium is read from them: total insured value is the sum of those buildings ($10,628,000), the year built is their value-weighted mean, the construction class is the one holding the most value on the majority side of the acceptable/not split (100% acceptable), sprinklered follows the value-weighted majority (0%), and the five-year incurred loss is the 3 claims on the insured's other policies dated 2020-10-01 to 2025-10-01. The premium is the only figure with no source: it is this account's value at 0.432% of TIV, the median rate of the book's 6 full-value property placements. The merge grammar carries one reported building and one reported location, so the portfolio is summarised into a single entry.",
   "values": [
     {
       "canonicalPath": "submissionType",
@@ -9,23 +8,27 @@
     },
     {
       "canonicalPath": "locations.*.state",
-      "value": "NC"
+      "value": "TN"
     },
     {
       "canonicalPath": "locations.*.city",
-      "value": "Cashiers"
+      "value": "Nashville"
+    },
+    {
+      "canonicalPath": "locations.*.postalCode",
+      "value": "37210"
     },
     {
       "canonicalPath": "locations.*.protectionClass",
-      "value": 9
+      "value": 1
     },
     {
-      "canonicalPath": "buildings.*.tiv",
-      "value": 11200000
+      "canonicalPath": "rollup.totalTiv",
+      "value": 10628000
     },
     {
       "canonicalPath": "buildings.*.yearBuilt",
-      "value": 2017
+      "value": 2013
     },
     {
       "canonicalPath": "buildings.*.constructionType",
@@ -37,19 +40,23 @@
     },
     {
       "canonicalPath": "buildings.*.stories",
-      "value": 2
+      "value": 1
     },
     {
       "canonicalPath": "buildings.*.occupancy",
-      "value": "restaurant - full service with event space"
+      "value": "Full-Service Restaurants"
     },
     {
-      "canonicalPath": "pricing.quotedPremium",
-      "value": 56800
+      "canonicalPath": "buildings.*.protectionClass",
+      "value": 1
     },
     {
       "canonicalPath": "rollup.fiveYearLoss",
-      "value": 18500
+      "value": 746100
+    },
+    {
+      "canonicalPath": "pricing.quotedPremium",
+      "value": 45900
     }
   ]
 }

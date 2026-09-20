@@ -4,7 +4,7 @@
  *
  * A tiny external store (no library), shared by /new, /sweep, /analyzing and
  * later screens. Pure apart from the `useSession` hook, which needs only
- * `react` — never `react-native` — so the store runs under vitest in node.
+ * `react`, never `react-native`, so the store runs under vitest in node.
  *
  * The store holds what the user gave us. It never computes a verdict, price or
  * hazard: those come back from the API.
@@ -20,6 +20,8 @@ export type TermMonths = 4 | 8 | 12;
 export const TERM_OPTIONS: readonly TermMonths[] = [4, 8, 12];
 export const DEFAULT_TERM: TermMonths = 12;
 export const ROOM_LABEL_MAX = 120;
+/** What a sweep is called when nothing asked. Matches the API's own default. */
+export const DEFAULT_ROOM_LABEL = 'Room';
 
 /** How the frames were gathered. The upload path is a first-class peer of the sweep. */
 export type FrameSource = 'sweep' | 'upload';
@@ -37,11 +39,14 @@ export interface SessionFrame {
 }
 
 export interface SessionState {
+  /** Blank is normal: nothing asks for a name, and the server defaults it. */
   readonly roomLabel: string;
   readonly termMonths: TermMonths;
   readonly submissionId: string | null;
   readonly source: FrameSource | null;
   readonly frames: readonly SessionFrame[];
+  /** Replacement value priced during the sweep, USD. Null before a sweep ends. */
+  readonly contentsEstimateUsd: number | null;
   /** Set once POST /sweeps returned. */
   readonly sweepId: string | null;
 }
@@ -52,6 +57,7 @@ export const initialSession: SessionState = Object.freeze({
   submissionId: null,
   source: null,
   frames: Object.freeze([]) as readonly SessionFrame[],
+  contentsEstimateUsd: null,
   sweepId: null,
 }) as SessionState;
 
@@ -74,21 +80,22 @@ function cleanFrame(f: SessionFrame): SessionFrame {
   };
 }
 
-export type SessionProblem = 'room-label-missing' | 'room-label-too-long' | 'no-frames' | 'too-many-frames';
+/**
+ * A blank room name is not a problem any more: the viewfinder is the first
+ * screen, so nothing asks for one and the server defaults it.
+ */
+export type SessionProblem = 'room-label-too-long' | 'no-frames' | 'too-many-frames';
 
 /** Plain-language messages for each problem, for the screen to show and announce. */
 export const SESSION_PROBLEM_TEXT: Readonly<Record<SessionProblem, string>> = {
-  'room-label-missing': 'Give the room a name, like "Kitchen".',
-  'room-label-too-long': `Keep the room name under ${ROOM_LABEL_MAX} characters.`,
-  'no-frames': 'Scan the room or add at least one photo first.',
-  'too-many-frames': `Use at most ${MAX_FRAMES} photos.`,
+  'room-label-too-long': `Room name over ${ROOM_LABEL_MAX} characters.`,
+  'no-frames': 'No photos yet. Scan the room, or pick photos.',
+  'too-many-frames': `At most ${MAX_FRAMES} photos.`,
 };
 
 export function sessionProblems(s: SessionState): SessionProblem[] {
   const problems: SessionProblem[] = [];
-  const label = s.roomLabel.trim();
-  if (label.length === 0) problems.push('room-label-missing');
-  if (label.length > ROOM_LABEL_MAX) problems.push('room-label-too-long');
+  if (s.roomLabel.trim().length > ROOM_LABEL_MAX) problems.push('room-label-too-long');
   if (s.frames.length === 0) problems.push('no-frames');
   if (s.frames.length > MAX_FRAMES) problems.push('too-many-frames');
   return problems;
@@ -103,10 +110,18 @@ export function buildCreateRequest(s: SessionState): BuildRequestResult {
   const problems = sessionProblems(s);
   if (problems.length > 0) return { ok: false, problems };
   const submissionId = s.submissionId?.trim();
+  const label = s.roomLabel.trim();
+  const contents = s.contentsEstimateUsd;
   const request: SweepCreateRequestDto = {
-    roomLabel: s.roomLabel.trim(),
+    // Always sent, never omitted: a deployed API older than this tree still
+    // requires the field and rejects the whole sweep without it. 'Room' is the
+    // same default `createSweep` would have applied, so nothing else changes.
+    roomLabel: label.length > 0 ? label : DEFAULT_ROOM_LABEL,
     termMonths: s.termMonths,
     ...(submissionId ? { submissionId } : {}),
+    ...(contents !== null && Number.isFinite(contents) && contents > 0
+      ? { contentsEstimateUsd: Math.round(contents) }
+      : {}),
     frames: s.frames.map((f) => ({
       bearingDeg: f.bearingDeg,
       ...(f.pitchDeg !== undefined && Number.isFinite(f.pitchDeg)
@@ -134,6 +149,8 @@ export interface SessionStore {
   addFrame(frame: SessionFrame): void;
   /** Replaces all frames (the upload path, or a finished sweep). Truncates to MAX_FRAMES. */
   setFrames(frames: readonly SessionFrame[], source: FrameSource): void;
+  /** The replacement value priced during the sweep. Null clears it. */
+  setContentsEstimate(usd: number | null): void;
   clearFrames(): void;
   setSweepId(id: string | null): void;
   /** Back to a blank session. */
@@ -177,8 +194,12 @@ export function createSessionStore(initial: SessionState = initialSession): Sess
     setFrames(frames, source) {
       set({ ...state, source, frames: frames.slice(0, MAX_FRAMES).map(cleanFrame) });
     },
+    setContentsEstimate(usd) {
+      const clean = usd !== null && Number.isFinite(usd) && usd > 0 ? usd : null;
+      set({ ...state, contentsEstimateUsd: clean });
+    },
     clearFrames() {
-      set({ ...state, source: null, frames: [] });
+      set({ ...state, source: null, frames: [], contentsEstimateUsd: null });
     },
     setSweepId(id) {
       set({ ...state, sweepId: id });

@@ -67,6 +67,8 @@ function sweep(id: string, stage: SweepDto['stage'], extra: Partial<SweepDto> = 
     observations: [],
     needsConfirmation: [],
     result: null,
+    hazardCosts: [],
+    pendingQuestion: null,
     askedQuestionIds: [],
     skippedCount: 0,
     error: null,

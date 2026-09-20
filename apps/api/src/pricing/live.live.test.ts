@@ -1,6 +1,7 @@
 /**
  * Live timing check for the sweep price chips (RUN_LIVE=1). One real frame
- * through identify, then one real lookup; prints how long each took.
+ * through identify (Gemini), then one real lookup (Anthropic web search, when
+ * that key is set); prints how long each took.
  *
  *   RUN_LIVE=1 PRICE_FRAME=<path to a room .jpg> node --env-file-if-exists=.env \
  *     node_modules/.bin/vitest run apps/api/src/pricing/live.live.test.ts --project api
@@ -8,17 +9,22 @@
 import { readFileSync } from 'node:fs';
 import Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it } from 'vitest';
+import { createGeminiProvider } from '../llm/gemini';
 import { createPricer } from './live';
 
 const frame = process.env.PRICE_FRAME;
 
-describe.skipIf(frame === undefined || process.env.ANTHROPIC_API_KEY === undefined)('live pricing', () => {
+describe.skipIf(frame === undefined || process.env.GEMINI_API_KEY === undefined)('live pricing', () => {
   it('identifies a real frame and prices one item inside the latency budget', async () => {
     const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID?.trim();
-    const client = new Anthropic({
-      ...(workspaceId ? { defaultHeaders: { 'anthropic-workspace-id': workspaceId } } : {}),
-    });
-    const pricer = createPricer(client, () => Date.now());
+    const anthropic =
+      process.env.ANTHROPIC_API_KEY === undefined
+        ? undefined
+        : new Anthropic({
+            ...(workspaceId ? { defaultHeaders: { 'anthropic-workspace-id': workspaceId } } : {}),
+          });
+    const llm = createGeminiProvider({ apiKey: process.env.GEMINI_API_KEY });
+    const pricer = createPricer({ llm, ...(anthropic !== undefined ? { anthropic } : {}) }, () => Date.now());
 
     let t = performance.now();
     const items = await pricer.identify(readFileSync(frame!).toString('base64'));

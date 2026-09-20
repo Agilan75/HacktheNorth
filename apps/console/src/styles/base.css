@@ -1,9 +1,44 @@
 /*
- * Base element styles and atom classes (PRD 13). Unit C02.
- * Paper background, Ink text, Inter body / Fraunces display, 4pt rhythm,
- * 1px Muted-tint borders, no shadows anywhere, 44px minimum interactive targets.
+ * Base element styles and atom classes (PRD §13). Unit C02.
+ *
+ * This stylesheet is the console's half of one shared design language. The
+ * other half is `apps/mobile/src/ui/kit.tsx`. Both read the same tokens from
+ * `@retrofit/design`, and every rule below is written with the same vocabulary
+ * the phone kit uses, so the two products look like one:
+ *
+ *   Bone is every background and ink is all text. Accent is the only accent:
+ *   the primary action, the active state, the one emphasised number. Amber
+ *   means REFER and nothing else; red means DOES_NOT_FIT (and a problem) and
+ *   nothing else. Mute is secondary text, mute-tint is a fill and a hairline.
+ *   Elevation is a border, never a shadow. Emphasis is a 2px border, never a
+ *   darker shade — with seven colours there is no darker accent to reach for.
+ *   Cards are radius 16, pills are radius 999, targets are 44px.
+ *
  * Every value comes from a --rf-* token in tokens.css.
  */
+
+/* ------------------------------------------------------- Console palette */
+
+/*
+ * One local override, and only one.
+ *
+ * `mutedDeep` is a console-only alias that the mobile rework collapsed onto
+ * `mute`. Mute is 3.24:1 on bone — AA-large only — and the console
+ * spends this token on 13px and 15px secondary text: table headers, stat
+ * labels, captions, footnotes. The phone app never does that (it uses `mute`
+ * for short secondary lines at body size beside something ink already says),
+ * so the shared palette is right for the app and wrong here.
+ *
+ * Mixing mute toward ink keeps the same warm grey family as the app while
+ * clearing AA at small sizes: 5.14:1 on bone and 4.65:1 on mute-tint. It is
+ * derived from two tokens, so it still moves when the palette moves, and it
+ * is scoped to this file — tokens.css stays generated and untouched.
+ */
+:root {
+  --rf-muted-deep: color-mix(in srgb, var(--rf-mute) 70%, var(--rf-ink));
+}
+
+/* ------------------------------------------------------------- Elements */
 
 *,
 *::before,
@@ -19,7 +54,7 @@ html {
 
 body {
   margin: 0;
-  background: var(--rf-paper);
+  background: var(--rf-bone);
   color: var(--rf-ink);
   font-family: var(--rf-font-body);
   font-size: var(--rf-size-body);
@@ -27,6 +62,11 @@ body {
   font-weight: var(--rf-weight-regular);
   -webkit-font-smoothing: antialiased;
   font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--rf-accent);
+  color: var(--rf-ink);
 }
 
 h1,
@@ -37,6 +77,7 @@ h4 {
   font-family: var(--rf-font-display);
   font-weight: var(--rf-weight-semibold);
   color: var(--rf-ink);
+  letter-spacing: -0.01em;
 }
 h1 { font-size: var(--rf-size-display); line-height: var(--rf-leading-display); }
 h2 { font-size: var(--rf-size-title); line-height: var(--rf-leading-title); }
@@ -47,10 +88,21 @@ p { margin: 0 0 var(--rf-space-md); }
 
 small { font-size: var(--rf-size-small); line-height: var(--rf-leading-small); }
 
+/*
+ * Ink and an underline, not a colour. The phone kit's `quiet` button is the
+ * same shape, and it keeps red for the one verdict that owns it.
+ */
 a {
-  color: var(--rf-red-deep);
+  color: var(--rf-ink);
   text-decoration: underline;
-  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: color 0.12s ease, text-decoration-color 0.12s ease;
+}
+a:hover,
+a:focus-visible {
+  color: var(--rf-accent);
+  text-decoration-color: var(--rf-accent);
 }
 
 hr {
@@ -58,6 +110,8 @@ hr {
   border-top: var(--rf-border-width) solid var(--rf-border-color);
   margin: var(--rf-space-lg) 0;
 }
+
+/* --------------------------------------------------------------- Tables */
 
 table {
   border-collapse: collapse;
@@ -72,6 +126,13 @@ td {
   text-align: left;
   vertical-align: top;
 }
+/* A mute-tint band, the phone kit's `muted` card surface, so a header row
+   reads as a header without a second colour or a rule under it. */
+thead th {
+  position: relative;
+  background: var(--rf-mute-tint);
+  border-bottom-color: var(--rf-mute);
+}
 th {
   font-weight: var(--rf-weight-semibold);
   color: var(--rf-muted-deep);
@@ -81,8 +142,10 @@ tr[data-clickable='true'] {
 }
 tr[data-clickable='true']:hover,
 tr[data-clickable='true']:focus-visible {
-  background: var(--rf-muted-tint);
+  background: var(--rf-mute-tint);
 }
+
+/* -------------------------------------------------------------- Buttons */
 
 button,
 input,
@@ -93,32 +156,47 @@ textarea {
 }
 
 button,
-[role='button'],
 a.rf-button,
 select,
 input:not([type='checkbox']):not([type='radio']) {
   min-height: var(--rf-min-touch-target);
 }
 
+/*
+ * The phone kit's Button: pill, 2px border, 24px of side padding, ink words.
+ * The secondary variant — bone fill, ink edge — is the default here, because
+ * a console page carries many actions and only one of them is primary.
+ *
+ * `[role="button"]` is deliberately not in this list. The one element that
+ * carries it is the glossary tooltip trigger, a span inside a sentence; giving
+ * it a pill would break the line it sits in, and WCAG 2.5.8 exempts a target
+ * inline in a block of text from the minimum size.
+ */
 button,
-[role='button'],
 a.rf-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--rf-space-sm);
   min-width: var(--rf-min-touch-target);
-  padding: 0 var(--rf-space-lg);
-  border: var(--rf-border-width) solid var(--rf-ink);
+  padding: var(--rf-space-sm) var(--rf-space-xl);
+  border: 2px solid var(--rf-ink);
   border-radius: var(--rf-radius-pill);
-  background: var(--rf-paper);
+  background: var(--rf-bone);
+  color: var(--rf-ink);
+  font-weight: var(--rf-weight-semibold);
   cursor: pointer;
-  transition: background-color 0.12s ease, border-color 0.12s ease;
+  transition: background-color 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+button:not(:disabled):hover,
+a.rf-button:hover {
+  background: var(--rf-mute-tint);
 }
 button:disabled {
   cursor: not-allowed;
   color: var(--rf-muted-deep);
-  border-color: var(--rf-muted-tint);
-}
-button:not(:disabled):hover,
-a.rf-button:hover {
-  background: var(--rf-muted-tint);
+  background: var(--rf-mute-tint);
+  border-color: var(--rf-mute-tint);
 }
 /* A toggle that is on (the verification field's colour / arrange / pick-out rows). */
 button[aria-pressed='true'],
@@ -127,28 +205,51 @@ button[aria-pressed='true']:not(:disabled):hover {
   color: var(--rf-paper);
 }
 
-/* Primary CTA (Approve, Extract fields): the one accent-filled button on a
-   page, reserved for the action the underwriter is most likely to take next.
-   Blue, not Red, so it never reads as a verdict (PRD 13). */
+/*
+ * The one accent-filled button on a page: the action the underwriter is most
+ * likely to take next. Ink sits on accent (5.63:1), exactly as it does on the
+ * phone, and a hover keeps the fill and takes an ink edge rather than
+ * darkening — there is no darker accent in a seven-colour palette.
+ */
 .rf-button--primary {
-  border-color: var(--rf-blue-deep);
-  background: var(--rf-blue);
-  color: var(--rf-paper);
+  border-color: var(--rf-accent);
+  background: var(--rf-accent);
+  color: var(--rf-ink);
 }
 .rf-button--primary:not(:disabled):hover {
-  background: var(--rf-blue-deep);
+  background: var(--rf-accent);
+  border-color: var(--rf-ink);
 }
 .rf-button--primary:disabled {
-  background: var(--rf-paper);
+  background: var(--rf-mute-tint);
+  border-color: var(--rf-mute-tint);
 }
+
+/* --------------------------------------------------------------- Inputs */
 
 input,
 select,
 textarea {
   padding: var(--rf-space-sm) var(--rf-space-md);
-  border: var(--rf-border-width) solid var(--rf-border-color);
-  border-radius: var(--rf-space-sm);
-  background: #fff;
+  border: var(--rf-border-width) solid var(--rf-mute);
+  border-radius: var(--rf-radius-card);
+  background: var(--rf-bone);
+  color: var(--rf-ink);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--rf-muted-deep);
+}
+/* The phone kit's TextField focus: the border thickens to 2px ink. The inset
+   ring keeps the box the same size so nothing shifts on focus. */
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--rf-ink);
+  box-shadow: none;
+  outline: 2px solid var(--rf-ink);
+  outline-offset: 1px;
 }
 
 :focus-visible {
@@ -178,24 +279,62 @@ textarea {
   border: 0 !important;
 }
 
-/* --------------------------------------------------------------- Nav */
+/* --------------------------------------------------------------- Brand */
 
+/* The lockup the phone app opens with: a flat accent disc carrying a house
+   glyph, then the wordmark in the display face. One colour, no gradient. */
+.rf-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--rf-space-sm);
+  margin: 0;
+  flex-shrink: 0;
+}
+.rf-brand__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--rf-radius-pill);
+  background: var(--rf-accent);
+  color: var(--rf-ink);
+}
+.rf-brand__word {
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-heading);
+  line-height: var(--rf-leading-heading);
+  font-weight: var(--rf-weight-semibold);
+  letter-spacing: -0.01em;
+}
+
+/* ----------------------------------------------------------------- Nav */
+
+/*
+ * Nav items are the phone kit's ChoiceGroup: a pill that fills with ink and
+ * flips to bone words when it is the one you are on. Colour is not the only
+ * signal — the active item is also semibold and carries aria-current.
+ */
 .rf-nav-link {
-  transition: background-color 0.12s ease;
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
 }
 .rf-nav-link:hover {
-  background: var(--rf-muted-tint);
+  background: var(--rf-mute-tint);
+}
+.rf-nav-link[aria-current='page']:hover {
+  background: var(--rf-ink);
 }
 
 /* ------------------------------------------------------------ Card */
 
 .rf-card {
-  background: var(--rf-paper);
+  background: var(--rf-bone);
   border: var(--rf-border-width) solid var(--rf-border-color);
   border-radius: var(--rf-radius-card);
   padding: var(--rf-space-xl);
   box-shadow: var(--rf-shadow-none);
-  scroll-margin-top: var(--rf-space-xl);
+  scroll-margin-top: var(--rf-space-xxl);
 }
 .rf-card__header {
   display: flex;
@@ -203,6 +342,8 @@ textarea {
   justify-content: space-between;
   gap: var(--rf-space-md);
   margin-bottom: var(--rf-space-lg);
+  padding-bottom: var(--rf-space-md);
+  border-bottom: var(--rf-border-width) solid var(--rf-border-color);
 }
 .rf-card__title {
   margin: 0;
@@ -210,6 +351,7 @@ textarea {
   font-size: var(--rf-size-heading);
   line-height: var(--rf-leading-heading);
   font-weight: var(--rf-weight-semibold);
+  letter-spacing: -0.01em;
 }
 .rf-card__aside {
   flex-shrink: 0;
@@ -217,15 +359,32 @@ textarea {
   line-height: var(--rf-leading-small);
   color: var(--rf-muted-deep);
 }
+.rf-card__subtitle {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--rf-space-sm);
+  margin: var(--rf-space-lg) 0 var(--rf-space-md);
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-body);
+  line-height: var(--rf-leading-body);
+  font-weight: var(--rf-weight-semibold);
+}
+.rf-card__body > :last-child { margin-bottom: 0; }
 
 /* ---------------------------------------------------- VerdictPill */
 
+/*
+ * The same three pills the phone shows, from the same VERDICT_STYLES: FIT is
+ * accent-filled, REFER amber-filled, DOES_NOT_FIT red-filled with bone words.
+ * Each carries its word and a shape glyph, so colour is never the only signal.
+ */
 .rf-pill {
   display: inline-flex;
   align-items: center;
   gap: var(--rf-space-xs);
   padding: var(--rf-space-xs) var(--rf-space-md);
-  border: var(--rf-border-width) solid transparent;
+  border: 2px solid transparent;
   border-radius: var(--rf-radius-pill);
   font-family: var(--rf-font-display);
   font-size: var(--rf-size-small);
@@ -239,23 +398,30 @@ textarea {
   font-weight: var(--rf-weight-regular);
 }
 .rf-pill--fit {
-  background: var(--rf-red);
-  border-color: var(--rf-red);
-  color: var(--rf-paper);
+  background: var(--rf-accent);
+  border-color: var(--rf-accent);
+  color: var(--rf-ink);
 }
 .rf-pill--refer {
-  background: transparent;
-  border-color: var(--rf-red);
-  color: var(--rf-red-deep);
+  background: var(--rf-amber);
+  border-color: var(--rf-amber);
+  color: var(--rf-ink);
 }
 .rf-pill--does-not-fit {
-  background: var(--rf-ink);
-  border-color: var(--rf-ink);
-  color: var(--rf-paper);
+  background: var(--rf-red);
+  border-color: var(--rf-red);
+  color: var(--rf-bone);
 }
 
 /* ---------------------------------------------------------- Badge */
 
+/*
+ * Five tones out of four colours, told apart by fill and edge rather than by
+ * hue — the phone kit's rule, because amber and red are spoken for. Quiet has
+ * neither fill nor edge, neutral has a fill, info has an ink edge, attention
+ * has a 2px accent edge, and positive is ink-filled. The label always carries
+ * the meaning on its own.
+ */
 .rf-badge {
   display: inline-flex;
   align-items: center;
@@ -267,30 +433,39 @@ textarea {
   font-weight: var(--rf-weight-medium);
   white-space: nowrap;
 }
-.rf-badge--neutral { background: var(--rf-muted-tint); color: var(--rf-ink); }
-.rf-badge--attention {
-  background: var(--rf-red-tint);
-  border-color: var(--rf-red-tint);
-  color: var(--rf-red-deep);
+.rf-badge--neutral {
+  background: var(--rf-mute-tint);
+  border-color: var(--rf-mute-tint);
+  color: var(--rf-ink);
 }
-.rf-badge--quiet { background: transparent; color: var(--rf-muted-deep); }
-.rf-badge--positive {
-  background: var(--rf-green-tint);
-  border-color: var(--rf-green-tint);
-  color: var(--rf-green-deep);
+.rf-badge--quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--rf-muted-deep);
 }
 .rf-badge--info {
-  background: var(--rf-blue-tint);
-  border-color: var(--rf-blue-tint);
-  color: var(--rf-blue-deep);
+  background: var(--rf-bone);
+  border-color: var(--rf-ink);
+  color: var(--rf-ink);
+}
+.rf-badge--attention {
+  background: var(--rf-bone);
+  border: 2px solid var(--rf-accent);
+  color: var(--rf-ink);
+  font-weight: var(--rf-weight-semibold);
+}
+.rf-badge--positive {
+  background: var(--rf-ink);
+  border-color: var(--rf-ink);
+  color: var(--rf-bone);
 }
 
 /* -------------------------------------------------- CitationQuote */
 
 .rf-citation {
   margin: 0;
-  padding: var(--rf-space-sm) 0 var(--rf-space-sm) var(--rf-space-md);
-  border-left: 2px solid var(--rf-muted-tint);
+  padding: var(--rf-space-sm) 0 var(--rf-space-sm) var(--rf-space-lg);
+  border-left: 2px solid var(--rf-accent);
 }
 .rf-citation__quote {
   margin: 0 0 var(--rf-space-xs);
@@ -304,7 +479,7 @@ textarea {
   line-height: var(--rf-leading-micro);
   color: var(--rf-muted-deep);
 }
-.rf-citation--compact { padding: 0 0 0 var(--rf-space-sm); }
+.rf-citation--compact { padding: 0 0 0 var(--rf-space-md); }
 .rf-citation--compact .rf-citation__quote {
   font-size: var(--rf-size-small);
   line-height: var(--rf-leading-small);
@@ -321,7 +496,7 @@ textarea {
   display: block;
   height: var(--rf-space-md);
   border-radius: var(--rf-radius-pill);
-  background: var(--rf-muted-tint);
+  background: var(--rf-mute-tint);
   animation: rf-skeleton-pulse 1.4s ease-in-out infinite;
 }
 @keyframes rf-skeleton-pulse {
@@ -330,6 +505,375 @@ textarea {
 }
 @media (prefers-reduced-motion: reduce) {
   .rf-skeleton__line { animation: none; }
+}
+
+/* ----------------------------------------------------------- Stats */
+
+/*
+ * The label/value pairs every panel builds out of
+ * `<dl class="rf-stats"><div class="rf-stat"><dt>…</dt><dd>…</dd></div></dl>`.
+ * Each pair is a mute-tint tile on the card radius, which is the phone kit's
+ * `muted` card. A headline number marked `.rf-stat__value` takes the display
+ * face, the way the price does on the phone; a plain fact stays in Inter.
+ */
+.rf-stats,
+.rf-enrichment__rows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--rf-space-md);
+  margin: 0 0 var(--rf-space-lg);
+  padding: 0;
+}
+.rf-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-xs);
+  min-width: 0;
+  padding: var(--rf-space-md) var(--rf-space-lg);
+  border-radius: var(--rf-radius-card);
+  background: var(--rf-mute-tint);
+}
+.rf-stat dt {
+  margin: 0;
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+  color: var(--rf-muted-deep);
+}
+.rf-stat dd {
+  margin: 0;
+  font-size: var(--rf-size-body);
+  line-height: var(--rf-leading-body);
+  font-weight: var(--rf-weight-semibold);
+  overflow-wrap: anywhere;
+}
+.rf-stat__value {
+  font-family: var(--rf-font-display);
+  font-size: var(--rf-size-heading);
+  line-height: var(--rf-leading-heading);
+  font-weight: var(--rf-weight-semibold);
+  letter-spacing: -0.01em;
+}
+/*
+ * The one number a panel is about — the premium the engine predicts — takes
+ * the silhouette the phone gives its price: a bone tile with an accent edge
+ * and the figure a step larger than its neighbours.
+ *
+ * The figure stays ink rather than accent. On the phone the price is the only
+ * thing on the screen and accent carries it at 2.73:1, which is the one
+ * concession §13 makes; a console tile sits in a grid of five and is read all
+ * day, so the accent does the pointing and ink does the reading.
+ */
+.rf-stat--lead {
+  background: var(--rf-bone);
+  border: 2px solid var(--rf-accent);
+}
+.rf-stat--lead .rf-stat__value {
+  font-size: var(--rf-size-title);
+  line-height: var(--rf-leading-title);
+}
+
+/* What a number used to be, before a flip moved it. */
+.rf-stat__before {
+  color: var(--rf-muted-deep);
+  font-weight: var(--rf-weight-regular);
+}
+.rf-stat__hint {
+  color: var(--rf-muted-deep);
+  font-family: var(--rf-font-body);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+  font-weight: var(--rf-weight-regular);
+}
+
+/* ------------------------------------------- Panels, notes, notices */
+
+.rf-panel > :last-child { margin-bottom: 0; }
+
+/* Tables inside a panel sit on the card radius with a hairline all round,
+   so a wide table reads as one object rather than a stack of rules. */
+/* `separate` rather than the global `collapse`: a table with collapsed borders
+   does not render a border-radius, and the frame is the point. Only bottom
+   borders are set on cells, so nothing doubles up. */
+.rf-table {
+  margin: 0 0 var(--rf-space-lg);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+}
+.rf-table tbody tr:last-child td { border-bottom: 0; }
+.rf-table-wrap { margin-bottom: var(--rf-space-lg); }
+.rf-table-wrap .rf-table { margin-bottom: 0; }
+
+/* Nothing here yet — said in words, on the muted surface, never as a dash. */
+.rf-empty {
+  margin: 0 0 var(--rf-space-md);
+  padding: var(--rf-space-lg);
+  border-radius: var(--rf-radius-card);
+  background: var(--rf-mute-tint);
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+
+/*
+ * The phone kit's Notice, in its three tones: a problem takes a 2px red edge
+ * on bone, and the word "Problem" is already in the copy, so the colour is
+ * never doing the work alone.
+ */
+.rf-error,
+.queue-error,
+.actions-error,
+.submission-error,
+.submission-panel-error {
+  margin: 0 0 var(--rf-space-lg);
+  padding: var(--rf-space-lg);
+  border: 2px solid var(--rf-red);
+  border-radius: var(--rf-radius-card);
+  background: var(--rf-bone);
+  color: var(--rf-ink);
+}
+.rf-error > :last-child,
+.queue-error > :last-child,
+.actions-error > :last-child,
+.submission-error > :last-child,
+.submission-panel-error > :last-child {
+  margin-bottom: 0;
+}
+.actions-notice {
+  margin: 0 0 var(--rf-space-lg);
+  padding: var(--rf-space-lg);
+  border: var(--rf-border-width) solid var(--rf-mute-tint);
+  border-radius: var(--rf-radius-card);
+  background: var(--rf-mute-tint);
+}
+.actions-notice > :last-child { margin-bottom: 0; }
+
+/* A quiet line under a panel: where the number came from, what it excludes. */
+.rf-footnote {
+  margin: 0 0 var(--rf-space-md);
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+}
+
+.rf-notes {
+  margin: 0 0 var(--rf-space-md);
+  padding-left: var(--rf-space-xl);
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.rf-notes li { margin-bottom: var(--rf-space-xs); }
+
+/* Field keys, component ids, raw payloads: mute-tint, never a second colour. */
+.rf-code,
+code {
+  padding: 0 var(--rf-space-xs);
+  border-radius: var(--rf-space-xs);
+  background: var(--rf-mute-tint);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+pre code {
+  display: block;
+  padding: var(--rf-space-md);
+  border-radius: var(--rf-space-sm);
+  overflow-x: auto;
+}
+
+/* ------------------------------------------------------------ Flip */
+
+.rf-flip__moves {
+  margin: 0 0 var(--rf-space-lg);
+  padding-left: var(--rf-space-xl);
+}
+.rf-flip__moves li { margin-bottom: var(--rf-space-md); }
+.rf-flip__human {
+  margin: 0 0 var(--rf-space-xs);
+  font-weight: var(--rf-weight-semibold);
+}
+.rf-flip__delta,
+.rf-flip__reason,
+.rf-flip__distance {
+  margin: 0 0 var(--rf-space-xs);
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+
+/* ------------------------------------------------------ Enrichment */
+
+.rf-enrichment__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--rf-space-lg);
+  margin-bottom: var(--rf-space-lg);
+}
+.rf-enrichment__header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--rf-space-sm);
+  margin-bottom: var(--rf-space-md);
+}
+.rf-enrichment__reason {
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+
+/* ---------------------------------------------------------- Drafts */
+
+/* The broker email as it will go out: a bone sheet inside the panel. */
+.rf-draft {
+  margin: 0 0 var(--rf-space-lg);
+  border: var(--rf-border-width) solid var(--rf-border-color);
+  border-radius: var(--rf-radius-card);
+  overflow: hidden;
+}
+.rf-draft__header {
+  padding: var(--rf-space-md) var(--rf-space-lg);
+  border-bottom: var(--rf-border-width) solid var(--rf-border-color);
+  background: var(--rf-mute-tint);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.rf-draft__subject {
+  font-weight: var(--rf-weight-semibold);
+}
+.rf-draft__body {
+  margin: 0;
+  padding: var(--rf-space-lg);
+  white-space: pre-wrap;
+  font-family: var(--rf-font-body);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-body);
+}
+
+/* --------------------------------------------------------- Charts */
+
+.rf-chart {
+  margin: 0 0 var(--rf-space-lg);
+}
+.rf-chart figcaption {
+  margin-top: var(--rf-space-sm);
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.rf-chart-empty {
+  padding: var(--rf-space-lg);
+  border-radius: var(--rf-radius-card);
+  background: var(--rf-mute-tint);
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+
+/* -------------------------------------------------- Page furniture */
+
+.queue-count,
+.submission-status,
+.actions-count {
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+
+.submission-breadcrumb {
+  margin: 0 0 var(--rf-space-sm);
+  color: var(--rf-muted-deep);
+  font-size: var(--rf-size-small);
+  line-height: var(--rf-leading-small);
+}
+.submission-header {
+  margin-bottom: var(--rf-space-xl);
+  padding-bottom: var(--rf-space-lg);
+  border-bottom: var(--rf-border-width) solid var(--rf-border-color);
+}
+.submission-verdict {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--rf-space-sm);
+  margin-bottom: var(--rf-space-lg);
+}
+.submission-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--rf-space-sm);
+}
+
+/* The account's facts across the top of the submission page, as stat tiles. */
+.submission-headline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--rf-space-md);
+  margin: 0 0 var(--rf-space-lg);
+  padding: 0;
+}
+.submission-headline > div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--rf-space-xs);
+  min-width: 0;
+  padding: var(--rf-space-md) var(--rf-space-lg);
+  border-radius: var(--rf-radius-card);
+  background: var(--rf-mute-tint);
+}
+.submission-headline dt {
+  margin: 0;
+  font-size: var(--rf-size-micro);
+  line-height: var(--rf-leading-micro);
+  color: var(--rf-muted-deep);
+}
+.submission-headline dd {
+  margin: 0;
+  font-weight: var(--rf-weight-semibold);
+  overflow-wrap: anywhere;
+}
+
+/* Panels stack with the same 24px rhythm the phone screens use between cards. */
+.submission-page > .rf-card,
+.actions-page > .rf-card,
+.queue-page > .rf-card {
+  margin-bottom: var(--rf-space-xl);
+}
+
+.queue-out-of-appetite { margin-top: var(--rf-space-xl); }
+.queue-out-of-appetite h2 { margin-bottom: var(--rf-space-md); }
+
+.actions-toolbar,
+.actions-stages {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--rf-space-sm);
+  margin-bottom: var(--rf-space-lg);
+}
+
+/* --------------------------------------------------------- Tooltip */
+
+/*
+ * A defined term inside a sentence. It carries role="button" so it is
+ * keyboard reachable, but it must stay part of the line it sits in: no fill,
+ * no edge, no minimum height. The dotted underline is the whole affordance.
+ */
+.rf-tooltip__trigger {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-weight: inherit;
+  min-height: 0;
+  min-width: 0;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--rf-mute);
+  cursor: help;
 }
 
 /* ------------------------------------- Layout hardening (phone width) */
@@ -379,7 +923,7 @@ a { padding-block: 4px; }
   display: flex;
   flex-wrap: wrap;
   gap: var(--rf-space-xs) var(--rf-space-sm);
-  margin: 0 0 var(--rf-space-lg);
+  margin: 0 0 var(--rf-space-xl);
   padding: 0;
   list-style: none;
 }
@@ -395,7 +939,12 @@ a { padding-block: 4px; }
   color: var(--rf-ink);
   text-decoration: none;
 }
-.submission-index a:hover { border-color: var(--rf-muted); text-decoration: underline; }
+.submission-index a:hover {
+  border-color: var(--rf-ink);
+  background: var(--rf-mute-tint);
+  color: var(--rf-ink);
+  text-decoration: none;
+}
 
 @media (max-width: 600px) {
   .rf-main { padding: var(--rf-space-lg); }
@@ -403,11 +952,18 @@ a { padding-block: 4px; }
   .rf-pill { white-space: normal; flex-wrap: wrap; }
   /* 14 stacked 44px chips would push the page body a full screen down; 36px keeps it compact and still well above 24px. */
   .submission-index a { min-height: 36px; }
+  .rf-stats,
+  .rf-enrichment__rows,
+  .submission-headline { grid-template-columns: 1fr; }
 }
 
 a.rf-button {
   display: inline-flex;
   align-items: center;
+  color: var(--rf-ink);
+  text-decoration: none;
+}
+a.rf-button:hover {
   color: var(--rf-ink);
   text-decoration: none;
 }

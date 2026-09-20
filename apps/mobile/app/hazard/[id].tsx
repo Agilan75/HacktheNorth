@@ -34,7 +34,7 @@ import {
 import type { IconName } from '@/ui';
 
 /**
- * What we found — PRD §11 `/hazard/[id]` (unit M9).
+ * What we found. PRD §11 `/hazard/[id]`, unit M9.
  *
  * The close-up photo (cropped to the model's `box_2d`, PRD 9.3 step 6), what
  * the hazard is and why it matters, and what fixing it does to the verdict and
@@ -52,9 +52,9 @@ type Verdict = EngineResult['verdict']['verdict'];
 
 /** Tenant-facing verdict words (PRD 11: plain language). The pill adds a glyph too. */
 const VERDICT_WORDS: Readonly<Record<Verdict, string>> = {
-  FIT: 'We can quote you',
-  REFER: 'An underwriter needs a quick look',
-  DOES_NOT_FIT: 'We cannot quote this yet',
+  FIT: 'Coverable',
+  REFER: 'Needs review',
+  DOES_NOT_FIT: 'Not coverable',
 };
 
 function money(n: number | null | undefined): string | null {
@@ -115,9 +115,9 @@ export default function HazardScreen() {
   }
   if (load.status === 'missing') {
     return (
-      <Screen title="We could not find this room">
-        <Notice tone="error">Open this from your quote, after a scan or photos of the room.</Notice>
-        <Button label="Go to your rooms" onPress={() => router.replace('/')} />
+      <Screen title="No scan">
+        <Notice tone="error">Open this from a quote.</Notice>
+        <Button label="Scan a room" onPress={() => router.replace('/scan')} />
       </Screen>
     );
   }
@@ -155,14 +155,14 @@ function HazardDetail({
 
   if (hazardKey === null) {
     return (
-      <Screen title="We could not find that item">
-        <Notice tone="error">This link does not match anything we found in the room.</Notice>
-        <Button label="Back to your quote" variant="secondary" onPress={() => router.back()} />
+      <Screen title="Unknown finding">
+        <Notice tone="error">Nothing in this room matches that link.</Notice>
+        <Button label="Back to the quote" variant="secondary" onPress={() => router.back()} />
       </Screen>
     );
   }
 
-  const words = HAZARD_WORDS[hazardKey] ?? { name: 'Something we found', why: '', fix: '' };
+  const words = HAZARD_WORDS[hazardKey] ?? { name: 'Finding', why: '', fix: '' };
   const componentKey = hazardComponentKey(hazardKey);
   const status = hazardStatus(result, hazardKey);
 
@@ -180,13 +180,13 @@ function HazardDetail({
         <>
           {status === 'present' && hazardKey !== 'highValueContents' ? (
             <Button
-              label="I fixed it: check with a new photo"
+              label="Fixed it? Recheck"
               icon="camera-outline"
-              accessibilityHint="Opens the camera so you can take one photo showing the fix. We then update your quote."
+              accessibilityHint="Takes one photo of the fix and reprices."
               onPress={() => router.push({ pathname: '/verify-fix', params: { hazard: hazardKey, sweep: sweep.id } })}
             />
           ) : null}
-          <Button label="Back to your quote" variant="secondary" onPress={() => router.back()} />
+          <Button label="Back to the quote" variant="secondary" onPress={() => router.back()} />
         </>
       }
     >
@@ -200,16 +200,16 @@ function HazardDetail({
       <HazardImage photo={photo} name={words.name} />
 
       <Card>
-        <Heading variant="heading">Why it matters</Heading>
+        <Heading variant="heading">Why</Heading>
         {words.why ? <Text>{words.why}</Text> : null}
         {firedRule ? (
           <View
             accessible
             accessibilityLabel={`From the insurer's rules, ${firedRule.citation.section}: ${firedRule.citation.quote}`}
-            style={{ gap: SPACE.xs, borderLeftWidth: 3, borderLeftColor: COLORS.muted, paddingLeft: SPACE.md }}
+            style={{ gap: SPACE.xs, borderLeftWidth: 3, borderLeftColor: COLORS.mute, paddingLeft: SPACE.md }}
           >
             <Text variant="small" tone="muted">
-              {`The insurer's rule (${firedRule.citation.section}):`}
+              {`Rule ${firedRule.citation.section}`}
             </Text>
             <Text variant="small">{`“${firedRule.citation.quote}”`}</Text>
           </View>
@@ -217,15 +217,15 @@ function HazardDetail({
         {priceFactor && priceFactor.factor !== 1 ? (
           <Text variant="small" tone="muted">
             {priceFactor.factor > 1
-              ? `While it is there, this part of your price is multiplied by ${priceFactor.factor.toFixed(2)}.`
-              : `This part of your price is multiplied by ${priceFactor.factor.toFixed(2)}.`}
+              ? `Price factor ${priceFactor.factor.toFixed(2)} while it is there.`
+              : `Price factor ${priceFactor.factor.toFixed(2)}.`}
           </Text>
         ) : null}
       </Card>
 
       {status === 'present' && fixText ? (
         <Card>
-          <Heading variant="heading">How to fix it</Heading>
+          <Heading variant="heading">Fix</Heading>
           <Text>{fixText}</Text>
         </Card>
       ) : null}
@@ -256,16 +256,16 @@ const STATUS_ICON: Readonly<Record<ReturnType<typeof hazardStatus>, IconName>> =
 function StatusLine({ status, hazardKey }: { readonly status: ReturnType<typeof hazardStatus>; readonly hazardKey: string }) {
   const text =
     status === 'fixed'
-      ? 'Fixed. Your new photo showed it is gone, and your quote was updated.'
+      ? 'Fixed. The new photo showed it gone. Price updated.'
       : status === 'absent'
         ? hazardKey === 'smokeDetectorCount'
-          ? 'We saw a smoke detector, so this is fine.'
-          : 'This is not counted against your quote.'
+          ? 'Detector seen.'
+          : 'Not counted against the price.'
         : status === 'present'
           ? hazardKey === 'smokeDetectorCount'
-            ? 'We did not see a smoke detector on the ceiling.'
-            : 'We saw this in your room. It affects your quote.'
-          : 'We are not sure about this one yet.';
+            ? 'No detector seen on the ceiling.'
+            : 'Seen in the room. It affects the price.'
+          : 'Not settled.';
   const word = status === 'fixed' ? 'Fixed' : status === 'present' ? 'Found' : status === 'absent' ? 'OK' : 'Unsure';
   return (
     <View accessible accessibilityRole="text" accessibilityLabel={`${word}. ${text}`} style={{ flexDirection: 'row', gap: SPACE.sm, alignItems: 'flex-start' }}>
@@ -276,14 +276,14 @@ function StatusLine({ status, hazardKey }: { readonly status: ReturnType<typeof 
           gap: SPACE.xs,
           borderWidth: 2,
           borderColor: COLORS.ink,
-          backgroundColor: status === 'present' ? COLORS.ink : COLORS.paper,
+          backgroundColor: status === 'present' ? COLORS.ink : COLORS.bone,
           borderRadius: RADIUS.pill,
           paddingHorizontal: SPACE.md,
           paddingVertical: SPACE.xs,
         }}
       >
-        <Icon name={STATUS_ICON[status]} size={14} color={status === 'present' ? COLORS.paper : COLORS.ink} />
-        <Text variant="small" weight="semibold" style={{ color: status === 'present' ? COLORS.paper : COLORS.ink }}>
+        <Icon name={STATUS_ICON[status]} size={14} color={status === 'present' ? COLORS.bone : COLORS.ink} />
+        <Text variant="small" weight="semibold" style={{ color: status === 'present' ? COLORS.bone : COLORS.ink }}>
           {word}
         </Text>
       </View>
@@ -337,7 +337,7 @@ function HazardImage({ photo, name }: { readonly photo: HazardPhoto | null; read
   if (photo === null) {
     return (
       <Card tone="muted">
-        <Text>There is no photo to show for this one.</Text>
+        <Text>No photo for this one.</Text>
       </Card>
     );
   }
@@ -380,8 +380,8 @@ function HazardImage({ photo, name }: { readonly photo: HazardPhoto | null; read
         <Button
           variant="quiet"
           fullWidth={false}
-          label={showWhole ? 'Show the close-up' : 'Show the whole photo'}
-          accessibilityHint={showWhole ? 'Zooms in on the item.' : 'Shows the full photo with the item marked by a box.'}
+          label={showWhole ? 'Close-up' : 'Whole photo'}
+          accessibilityHint={showWhole ? 'Zooms in on the item.' : 'Shows the full photo, item boxed.'}
           onPress={() => setShowWhole((v) => !v)}
         />
       ) : null}
@@ -413,7 +413,7 @@ function FramedImage({
         borderWidth: BORDER.width,
         borderColor: BORDER.color,
         overflow: 'hidden',
-        backgroundColor: COLORS.mutedTint,
+        backgroundColor: COLORS.muteTint,
       }}
     >
       <Image source={{ uri }} resizeMode="contain" style={{ width: '100%', height: '100%' }} />
@@ -430,7 +430,7 @@ function FramedImage({
             height: `${Math.abs(box[2] - box[0]) / 10}%`,
             width: `${Math.abs(box[3] - box[1]) / 10}%`,
             borderWidth: 3,
-            borderColor: COLORS.paper,
+            borderColor: COLORS.bone,
             borderRadius: 6,
           }}
         >
@@ -469,9 +469,9 @@ function IfFixedCard({
   if (status === 'fixed' || status === 'absent') {
     return (
       <Card>
-        <Heading variant="heading">Your quote now</Heading>
+        <Heading variant="heading">Now</Heading>
         <VerdictPill verdict={now} text={VERDICT_WORDS[now]} />
-        {nowPrice ? <Text>{`About ${nowPrice} a month.`}</Text> : null}
+        {nowPrice ? <Text>{`${nowPrice} a month`}</Text> : null}
       </Card>
     );
   }
@@ -486,8 +486,8 @@ function IfFixedCard({
     }${also}`;
     return (
       <Card tone="accent" accessibilityLabel={sentence}>
-        <Heading variant="heading">If you fix this</Heading>
-        <Text>Your result becomes</Text>
+        <Heading variant="heading">If fixed</Heading>
+        <Text>Becomes</Text>
         <VerdictPill verdict={verdictAfter} text={VERDICT_WORDS[verdictAfter]} size="large" />
         {after ? (
           <Text>
@@ -506,16 +506,16 @@ function IfFixedCard({
       <Heading variant="heading">If you fix this</Heading>
       <Text>
         {now === 'FIT'
-          ? 'You can already get a quote. Fixing this still makes your home safer, and it may lower your price.'
+          ? 'Already coverable. Fixing this still lowers the price.'
           : hasFlip
-            ? 'Fixing this alone is not the change that gets you a quote. Your quote page shows the change that does.'
-            : 'We could not find one simple change that gets you a quote. Fixing this still makes your home safer.'}
+            ? 'This one alone is not enough. The quote names the change that is.'
+            : 'No single change reaches coverable. Fixing this still lowers the risk.'}
       </Text>
       <Text variant="small" tone="muted">
-        Fix it and take a new photo, and we will re-price your quote with the real numbers.
+        Fix it, photograph it, and the price is recomputed.
       </Text>
       <VerdictPill verdict={now} text={`Now: ${VERDICT_WORDS[now]}`} />
-      {nowPrice ? <Text variant="small">{`Your price now: about ${nowPrice} a month.`}</Text> : null}
+      {nowPrice ? <Text variant="small">{`Now ${nowPrice} a month`}</Text> : null}
     </Card>
   );
 }

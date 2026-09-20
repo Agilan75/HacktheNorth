@@ -1,7 +1,9 @@
 /** The sweep pipeline; it is what drives the `stage` column. Unit A18. */
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 import sharp from 'sharp';
 import type {
+  HazardCostDto,
   ObserveInput,
   ObserveOutput,
   RelateInput,
@@ -15,8 +17,11 @@ import {
   MIN_OBSERVATION_CONFIDENCE,
   OBJECT_CATEGORY,
   OBJECT_VOCAB,
+  SWEEP_FALLBACK_CONFIDENCE,
   applySelfConsistency,
   coverage as sweepCoverage,
+  dataFilePath,
+  dedupeObservations,
   math,
   pairRules,
   readQuestions,
@@ -25,6 +30,7 @@ import {
   readVectorSpec,
   runEngine,
   toHazardValues,
+  unknownHazards,
   voi,
 } from '@retrofit/engine';
 import type {
@@ -46,6 +52,8 @@ import type { ImageMetrics } from '../images/metrics';
 import { gradeFrame } from '../images/quality';
 import { observeCall, relateCall } from '../llm/index';
 import type { LlmImagePart } from '../llm/index';
+import { tablePrice } from '../pricing/table';
+import type { PriceLabel } from '../pricing/table';
 import type { Deps } from './types';
 
 /*
@@ -82,28 +90,37 @@ const UNIT_BUILDING_ID = 'unit';
 /** Id prefixes of the derived observations this unit writes. */
 const RELATE_PREFIX = 'relate:';
 const CEILING_PREFIX = 'ceiling:';
+/** Carries the replacement value the phone priced during the sweep, in its id. */
+const CONTENTS_PREFIX = 'contents:';
 
-/** Labels whose sighting feeds each hazard slot; used to hold a slot open while a sighting awaits confirmation. */
-const LABEL_TO_KEYS: Readonly<Partial<Record<ObjectLabel, readonly string[]>>> = {
-  portable_heater: ['portableHeater', 'heaterNearCombustible'],
-  curtain: ['heaterNearCombustible'],
-  fabric: ['heaterNearCombustible'],
-  bedding: ['heaterNearCombustible'],
-  extension_cord: ['extensionCord'],
-  power_bar: ['powerBarOverload'],
-  candle: ['candle'],
-  stove: ['stove'],
-  blocked_exit: ['blockedExit'],
-  window_ac_unit: ['windowAcUnit'],
-  water_heater: ['waterHeater'],
-  bike: ['highValueContents'],
-  jewelry: ['highValueContents'],
-  camera: ['highValueContents'],
-  laptop: ['highValueContents'],
-  tv: ['highValueContents'],
-  instrument: ['highValueContents'],
-  smoke_detector: ['smokeDetectorCount'],
-  sprinkler_head: ['sprinklerHeadCount'],
+/** Applied when nothing asks for one; the phone no longer has a term screen. */
+const DEFAULT_TERM_MONTHS = 12;
+/** Applied when nothing names the room; the phone opens straight on the camera. */
+const DEFAULT_ROOM_LABEL = 'Room';
+
+/** `exposure.contentsLimit` rounds up to this step and never falls below the floor. */
+const CONTENTS_STEP_USD = 5_000;
+const CONTENTS_FLOOR_USD = 15_000;
+
+/** At most one question is ever shown, and never about something the camera saw. */
+export const MAX_QUESTIONS_PER_SWEEP = 1;
+
+/**
+ * Sweep labels that are the renter's own belongings, mapped to the live price
+ * table's label for them. Fixed appliances (`stove`, `water_heater`) are the
+ * landlord's and never counted. This is only the fallback: when the phone sends
+ * its own `contentsEstimateUsd`, that wins, because `/price/identify` reads a
+ * far wider vocabulary than the 21 labels the hazard sweep looks for.
+ */
+const CONTENTS_LABEL: Readonly<Partial<Record<ObjectLabel, PriceLabel>>> = {
+  tv: 'tv',
+  laptop: 'laptop',
+  camera: 'camera',
+  instrument: 'instrument',
+  bike: 'bike',
+  jewelry: 'other',
+  portable_heater: 'portable_heater',
+  window_ac_unit: 'window_ac_unit',
 };
 
 /* -------------------------------------------------------------------------- */
@@ -132,8 +149,24 @@ export interface FixEvent {
   readonly at: string;
 }
 
+/**
+ * An inline correction to a field the sweep derived or defaulted, made on the
+ * verdict screen. It names the canonical field directly, because a derived
+ * field (`exposure.contentsLimit`) has no question to answer.
+ *
+ * @internal A18
+ */
+export interface EditEvent {
+  readonly kind: 'edit';
+  /** A question's field spelling: a canonical path, or `buildings[0].yearBuilt`. */
+  readonly field: string;
+  /** Already coerced to the vector component's type; null when it did not fit. */
+  readonly value: string | number | boolean | null;
+  readonly at: string;
+}
+
 /** @internal A18 */
-export type SessionEvent = AnswerEvent | FixEvent;
+export type SessionEvent = AnswerEvent | FixEvent | EditEvent;
 
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null;
@@ -151,6 +184,15 @@ function parseEvent(data: unknown): SessionEvent | null {
       field: data.field,
       value,
       skipped: data.skipped === true,
+      at: typeof data.at === 'string' ? data.at : '',
+    };
+  }
+  if (data.kind === 'edit' && typeof data.field === 'string') {
+    const v = data.value;
+    return {
+      kind: 'edit',
+      field: data.field,
+      value: typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ? v : null,
       at: typeof data.at === 'string' ? data.at : '',
     };
   }
@@ -196,7 +238,33 @@ export function askedQuestionIdsOf(session: readonly SessionEvent[]): string[] {
 export interface TenantConfig {
   readonly config: EngineConfig;
   readonly questions: readonly Question[];
+  /** Ids of the questions a camera sweep of the room can answer by itself. */
+  readonly observableQuestionIds: ReadonlySet<string>;
 }
+
+/**
+ * `observable` is a property of `questions/tenant.json`, not of the engine's
+ * frozen `Question` type, so the engine's zod parse drops it. The one place
+ * that needs it reads the file directly rather than widening a frozen type.
+ */
+async function readObservableQuestionIds(): Promise<ReadonlySet<string>> {
+  const raw = JSON.parse(await readFile(dataFilePath('questions', 'tenant'), 'utf8')) as {
+    readonly questions?: readonly { readonly id?: unknown; readonly observable?: unknown }[];
+  };
+  const out = new Set<string>();
+  for (const q of raw.questions ?? []) {
+    if (typeof q.id === 'string' && q.observable === true) out.add(q.id);
+  }
+  return out;
+}
+
+/**
+ * The observable ids as a plain value, so the synchronous `toSweepDto` can read
+ * them. It is written when the config loads, and every DTO that carries a
+ * result is built after `scoreSweep` has already awaited that load, so it is
+ * never read empty in a way that could surface a question the camera answered.
+ */
+let observableQuestionIdsNow: ReadonlySet<string> = new Set<string>();
 
 let tenantConfigPromise: Promise<TenantConfig> | null = null;
 
@@ -204,15 +272,18 @@ let tenantConfigPromise: Promise<TenantConfig> | null = null;
 export function loadTenantConfig(): Promise<TenantConfig> {
   if (tenantConfigPromise === null) {
     tenantConfigPromise = (async () => {
-      const [spec, rulebook, ratingTable, questions] = await Promise.all([
+      const [spec, rulebook, ratingTable, questions, observableQuestionIds] = await Promise.all([
         readVectorSpec('tenant'),
         readRulebook('tenant'),
         readRatingTable('tenant'),
         readQuestions('tenant'),
+        readObservableQuestionIds(),
       ]);
+      observableQuestionIdsNow = observableQuestionIds;
       return {
         config: { spec, rulebook, ratingTable, bookStats: null, questions },
         questions,
+        observableQuestionIds,
       };
     })();
     // A failed read must not poison every later sweep.
@@ -277,9 +348,35 @@ function isPending(o: Observation): boolean {
   return o.derived !== true && math.clamp01(o.confidence) < MIN_OBSERVATION_CONFIDENCE;
 }
 
+/**
+ * What each priced hazard adds to the monthly premium, dearest first.
+ *
+ * The engine composes a tenant premium as `base x PI(factors)` (stages/price.ts),
+ * so the premium without one factor is exactly `monthly / factor` — a division,
+ * not an estimate. It is done here, beside every other number, so the phone can
+ * keep its rule of never doing arithmetic on money.
+ */
+function hazardCostsOf(result: EngineResult | null): HazardCostDto[] {
+  if (result === null) return [];
+  const monthly = result.price.predictedMonthlyPremium;
+  const out: HazardCostDto[] = [];
+  for (const f of result.price.factors) {
+    if (!f.name.startsWith('hazard.')) continue;
+    const factor = f.factor;
+    const priced = monthly !== null && Number.isFinite(monthly) && Number.isFinite(factor) && factor > 0;
+    out.push({
+      hazardKey: f.name.slice('hazard.'.length),
+      factor,
+      monthlyDelta: priced ? math.roundTo(monthly - monthly / factor, 2) : null,
+    });
+  }
+  return out.sort((a, b) => (b.monthlyDelta ?? 0) - (a.monthlyDelta ?? 0));
+}
+
 /** @internal A18 */
 export function toSweepDto(row: SweepRow): SweepDto {
   const result = row.result ?? null;
+  const asked = askedQuestionIdsOf(sessionOf(result));
   return {
     id: row.id,
     submissionId: row.submissionId ?? null,
@@ -291,7 +388,9 @@ export function toSweepDto(row: SweepRow): SweepDto {
     observations: row.observations,
     needsConfirmation: row.observations.filter(isPending),
     result,
-    askedQuestionIds: askedQuestionIdsOf(sessionOf(result)),
+    hazardCosts: hazardCostsOf(result),
+    pendingQuestion: qualifyingQuestion(result, asked, observableQuestionIdsNow),
+    askedQuestionIds: asked,
     skippedCount: result?.voi.skipped.length ?? 0,
     error: row.error ?? null,
     createdAt: row.createdAt,
@@ -390,22 +489,42 @@ export function hazardKeyOf(pathOrKey: string): string {
   return pathOrKey.replace(/^hazards\.(present\.)?/, '');
 }
 
-/** Latest answer per question wins; skipped and invalid answers carry no value. */
+/**
+ * What the renter said, keyed by canonical path so one path never carries two
+ * competing answers. Latest answer per question wins; skipped and invalid
+ * answers carry no value. Inline edits are applied last, because a correction
+ * on the verdict screen is the newest thing the renter said about that field.
+ */
 function answerValues(events: readonly SessionEvent[], canonical: CanonicalSubmission): ExternalValue[] {
+  const byPath = new Map<string, ExternalValue>();
+  const put = (
+    field: string,
+    value: string | number | boolean,
+    sourceDetail: string,
+    at: string,
+  ): void => {
+    const path = canonicalPathFor(field, canonical);
+    if (path === null) return;
+    byPath.set(path, {
+      canonicalPath: path,
+      value,
+      provenance: { source: 'answer', sourceDetail, observedAt: at },
+    });
+  };
+
   const latest = new Map<string, AnswerEvent>();
   for (const e of events) if (e.kind === 'answer') latest.set(e.questionId, e);
-  const out: ExternalValue[] = [];
   for (const e of latest.values()) {
     if (e.skipped || e.value === null) continue;
-    const path = canonicalPathFor(e.field, canonical);
-    if (path === null) continue;
-    out.push({
-      canonicalPath: path,
-      value: e.value,
-      provenance: { source: 'answer', sourceDetail: `question:${e.questionId}`, observedAt: e.at },
-    });
+    put(e.field, e.value, `question:${e.questionId}`, e.at);
   }
-  return out;
+
+  for (const e of events) {
+    if (e.kind !== 'edit' || e.value === null) continue;
+    put(e.field, e.value, `edit:${e.field}`, e.at);
+  }
+
+  return [...byPath.values()];
 }
 
 /** Hazard keys whose latest verify-fix photo credibly showed the hazard gone. */
@@ -419,37 +538,41 @@ function creditedFixes(events: readonly SessionEvent[]): Map<string, FixEvent> {
   return out;
 }
 
-function isNegative(value: unknown): boolean {
-  return value === false || value === 0;
+/**
+ * The confidence the engine puts on its own negative evidence: the fraction of
+ * the room the sweep covered (`sweep/observations.ts`, `assess`). A sweep that
+ * covered nothing falls back to the engine's `SWEEP_FALLBACK_CONFIDENCE` rather
+ * than claiming 0, which would read as "certainly unknown".
+ */
+function negativeEvidenceConfidence(coverage: CoverageResult): number {
+  const covered = math.clamp01((coverage.coveragePct ?? 0) / 100);
+  return covered > 0 ? covered : SWEEP_FALLBACK_CONFIDENCE;
 }
 
 /**
  * Every `hazards.*` value the sweep supports (PRD 9.3), assembled in code:
- * 1. Observations awaiting confirmation (< 0.6) are held out, and the slots
- *    they feed stay unknown rather than being recorded absent (step 7).
- * 2. E12 turns the active sightings plus the engine pair rules into values.
- * 3. `relate` hazards whose supporting sightings are all still active add a
+ * 1. E12 turns the sightings plus the engine pair rules into values. A sighting
+ *    under MIN_OBSERVATION_CONFIDENCE is no longer held out: nothing asks the
+ *    renter to confirm it any more, so it rides in carrying its own low
+ *    confidence, which the engine already discounts (docs/decisions/mobile-rework.md).
+ * 2. `relate` hazards whose supporting sightings are all still active add a
  *    hazard, or re-state an existing one's confidence. They never remove one.
- * 4. A credited verify-fix replaces the hazard's value with `false`.
+ * 3. A credited verify-fix replaces the hazard's value with `false`.
+ * 4. Every observable slot still unknown is recorded absent, so the renter is
+ *    never asked about something the camera just looked at.
  */
 function sweepHazardValues(
   observations: readonly Observation[],
   coverage: CoverageResult,
   fixes: ReadonlyMap<string, FixEvent>,
 ): ExternalValue[] {
-  const active = observations.filter((o) => !isPending(o) && !o.id.startsWith(RELATE_PREFIX));
+  const active = observations.filter((o) => !o.id.startsWith(RELATE_PREFIX));
   const activeIds = new Set(active.filter((o) => o.derived !== true).map((o) => o.id));
-  const heldOpen = new Set<string>();
-  for (const o of observations) {
-    if (!isPending(o)) continue;
-    for (const key of LABEL_TO_KEYS[o.label] ?? []) heldOpen.add(key);
-  }
 
   const byKey = new Map<string, ExternalValue>();
   const extra: ExternalValue[] = [];
   for (const v of toHazardValues(active, pairRules(active), coverage)) {
     const key = hazardKeyOf(v.canonicalPath);
-    if (heldOpen.has(key) && isNegative(v.value)) continue;
     if (v.canonicalPath.startsWith('hazards.')) byKey.set(key, v);
     else extra.push(v);
   }
@@ -491,7 +614,123 @@ function sweepHazardValues(
     });
   }
 
+  // Nothing asks the renter about what the camera just looked at, so an
+  // observable slot the sweep left unknown is recorded absent at the engine's
+  // own negative-evidence confidence, never turned into a question.
+  const absentConfidence = negativeEvidenceConfidence(coverage);
+  for (const key of unknownHazards(active, coverage)) {
+    if (byKey.has(key)) continue;
+    byKey.set(key, {
+      canonicalPath: `hazards.${key}`,
+      value: key === 'smokeDetectorCount' ? 0 : false,
+      provenance: {
+        source: 'sweep',
+        sourceDetail: `unseen:coverage=${String(coverage.coveragePct)}`,
+        confidence: absentConfidence,
+      },
+    });
+  }
+
   return [...byKey.values(), ...extra];
+}
+
+/* -------------------------------------------------------------------------- */
+/* Contents                                                                   */
+/* -------------------------------------------------------------------------- */
+
+/** The replacement value the phone priced during the sweep, or null. */
+function storedContentsEstimate(observations: readonly Observation[]): number | null {
+  for (const o of observations) {
+    if (!o.id.startsWith(CONTENTS_PREFIX)) continue;
+    const n = Number(o.id.slice(CONTENTS_PREFIX.length));
+    if (Number.isFinite(n) && n >= 0) return n;
+  }
+  return null;
+}
+
+/** The fallback estimate: table price of the belongings the sweep itself saw. */
+function sightedContentsUsd(observations: readonly Observation[]): number {
+  const seen = dedupeObservations(observations.filter((o) => o.derived !== true));
+  let total = 0;
+  for (const o of seen) {
+    const label = CONTENTS_LABEL[o.label];
+    if (label !== undefined) total += tablePrice(label);
+  }
+  return total;
+}
+
+/**
+ * `exposure.contentsLimit` from an estimate: rounded up to the nearest $5,000,
+ * never below the $15,000 floor. The renter is never asked to value their own
+ * belongings — that is the thing the app exists to do.
+ *
+ * @internal A18
+ */
+export function contentsLimitFor(estimateUsd: number): number {
+  const safe = Number.isFinite(estimateUsd) && estimateUsd > 0 ? estimateUsd : 0;
+  return Math.max(CONTENTS_FLOOR_USD, Math.ceil(safe / CONTENTS_STEP_USD) * CONTENTS_STEP_USD);
+}
+
+/** The derived observation that carries a phone-sent contents estimate through the pipeline. */
+function contentsMarker(estimateUsd: number): Observation {
+  return {
+    id: `${CONTENTS_PREFIX}${String(Math.round(estimateUsd))}`,
+    label: 'unknown',
+    category: OBJECT_CATEGORY.unknown,
+    bearingDeg: 0,
+    distanceBand: 'mid',
+    confidence: 1,
+    frameIndex: -1,
+    notes: 'replacement value priced during the sweep',
+    derived: true,
+  };
+}
+
+/** `exposure.contentsLimit` as a sweep-sourced value, for the engine to price on. */
+function contentsValue(
+  observations: readonly Observation[],
+  coverage: CoverageResult,
+): ExternalValue {
+  const estimate = storedContentsEstimate(observations) ?? sightedContentsUsd(observations);
+  return {
+    canonicalPath: 'exposure.contentsLimit',
+    value: contentsLimitFor(estimate),
+    provenance: {
+      source: 'sweep',
+      sourceDetail: `${CONTENTS_PREFIX}${String(Math.round(estimate))}`,
+      confidence: negativeEvidenceConfidence(coverage),
+    },
+  };
+}
+
+/* -------------------------------------------------------------------------- */
+/* Questions                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The one question this sweep may still show, or null.
+ *
+ * A question qualifies only when all three hold: the camera cannot answer it
+ * (`observable: false` in `questions/tenant.json`); the VOI stage ranked it
+ * worth asking at all, which is the existing threshold in `stages/voi.ts` —
+ * a candidate reaches `ranked` only when it can move the appetite score or
+ * leaves a rule undetermined; and fewer than MAX_QUESTIONS_PER_SWEEP have
+ * already been shown. In practice this is at most one question, usually none.
+ *
+ * @internal A18
+ */
+export function qualifyingQuestion(
+  result: EngineResult | null,
+  askedQuestionIds: readonly string[],
+  observableQuestionIds: ReadonlySet<string>,
+): Question | null {
+  if (result === null) return null;
+  if (askedQuestionIds.length >= MAX_QUESTIONS_PER_SWEEP) return null;
+  for (const candidate of result.voi.ranked) {
+    if (observableQuestionIds.has(candidate.question.id)) continue;
+    return candidate.question;
+  }
+  return null;
 }
 
 /** @internal A18 — run the engine over the sweep with the given session events. */
@@ -500,11 +739,14 @@ export async function scoreSweep(
   row: SweepRow,
   events: readonly SessionEvent[],
 ): Promise<{ readonly result: EngineResult; readonly stage: SweepStageDto }> {
-  const { config, questions } = await loadTenantConfig();
+  const { config, questions, observableQuestionIds } = await loadTenantConfig();
   const submission = baseCanonical(deps, row, events);
   const coverage = row.coverage ?? sweepCoverage([], FRAME_FOV_DEG);
   const fixes = creditedFixes(events);
-  const hazards = sweepHazardValues(row.observations, coverage, fixes);
+  const sweepFacts = [
+    ...sweepHazardValues(row.observations, coverage, fixes),
+    contentsValue(row.observations, coverage),
+  ];
   const answers = answerValues(events, submission).filter(
     (a) => !fixes.has(hazardKeyOf(a.canonicalPath)),
   );
@@ -514,7 +756,7 @@ export async function scoreSweep(
       submission,
       // Sweep facts ride in the pre-answer slot: merge appends them after the
       // broker's values and before answers, and their provenance stays `sweep`.
-      enrichment: hazards,
+      enrichment: sweepFacts,
       answers,
       observations: [],
       asOf: deps.clock.today(),
@@ -531,8 +773,8 @@ export async function scoreSweep(
     asked,
   );
   const result: EngineResult = { ...engine, voi: information };
-  const pending = row.observations.some(isPending);
-  const stage: SweepStageDto = pending || information.nextQuestion !== null ? 'questions' : 'done';
+  const stage: SweepStageDto =
+    qualifyingQuestion(result, asked, observableQuestionIds) !== null ? 'questions' : 'done';
   return { result, stage };
 }
 
@@ -545,6 +787,12 @@ async function runQualityGate(deps: Deps, row: SweepRow): Promise<SweepRow> {
   const frames: SweepFrameDto[] = [];
   const quality: (number | null)[] = [];
   let previous: ImageMetrics | undefined;
+  /**
+   * The best frame that decoded but graded under the bar, with its bytes. A
+   * short or hand-held sweep can score every frame low; rather than strand the
+   * scan, the best of them is reinstated below and the sweep carries on.
+   */
+  let fallback: { at: number; bytes: Uint8Array; quality: number } | null = null;
 
   for (const frame of row.frames) {
     if (frame.imageRef === null) {
@@ -566,6 +814,9 @@ async function runQualityGate(deps: Deps, row: SweepRow): Promise<SweepRow> {
     previous = metrics;
     quality.push(verdict.quality);
     if (!verdict.pass) {
+      if (fallback === null || verdict.quality > fallback.quality) {
+        fallback = { at: frames.length, bytes, quality: verdict.quality };
+      }
       frames.push({
         ...frame,
         quality: verdict.quality,
@@ -583,6 +834,23 @@ async function runQualityGate(deps: Deps, row: SweepRow): Promise<SweepRow> {
       dropReason: null,
       imageRef: `data:image/jpeg;base64,${stored}`,
     });
+  }
+
+  // Nothing cleared the bar: reinstate the best frame rather than end the scan
+  // there. A soft photo still reads well enough to observe, and the verdict
+  // carries the note that the room was seen poorly.
+  if (!frames.some((f) => !f.dropped) && fallback !== null) {
+    const at = fallback.at;
+    const weak = frames[at];
+    if (weak !== undefined) {
+      const stored = await normalizeImage(fallback.bytes);
+      frames[at] = {
+        ...weak,
+        dropped: false,
+        dropReason: null,
+        imageRef: `data:image/jpeg;base64,${stored}`,
+      };
+    }
   }
 
   const kept = frames.filter((f) => !f.dropped);
@@ -641,6 +909,9 @@ function observationsOf(
 
 /** PRD 9.3 steps 2-4: model gate, two shuffled `observe` runs, self-consistency. */
 async function runObserve(deps: Deps, row: SweepRow): Promise<SweepRow> {
+  // This stage replaces the observation list, so anything seeded at creation
+  // (the phone's contents estimate) has to be carried across it.
+  const carried = row.observations.filter((o) => o.id.startsWith(CONTENTS_PREFIX));
   const kept = row.frames.filter((f) => !f.dropped && f.imageRef !== null);
   const byIndex = new Map(kept.map((f) => [f.index, f] as const));
   const parts = kept.map((f) =>
@@ -676,14 +947,19 @@ async function runObserve(deps: Deps, row: SweepRow): Promise<SweepRow> {
     const why = reasons.get(f.index) ?? 'not usable';
     return { ...f, dropped: true, dropReason: `model: ${why}`.slice(0, 200) };
   });
-  const usableFrames = frames.filter((f) => !f.dropped);
+  // The model read none of them. Rather than end the scan there, keep whatever
+  // the quality gate passed: the later stages handle an empty observation set,
+  // and the verdict says plainly that the room was seen poorly.
+  const readable = frames.filter((f) => !f.dropped);
+  const survivors = readable.length > 0 ? frames : row.frames;
+  const usableFrames = survivors.filter((f) => !f.dropped);
   const coverage = sweepCoverage(usableFrames.map((f) => f.bearingDeg), FRAME_FOV_DEG);
 
   if (usableFrames.length === 0) {
     return update(deps, row.id, {
       frames,
       coverage,
-      observations: [],
+      observations: carried,
       stage: 'failed',
       error: 'None of the photos showed a room we could check. Please sweep the room again.',
     });
@@ -716,9 +992,9 @@ async function runObserve(deps: Deps, row: SweepRow): Promise<SweepRow> {
   }
 
   return update(deps, row.id, {
-    frames,
+    frames: survivors,
     coverage,
-    observations: [...sightings, ...markers],
+    observations: [...sightings, ...markers, ...carried],
     stage: 'observing',
     error: null,
   });
@@ -772,10 +1048,11 @@ async function runScore(deps: Deps, row: SweepRow): Promise<SweepRow> {
   return update(deps, row.id, { result, stage: 'scoring', error: null });
 }
 
-function afterScoring(deps: Deps, row: SweepRow): SweepRow {
-  const pending = row.observations.some(isPending);
-  const next = pending || (row.result?.voi.nextQuestion ?? null) !== null ? 'questions' : 'done';
-  return update(deps, row.id, { stage: next });
+async function afterScoring(deps: Deps, row: SweepRow): Promise<SweepRow> {
+  const { observableQuestionIds } = await loadTenantConfig();
+  const asked = askedQuestionIdsOf(sessionOf(row.result ?? null));
+  const question = qualifyingQuestion(row.result ?? null, asked, observableQuestionIds);
+  return update(deps, row.id, { stage: question === null ? 'done' : 'questions' });
 }
 
 /* -------------------------------------------------------------------------- */
@@ -795,14 +1072,21 @@ export async function createSweep(deps: Deps, request: SweepCreateRequestDto): P
     dropReason: null,
     imageRef: toDataUrl(f.imageBase64),
   }));
+  // The phone opens on the camera, so nothing asks for a room name or a term
+  // before the sweep: both have a server-side default (mobile-rework A4).
+  const estimate = request.contentsEstimateUsd;
+  const seeded: Observation[] =
+    typeof estimate === 'number' && Number.isFinite(estimate) && estimate > 0
+      ? [contentsMarker(estimate)]
+      : [];
   const row = createRepos(deps.db).sweeps.insert({
     id: `sweep_${randomUUID()}`,
     submissionId: request.submissionId ?? null,
-    roomLabel: request.roomLabel,
-    term: request.termMonths,
+    roomLabel: request.roomLabel?.trim() || DEFAULT_ROOM_LABEL,
+    term: request.termMonths ?? DEFAULT_TERM_MONTHS,
     frames,
     frameQuality: frames.map(() => null),
-    observations: [],
+    observations: seeded,
     coverage: null,
     result: null,
     stage: 'received',
@@ -811,6 +1095,21 @@ export async function createSweep(deps: Deps, request: SweepCreateRequestDto): P
     updatedAt: now,
   });
   return toSweepDto(row);
+}
+
+/**
+ * The same sweep with the frame images left out.
+ *
+ * Fifteen stored frames are about six megabytes of base64, and `/analyzing`
+ * polls this every 1.2 s without ever drawing one: a minute of that is a
+ * hundred megabytes through a phone, which is enough to end the app. The poll
+ * asks for this form; the screens that actually show a photo do not.
+ */
+export function withoutFrameImages(sweep: SweepDto): SweepDto {
+  return {
+    ...sweep,
+    frames: sweep.frames.map((f) => (f.imageRef === null ? f : { ...f, imageRef: null })),
+  };
 }
 
 /** Advances one stage: quality gate -> observe -> relate -> score -> questions. */
@@ -830,7 +1129,7 @@ export async function advanceSweep(deps: Deps, sweepId: string): Promise<SweepDt
       case 'relating':
         return toSweepDto(await runScore(deps, row));
       case 'scoring':
-        return toSweepDto(afterScoring(deps, row));
+        return toSweepDto(await afterScoring(deps, row));
       default:
         return toSweepDto(row);
     }

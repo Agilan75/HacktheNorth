@@ -1,11 +1,11 @@
 /**
- * Photos — unit M9.
+ * Photos. Unit M9.
  *
  * Two jobs, both about still photos rather than the live sweep:
  *
- * 1. **The 3-photo path (PRD §11).** Anyone who cannot do a camera sweep —
+ * 1. **The 3-photo path (PRD §11).** Anyone who cannot do a camera sweep,
  *    because of a motor or vision impairment, a broken compass, the iOS
- *    Simulator, or just preference — picks three photos (library or camera).
+ *    Simulator, or just preference, picks three photos (library or camera).
  *    They get bearings 0°, 120° and 240° and go through exactly the same
  *    `POST /sweeps` pipeline as a sweep. It is a first-class path, not a
  *    hidden fallback.
@@ -27,15 +27,15 @@ import { uploadBearings } from './capture';
 import { sessionStore, type SessionFrame } from './session';
 
 /* -------------------------------------------------------------------------- */
-/* The 3-photo path — pure                                                    */
+/* The 3-photo path: pure                                                     */
 /* -------------------------------------------------------------------------- */
 
 export const REQUIRED_PHOTOS = 3;
 
-/** 0, 120, 240 — the PRD §11 bearings, from the same helper the session uses. */
+/** 0, 120, 240: the PRD §11 bearings, from the same helper the session uses. */
 export const PHOTO_BEARINGS: readonly number[] = Object.freeze(uploadBearings(REQUIRED_PHOTOS));
 
-/** Longest edge sent to the API. Big enough for Gemini, small enough for venue Wi-Fi. */
+/** Longest edge sent to the API. Big enough for the vision call, small enough for venue Wi-Fi. */
 export const MAX_PHOTO_EDGE = 1600;
 export const PHOTO_JPEG_QUALITY = 0.7;
 
@@ -190,7 +190,7 @@ export function fitWithin(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Hazard photos — pure                                                       */
+/* Hazard photos: pure                                                        */
 /* -------------------------------------------------------------------------- */
 
 type SweepObservation = SweepDto['observations'][number];
@@ -210,59 +210,59 @@ export interface HazardWords {
 
 export const HAZARD_WORDS: Readonly<Record<string, HazardWords>> = Object.freeze({
   portableHeater: {
-    name: 'Portable heater',
-    why: 'Portable heaters start more home fires than any other kind of heating, usually when something soft is too close.',
-    fix: 'Keep it at least one metre from anything that can burn, or use a fixed heater instead.',
+    name: 'Space heater',
+    why: 'Portable heaters start more home fires than any other heating.',
+    fix: 'Keep it a metre from anything that burns.',
   },
   heaterNearCombustible: {
-    name: 'Heater close to something that can burn',
-    why: 'A heater near curtains, fabric or bedding can set them alight, even when nobody touches it.',
+    name: 'Heater near fabric',
+    why: 'A heater beside curtains or bedding can light them untouched.',
     fix: 'Move the heater away from curtains, fabric and bedding.',
   },
   extensionCord: {
-    name: 'Extension cord in use',
-    why: 'Extension cords used all the time can overheat, especially under rugs or behind furniture.',
-    fix: 'Plug the appliance straight into a wall outlet and put the extension cord away.',
+    name: 'Extension cord',
+    why: 'Cords in permanent use overheat, especially under a rug.',
+    fix: 'Use a wall outlet. Put the cord away.',
   },
   powerBarOverload: {
     name: 'Overloaded power bar',
-    why: 'A full power bar can draw more than it is built for, which heats the wiring.',
-    fix: 'Spread the plugs across more than one wall outlet.',
+    why: 'A full bar draws more than its wiring is rated for.',
+    fix: 'Spread the plugs across more than one outlet.',
   },
   candle: {
-    name: 'Open-flame candle',
-    why: 'An open flame can catch nearby things, especially if it is left burning.',
-    fix: 'Swap open-flame candles for battery candles.',
+    name: 'Open flame',
+    why: 'An unattended flame catches what is next to it.',
+    fix: 'Use battery candles.',
   },
   stove: {
     name: 'Cooking appliance',
     why: 'Cooking is the most common cause of home fires.',
-    fix: 'Keep the area around it clear, and never leave it on when you are out.',
+    fix: 'Keep the area clear. Never leave it on unattended.',
   },
   blockedExit: {
     name: 'Blocked exit',
-    why: 'If there is a fire, you need a clear way out through the door or window.',
+    why: 'A fire needs a clear way out, through a door or a window.',
     fix: 'Clear the path to the door or window.',
   },
   windowAcUnit: {
-    name: 'Window air conditioner',
-    why: 'Window units can leak water into the wall and floor.',
-    fix: 'Check that it drains outside and the seal around it is tight.',
+    name: 'Window AC',
+    why: 'Window units leak water into the wall and the floor.',
+    fix: 'Check the drain runs outside and the seal is tight.',
   },
   waterHeater: {
-    name: 'Water heater in the room',
-    why: 'Water heaters can leak or burst, which can damage your things and the unit below.',
-    fix: 'Check it for leaks and keep the area around it clear.',
+    name: 'Water heater',
+    why: 'Tanks leak and burst, into your unit and the one below.',
+    fix: 'Check for leaks. Keep the area clear.',
   },
   highValueContents: {
-    name: 'Valuable items on show',
-    why: 'Jewellery, cameras, laptops and similar items can be worth more than a standard policy covers.',
-    fix: 'List the most valuable items so they can be covered properly.',
+    name: 'High-value contents',
+    why: 'Jewellery, cameras and instruments can exceed a standard limit.',
+    fix: 'List the dearest items so they are covered in full.',
   },
   smokeDetectorCount: {
-    name: 'No smoke detector seen',
-    why: 'A working smoke detector is the best early warning if there is a fire.',
-    fix: 'Put a smoke detector on the ceiling, then take a photo of it.',
+    name: 'No smoke detector',
+    why: 'A working detector is the earliest warning there is.',
+    fix: 'Fit one on the ceiling, then photograph it.',
   },
 });
 
@@ -386,7 +386,7 @@ export interface HazardPhoto {
   readonly frame: SweepFrame;
   /** Data URL (or path) of the whole frame, from the API. */
   readonly imageRef: string;
-  /** Gemini `box_2d` `[y0, x0, y1, x1]` in 0..1000, when the model gave one. */
+  /** The model`s `box_2d` `[y0, x0, y1, x1]` in 0..1000, when it gave one. */
   readonly box2d: Box2d | null;
 }
 
@@ -486,7 +486,7 @@ export function bearingWords(bearingDeg: number): string {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Native — picker and resize (not run in node)                               */
+/* Native: picker and resize, not run in node                                 */
 /* -------------------------------------------------------------------------- */
 
 export type PickOutcome =
