@@ -13,6 +13,7 @@ import {
   Heading,
   Icon,
   Notice,
+  RADIUS,
   SPACE,
   Screen,
   SkeletonCard,
@@ -75,6 +76,58 @@ const HAZARD_ICON: Readonly<Record<string, IconName>> = {
   windowAcUnit: 'snow-outline',
   waterHeater: 'water-outline',
   highValueContents: 'diamond-outline',
+};
+
+/**
+ * The fix for each finding, in the renter's words. What each one saves comes
+ * from the API (`hazardCosts.monthlyDelta`); this only says what to do.
+ */
+const HAZARD_TIP: Readonly<Record<string, { readonly title: string; readonly body: string }>> = {
+  portableHeater: {
+    title: 'Retire the space heater',
+    body: 'Space heaters start more apartment fires than anything else in the room. Use the building heat, or unplug it whenever you leave.',
+  },
+  heaterNearCombustible: {
+    title: 'Give the heater a metre of space',
+    body: 'Curtains, bedding and sofas catch. One clear metre around the heater takes this finding off your quote.',
+  },
+  extensionCord: {
+    title: 'Plug straight into the wall',
+    body: 'Extension cords are for occasional use. Move the appliance closer to an outlet, or ask for one to be added.',
+  },
+  powerBarOverload: {
+    title: 'Spread the load',
+    body: 'Leave a socket free on every power bar, and never plug one bar into another.',
+  },
+  candle: {
+    title: 'Swap to flameless candles',
+    body: 'LED candles look the same on the shelf and cannot tip into a curtain.',
+  },
+  stove: {
+    title: 'Keep the cooking area clear',
+    body: 'Nothing that burns within reach of the burners, and a small extinguisher nearby.',
+  },
+  blockedExit: {
+    title: 'Clear the way out',
+    body: 'Keep a straight path to the door and to one window. Move whatever is in the way.',
+  },
+  windowAcUnit: {
+    title: 'Secure the window unit',
+    body: 'A support bracket underneath and a sealed frame keep it from falling and keep water out.',
+  },
+  waterHeater: {
+    title: 'Put a pan and a leak alarm under it',
+    body: 'A drip pan and a small leak sensor turn a flood into a puddle.',
+  },
+  highValueContents: {
+    title: 'Lock up the valuables',
+    body: 'A safe, or storage away from the unit, for camera gear, jewellery and instruments takes this factor off the quote.',
+  },
+};
+
+const GENERIC_TIP = {
+  title: 'Fix this finding',
+  body: 'Remove or resolve it, then recheck with one photo.',
 };
 
 function humanize(key: string): string {
@@ -255,7 +308,7 @@ function Quote({
 }) {
   const price = result.price;
   const verdict = result.verdict.verdict;
-  const top = sweep.hazardCosts.filter((h) => (h.monthlyDelta ?? 0) > 0).slice(0, 3);
+  const findings = sweep.hazardCosts.filter((h) => (h.monthlyDelta ?? 0) > 0);
   const flip = result.flip.flip;
   const fix = flip?.moves[0] ?? null;
   const contents = numberOf(result.canonical.exposure.contentsLimit);
@@ -263,49 +316,60 @@ function Quote({
   const question = sweep.pendingQuestion;
   const coverage = sweep.coverage;
   const short = coverage !== null && !coverage.sufficient;
+  const term = price.termMonths ?? sweep.termMonths;
+  const noSmokeDetector = price.factors.some((f) => f.name === 'smokeDetector' && f.input === 'absent');
+  const monthly = money(price.predictedMonthlyPremium);
 
   return (
     <Screen
       footer={
         <>
-          {top.length > 0 ? (
+          {findings.length > 0 ? (
             <Button
-              label="Fixed it? Recheck"
+              label="Fixed something? Recheck"
+              icon="camera-outline"
               accessibilityHint="Takes one photo of the fix and reprices."
-              onPress={() => onVerify(top[0]?.hazardKey ?? null)}
+              onPress={() => onVerify(findings[0]?.hazardKey ?? null)}
             />
           ) : null}
-          <Button label="Scan another room" variant="secondary" fullWidth onPress={onScanAgain} />
+          <Button label="Scan another room" variant={findings.length > 0 ? 'secondary' : 'primary'} fullWidth onPress={onScanAgain} />
         </>
       }
     >
-      {/* Price */}
+      {/* Price hero */}
       <View
         accessible
         accessibilityRole="summary"
-        accessibilityLabel={`${money(price.predictedMonthlyPremium)} a month. ${money(price.predictedPremium)} a year. ${VERDICT_WORDS[verdict]}.`}
-        style={{ gap: SPACE.xs }}
+        accessibilityLabel={`Estimated premium ${monthly} a month, ${money(price.predictedPremium)} a year on a ${String(term)}-month term. ${VERDICT_WORDS[verdict]}.`}
+        style={{
+          backgroundColor: COLORS.accent,
+          borderRadius: RADIUS.card,
+          padding: SPACE.xl,
+          gap: SPACE.sm,
+        }}
       >
-        <Text variant="small" tone="muted">
-          {sweep.roomLabel}
+        <Text variant="micro" weight="semibold">
+          {`ESTIMATED PREMIUM · ${sweep.roomLabel.toUpperCase()}`}
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: SPACE.sm }}>
-          <Text variant="display" weight="semibold" tone="accent">
-            {money(price.predictedMonthlyPremium)}
+          <Text variant="display" weight="semibold">
+            {monthly}
           </Text>
-          <Text tone="muted">a month</Text>
+          <Text weight="semibold">/ month</Text>
         </View>
-        <Text variant="small" tone="muted">
-          {`${money(price.predictedPremium)} a year · ${String(price.termMonths ?? sweep.termMonths)}-month term`}
+        <Text variant="small">
+          {`${money(price.predictedPremium)} a year on a ${String(term)}-month term`}
         </Text>
+      </View>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
+        <VerdictPill verdict={verdict} text={VERDICT_WORDS[verdict]} size="large" />
         {price.estimate ? (
-          <Text variant="small" tone="muted">
-            Demo rate
+          <Text variant="micro" tone="muted" style={{ flex: 1 }}>
+            Estimate from a demo rate table. Not a binding quote.
           </Text>
         ) : null}
       </View>
-
-      <VerdictPill verdict={verdict} text={VERDICT_WORDS[verdict]} size="large" />
 
       {saveProblem !== null ? <Notice tone="error">{saveProblem}</Notice> : null}
 
@@ -325,43 +389,62 @@ function Quote({
         />
       ) : null}
 
-      {/* Top three findings, dearest first, each with what it costs a month. */}
-      {top.length > 0 ? (
-        <Card>
-          <Heading variant="heading">What costs you</Heading>
-          <View accessibilityRole="list" style={{ gap: SPACE.xs }}>
-            {top.map((h) => (
-              <HazardRow key={h.hazardKey} cost={h} onPress={() => onHazard(h.hazardKey)} />
-            ))}
-          </View>
-        </Card>
-      ) : null}
-
-      {/* One fix. */}
-      <Card tone={fix !== null ? 'accent' : 'plain'}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
-          <Icon name="construct-outline" size={18} color={COLORS.ink} />
-          <Heading variant="heading">Fix</Heading>
+      {/* Ways to pay less: every finding with its fix and what fixing it saves. */}
+      <View style={{ gap: SPACE.md }}>
+        <View style={{ gap: 2 }}>
+          <Heading variant="heading" accessibilityRole="header">
+            Lower your price
+          </Heading>
+          <Text variant="small" tone="muted">
+            {findings.length > 0
+              ? `${String(findings.length)} ${findings.length === 1 ? 'thing' : 'things'} in this room ${findings.length === 1 ? 'adds' : 'add'} to your premium. Each one comes with a fix.`
+              : 'Nothing in this room adds to your premium. This is already the best rate for this scan.'}
+          </Text>
         </View>
+
         {fix !== null && flip !== null ? (
-          <View
-            accessible
-            accessibilityLabel={`${fix.fixHint ?? fix.label}. Then ${VERDICT_WORDS[flip.verdictAfter]}, ${money(flip.premiumAfter)} a year instead of ${money(flip.premiumBefore)}.`}
-            style={{ gap: SPACE.xs }}
-          >
+          <Card tone="accent" accessibilityLabel={`Best next step. ${fix.fixHint ?? fix.label}. Then ${money(flip.premiumAfter)} a year instead of ${money(flip.premiumBefore)}.`}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.sm }}>
+              <Icon name="sparkles-outline" size={18} color={COLORS.ink} />
+              <Text variant="micro" weight="semibold">
+                BEST NEXT STEP
+              </Text>
+            </View>
             <Text weight="semibold">{fix.fixHint ?? fix.label}</Text>
             <Text variant="small">
-              {`Then ${VERDICT_WORDS[flip.verdictAfter]}. ${money(flip.premiumAfter)} a year, from ${money(flip.premiumBefore)}.`}
+              {`Then ${money(flip.premiumAfter)} a year instead of ${money(flip.premiumBefore)}${flip.verdictAfter !== verdict ? `, and ${VERDICT_WORDS[flip.verdictAfter].toLowerCase()}` : ''}.`}
             </Text>
+          </Card>
+        ) : null}
+
+        {findings.length > 0 ? (
+          <View accessibilityRole="list" style={{ gap: SPACE.sm }}>
+            {findings.map((h) => (
+              <TipRow key={h.hazardKey} cost={h} onPress={() => onHazard(h.hazardKey)} />
+            ))}
           </View>
-        ) : (
-          <Text>{result.flip.reason ?? 'Nothing to fix.'}</Text>
-        )}
-      </Card>
+        ) : null}
+
+        {noSmokeDetector ? (
+          <TipRow
+            icon="radio-button-on-outline"
+            title="Install a smoke detector"
+            body="None was seen on the ceiling. One working detector in the unit lowers the rate and is required by most leases."
+          />
+        ) : null}
+
+        {term < 12 ? (
+          <TipRow
+            icon="calendar-outline"
+            title="Choose a 12-month term"
+            body={`A ${String(term)}-month policy costs more per month than a full year. Change the term below to see the difference.`}
+          />
+        ) : null}
+      </View>
 
       {/* Everything the sweep derived or defaulted, editable in place. */}
       <Card>
-        <Heading variant="heading">From the scan</Heading>
+        <Heading variant="heading">Quote details</Heading>
         <NumberEdit
           label="Contents"
           value={contents}
@@ -396,24 +479,79 @@ function Quote({
 /* Pieces                                                                     */
 /* -------------------------------------------------------------------------- */
 
-function HazardRow({ cost, onPress }: { readonly cost: HazardCostDto; readonly onPress: () => void }) {
-  const name = hazardName(cost.hazardKey);
-  const delta = cost.monthlyDelta;
+/**
+ * One way to pay less. Given a `cost` it is a finding from the scan: the fix,
+ * what it saves a month (the API's number), and a tap to the photo. Without
+ * one it is a general tip with no dollar figure, because the phone never
+ * computes money.
+ */
+function TipRow({
+  cost,
+  icon,
+  title,
+  body,
+  onPress,
+}: {
+  readonly cost?: HazardCostDto;
+  readonly icon?: IconName;
+  readonly title?: string;
+  readonly body?: string;
+  readonly onPress?: () => void;
+}) {
+  const tip = cost !== undefined ? (HAZARD_TIP[cost.hazardKey] ?? GENERIC_TIP) : null;
+  const heading = title ?? tip?.title ?? '';
+  const words = body ?? tip?.body ?? '';
+  const glyph = icon ?? (cost !== undefined ? (HAZARD_ICON[cost.hazardKey] ?? 'warning-outline') : 'bulb-outline');
+  const saves = cost?.monthlyDelta ?? null;
+  const found = cost !== undefined ? hazardName(cost.hazardKey) : null;
+  const label = [found !== null ? `Found: ${found}.` : null, heading, words, saves !== null ? `Saves ${money(saves)} a month.` : null]
+    .filter((s): s is string => s !== null)
+    .join(' ');
+
   return (
     <Card
-      padding="md"
-      onPress={onPress}
-      accessibilityLabel={`${name}. ${money(delta)} a month.`}
-      accessibilityHint="Shows the photo and what fixing it does."
+      padding="lg"
+      {...(onPress !== undefined ? { onPress, accessibilityHint: 'Shows the photo and what fixing it does.' } : {})}
+      accessibilityLabel={label}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}>
-        <Icon name={HAZARD_ICON[cost.hazardKey] ?? 'warning-outline'} size={18} color={COLORS.mute} />
-        <Text weight="semibold" style={{ flex: 1 }}>
-          {name}
-        </Text>
-        <Text weight="semibold" style={{ fontVariant: ['tabular-nums'] }}>
-          {`+${money(delta)}/mo`}
-        </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: SPACE.md }}>
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 20,
+            backgroundColor: COLORS.muteTint,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Icon name={glyph} size={20} color={COLORS.ink} />
+        </View>
+        <View style={{ flex: 1, gap: SPACE.xs }}>
+          {found !== null ? (
+            <Text variant="micro" tone="muted" weight="semibold">
+              {`FOUND: ${found.toUpperCase()}`}
+            </Text>
+          ) : null}
+          <Text weight="semibold">{heading}</Text>
+          <Text variant="small" tone="muted">
+            {words}
+          </Text>
+        </View>
+        {saves !== null ? (
+          <View
+            style={{
+              paddingHorizontal: SPACE.sm,
+              paddingVertical: 2,
+              borderRadius: RADIUS.pill,
+              backgroundColor: COLORS.accent,
+            }}
+          >
+            <Text variant="micro" weight="semibold" style={{ fontVariant: ['tabular-nums'] }}>
+              {`−${money(saves)}/mo`}
+            </Text>
+          </View>
+        ) : null}
       </View>
     </Card>
   );

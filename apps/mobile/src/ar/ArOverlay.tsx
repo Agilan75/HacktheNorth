@@ -60,6 +60,10 @@ export interface ArOverlayProps {
   /** Camera position in the AR session's frame, metres. */
   readonly camera?: readonly [number, number, number];
   readonly coveragePct: number;
+  /** Current bearing relative to the sweep start, degrees; null before the compass answers. */
+  readonly bearingDeg: number | null;
+  /** Plain-language turn advice, shown under the compass ring. */
+  readonly hint?: string;
   readonly canFinish: boolean;
   readonly onFinish: () => void;
   readonly live: LiveSnapshot;
@@ -90,6 +94,8 @@ export function ArOverlay({
   planes,
   camera,
   coveragePct,
+  bearingDeg,
+  hint,
   canFinish,
   onFinish,
   live,
@@ -136,6 +142,9 @@ export function ArOverlay({
 
       <Hud
         coveragePct={coveragePct}
+        panels={panels}
+        bearingDeg={bearingDeg}
+        {...(hint !== undefined ? { hint } : {})}
         totalUsd={live.total}
         itemCount={live.entries.length}
         working={live.identifying > 0 || live.searching > 0}

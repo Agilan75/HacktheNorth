@@ -14,6 +14,7 @@ import * as Haptics from 'expo-haptics';
 import { COLORS, MIN_TOUCH_TARGET, RADIUS, SPACE } from '@retrofit/design';
 
 import { Button, Text } from '@/ui';
+import { CoverageRing } from './CoverageRing';
 
 /** Coverage at which Finish unlocks. The engine's MIN_COVERAGE_PCT. */
 export const FINISH_COVERAGE_PCT = 25;
@@ -24,6 +25,12 @@ const SCRIM = 'rgba(25, 25, 25, 0.72)';
 export interface HudProps {
   /** 0..100, floored, so 74.9 never reads as 75. */
   readonly coveragePct: number;
+  /** 36 booleans from the capture machine, relative to the sweep start. */
+  readonly panels: readonly boolean[];
+  /** Current bearing relative to the sweep start, degrees. Null before the compass answers. */
+  readonly bearingDeg: number | null;
+  /** Plain-language turn advice from the capture machine. */
+  readonly hint?: string;
   /** Replacement value priced so far, USD. */
   readonly totalUsd: number;
   readonly itemCount: number;
@@ -40,6 +47,9 @@ const usd = (n: number): string => `$${Math.round(Math.max(0, n)).toLocaleString
 
 export function Hud({
   coveragePct,
+  panels,
+  bearingDeg,
+  hint,
   totalUsd,
   itemCount,
   working = false,
@@ -55,11 +65,11 @@ export function Hud({
 
   return (
     <View pointerEvents="box-none" style={[{ flex: 1, justifyContent: 'space-between', padding: SPACE.lg }, style]}>
-      {/* Top corner: the two live numbers, as one spoken element. */}
+      {/* Top corner: what the camera has priced so far. */}
       <View
         accessible
-        accessibilityRole="progressbar"
-        accessibilityValue={{ min: 0, max: 100, now: pct, text: `${String(pct)}% scanned. ${String(itemCount)} items, ${usd(totalUsd)}.` }}
+        accessibilityRole="text"
+        accessibilityLabel={`${usd(totalUsd)} of belongings priced, ${String(itemCount)} ${itemCount === 1 ? 'item' : 'items'}${working ? ', still pricing' : ''}.`}
         style={{
           alignSelf: 'flex-start',
           gap: 2,
@@ -70,21 +80,22 @@ export function Hud({
         }}
       >
         <Text variant="heading" weight="semibold" tone="inverse" style={{ fontVariant: ['tabular-nums'] }}>
-          {`${String(pct)}%`}
-        </Text>
-        <Text variant="micro" tone="inverse">
-          scanned
-        </Text>
-        <Text variant="small" weight="semibold" tone="inverse" style={{ fontVariant: ['tabular-nums'] }}>
           {usd(totalUsd)}
         </Text>
         <Text variant="micro" tone="inverse">
-          {`${String(itemCount)} ${itemCount === 1 ? 'item' : 'items'}${working ? ' · pricing' : ''}`}
+          {`${String(itemCount)} ${itemCount === 1 ? 'item' : 'items'} priced${working ? ' · looking' : ''}`}
         </Text>
       </View>
 
-      {/* Bottom: Finish, then the photo alternative. */}
+      {/* Bottom: the compass ring, Finish, then the photo alternative. */}
       <View pointerEvents="box-none" style={{ gap: SPACE.md }}>
+        <CoverageRing
+          panels={panels}
+          bearingDeg={bearingDeg}
+          coveragePct={pct}
+          {...(hint !== undefined ? { hint } : {})}
+          style={{ alignSelf: 'center' }}
+        />
         {canFinish ? (
           <Button label="Finish" fullWidth accessibilityHint="Ends the scan and prices the room." onPress={onFinish} />
         ) : (

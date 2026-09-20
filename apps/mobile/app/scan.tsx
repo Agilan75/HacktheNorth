@@ -634,6 +634,8 @@ export default function SweepScreen() {
         pose={pose}
         panels={capture.panels}
         coveragePct={summary.coveragePctDisplay}
+        bearingDeg={capture.bearingDeg}
+        hint={summary.hint}
         canFinish={summary.canFinish}
         onFinish={finishSweep}
         live={liveSnap}

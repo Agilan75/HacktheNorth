@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
+import type { ViewStyle } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Location from 'expo-location';
 import type { SweepDto, SweepStageDto } from '@retrofit/contracts';
@@ -20,6 +21,7 @@ import {
   Heading,
   Icon,
   Notice,
+  RADIUS,
   SPACE,
   Screen,
   SkeletonCard,
@@ -197,7 +199,17 @@ export default function HomeScreen() {
         <Heading>Retrofit</Heading>
       </View>
 
-      <Text tone="muted">Scan a room and get a tenant insurance quote. It takes about a minute.</Text>
+      <View style={{ gap: SPACE.sm }}>
+        <Heading variant="display" accessibilityRole="header">
+          Tenant insurance that looks at the room.
+        </Heading>
+        <Text>
+          Point your phone around once. Retrofit finds what drives your price, quotes it on the spot, and
+          shows you what to fix to pay less. About a minute, no forms.
+        </Text>
+      </View>
+
+      {list.length === 0 ? <HeroArt /> : null}
 
       {queueLine ? (
         <Notice
@@ -261,10 +273,171 @@ export default function HomeScreen() {
             Rooms are kept until you close the app.
           </Text>
         </View>
-      ) : null}
+      ) : (
+        <HowItWorks />
+      )}
+
+      <Text variant="micro" tone="muted">
+        Prices are estimates from a demo rate table. Photos are used for this quote only and are never
+        stored with your location.
+      </Text>
     </Screen>
   );
 }
+
+/* -------------------------------------------------------------------------- */
+/* Hero                                                                       */
+/* -------------------------------------------------------------------------- */
+
+const STEPS: readonly { readonly icon: IconName; readonly title: string; readonly body: string }[] = [
+  {
+    icon: 'sync-outline',
+    title: 'Turn in place',
+    body: 'The camera takes the photos as you go. About 20 seconds, no typing.',
+  },
+  {
+    icon: 'search-outline',
+    title: 'We read the room',
+    body: 'A space heater by the curtains. A missing smoke detector. What your things are worth.',
+  },
+  {
+    icon: 'trending-down-outline',
+    title: 'Fix it, pay less',
+    body: 'Every finding comes with a fix and what it saves. Re-scan and watch the price drop.',
+  },
+];
+
+function HowItWorks() {
+  return (
+    <View style={{ gap: SPACE.md }}>
+      <Heading variant="heading" accessibilityRole="header">
+        How it works
+      </Heading>
+      {STEPS.map((s, i) => (
+        <View
+          key={s.title}
+          accessible
+          accessibilityLabel={`Step ${String(i + 1)}. ${s.title}. ${s.body}`}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: SPACE.md }}
+        >
+          <View style={heroStyles.stepMark}>
+            <Icon name={s.icon} size={18} color={COLORS.ink} />
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text weight="semibold">{s.title}</Text>
+            <Text variant="small" tone="muted">
+              {s.body}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** A still of the product: a viewfinder, the coverage ring, two live tags. Purely decorative. */
+function HeroArt() {
+  return (
+    <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={heroStyles.art}>
+      <View style={[heroStyles.corner, { top: SPACE.md, left: SPACE.md }]} />
+      <View style={[heroStyles.corner, { top: SPACE.md, right: SPACE.md, transform: [{ rotate: '90deg' }] }]} />
+      <View style={[heroStyles.corner, { bottom: SPACE.md, left: SPACE.md, transform: [{ rotate: '-90deg' }] }]} />
+      <View style={[heroStyles.corner, { bottom: SPACE.md, right: SPACE.md, transform: [{ rotate: '180deg' }] }]} />
+
+      <View style={heroStyles.ring}>
+        <View style={heroStyles.ringFill} />
+        <Text variant="micro" weight="semibold">
+          72%
+        </Text>
+      </View>
+
+      <HeroTag style={{ top: 44, left: 36 }} icon="tv-outline" text="TV · $600" />
+      <HeroTag style={{ top: 96, right: 28 }} icon="flame-outline" text="Heater · +$3/mo" accent />
+      <HeroTag style={{ bottom: 40, left: 52 }} icon="bed-outline" text="Bed · $1,600" />
+    </View>
+  );
+}
+
+function HeroTag({
+  style,
+  icon,
+  text,
+  accent = false,
+}: {
+  readonly style: ViewStyle;
+  readonly icon: IconName;
+  readonly text: string;
+  readonly accent?: boolean;
+}) {
+  return (
+    <View style={[heroStyles.tag, accent ? { backgroundColor: COLORS.accent } : null, style]}>
+      <Icon name={icon} size={14} color={COLORS.ink} />
+      <Text variant="micro" weight="semibold">
+        {text}
+      </Text>
+    </View>
+  );
+}
+
+const heroStyles = StyleSheet.create({
+  stepMark: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.muteTint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  art: {
+    height: 220,
+    borderRadius: RADIUS.card,
+    backgroundColor: COLORS.muteTint,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  corner: {
+    position: 'absolute',
+    width: 22,
+    height: 22,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderColor: COLORS.ink,
+    borderTopLeftRadius: 6,
+  },
+  ring: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 6,
+    borderColor: COLORS.bone,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  ringFill: {
+    position: 'absolute',
+    left: -6,
+    top: -6,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 6,
+    borderColor: COLORS.accent,
+    borderRightColor: 'transparent',
+    transform: [{ rotate: '35deg' }],
+  },
+  tag: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACE.xs,
+    paddingHorizontal: SPACE.sm,
+    paddingVertical: SPACE.xs,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.bone,
+  },
+});
 
 /* -------------------------------------------------------------------------- */
 /* Room card                                                                  */
