@@ -402,13 +402,12 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
     createSweep: (body, opts) =>
       request<SweepDto>('POST', API_PATHS.createSweep(), body, uploadTimeoutMs, opts),
     getSweep: (id, opts) =>
-      request<SweepDto>(
-        'GET',
-        opts?.images === false ? `${API_PATHS.getSweep(id)}?images=0` : API_PATHS.getSweep(id),
-        undefined,
-        timeoutMs,
-        opts,
-      ),
+      opts?.images === false
+        ? request<SweepDto>('GET', `${API_PATHS.getSweep(id)}?images=0`, undefined, timeoutMs, opts).then(
+            // A server older than `?images=0` ignores it and sends them anyway.
+            dropFrameImages,
+          )
+        : request<SweepDto>('GET', API_PATHS.getSweep(id), undefined, timeoutMs, opts),
     nextQuestion: (id, opts) =>
       request<NextQuestionResponseDto>('GET', API_PATHS.nextQuestion(id), undefined, timeoutMs, opts),
     submitAnswers: (id, body, opts) =>
@@ -437,6 +436,20 @@ export function isRestingStage(stage: SweepStageDto): boolean {
   return RESTING_STAGES.includes(stage);
 }
 
+/**
+ * Drops the frame images from a polled sweep.
+ *
+ * `?images=0` already asks the server not to send them, but a server older than
+ * that parameter ignores it and sends all fifteen anyway — about six megabytes,
+ * every poll. Holding that in state while the next one arrives is what takes
+ * the app out, so it is dropped here too, the moment it lands, whatever the
+ * server chose to send. Nothing that polls ever draws a frame.
+ */
+function dropFrameImages(sweep: SweepDto): SweepDto {
+  if (!sweep.frames.some((f) => f.imageRef !== null)) return sweep;
+  return { ...sweep, frames: sweep.frames.map((f) => (f.imageRef === null ? f : { ...f, imageRef: null })) };
+}
+
 export interface PollOptions {
   readonly intervalMs?: number;
   /** Give up after this long; rejects with an ApiError of kind `timeout`. */
@@ -460,7 +473,7 @@ export async function pollSweep(client: ApiClient, id: string, opts: PollOptions
     // Never the images: this runs every 1.2 s and nothing on the way draws one.
     const callOpts: CallOptions =
       opts.signal === undefined ? { images: false } : { images: false, signal: opts.signal };
-    const sweep = await client.getSweep(id, callOpts);
+    const sweep = dropFrameImages(await client.getSweep(id, callOpts));
     opts.onUpdate?.(sweep);
     if (isRestingStage(sweep.stage)) return sweep;
     if (now() - started >= limitMs) {

@@ -157,6 +157,23 @@ describe('createApiClient', () => {
     expect(calls[0]?.init?.body).toBeUndefined();
   });
 
+  it('asks for a sweep without its images, and drops them if sent anyway', async () => {
+    // A server older than `?images=0` ignores it and returns every frame. Six
+    // megabytes a poll is what takes the app out, so they go on arrival too.
+    const fat: SweepDto = {
+      ...sweep('observing'),
+      frames: [
+        { index: 0, bearingDeg: 0, pitchDeg: null, capturedAt: '2026-09-19T00:00:00.000Z', quality: 0.9, dropped: false, dropReason: null, imageRef: 'data:image/jpeg;base64,AAAA' },
+        { index: 1, bearingDeg: 90, pitchDeg: null, capturedAt: '2026-09-19T00:00:00.000Z', quality: null, dropped: true, dropReason: 'blur', imageRef: null },
+      ],
+    };
+    const { api, calls } = client([json(200, fat)]);
+    const out = await api.getSweep('sw_1', { images: false });
+    expect(calls[0]?.url).toBe(`${BASE}/sweeps/sw_1?images=0`);
+    expect(out.frames.every((f) => f.imageRef === null)).toBe(true);
+    expect(out.frames[1]?.dropReason).toBe('blur');
+  });
+
   it('POSTs JSON bodies with a content type', async () => {
     const { api, calls } = client([json(201, sweep())]);
     await api.createSweep(createBody);
