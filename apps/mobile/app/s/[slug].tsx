@@ -100,7 +100,7 @@ export default function SharedResultScreen() {
         <Notice tone="error" {...(load.retryable ? { actionLabel: 'Try again', onAction: retry } : {})}>
           {load.message}
         </Notice>
-        <Button label="Get your own quote" variant="secondary" onPress={() => router.replace('/')} />
+        <Button label="Get your own quote" variant="secondary" onPress={() => router.dismissTo('/')} />
       </Screen>
     );
   }
@@ -149,7 +149,7 @@ function SharedResult({ share }: { readonly share: ShareDto }) {
               void onShare();
             }}
           />
-          <Button label="Get your own quote" icon="camera-outline" variant="secondary" onPress={() => router.replace('/')} />
+          <Button label="Get your own quote" variant="secondary" onPress={() => router.dismissTo('/')} />
         </>
       }
     >

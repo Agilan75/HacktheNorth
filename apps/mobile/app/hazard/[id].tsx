@@ -117,7 +117,7 @@ export default function HazardScreen() {
     return (
       <Screen title="No scan">
         <Notice tone="error">Open this from a quote.</Notice>
-        <Button label="Scan a room" onPress={() => router.replace('/')} />
+        <Button label="Scan a room" onPress={() => router.replace('/scan')} />
       </Screen>
     );
   }

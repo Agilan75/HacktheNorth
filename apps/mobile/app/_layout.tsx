@@ -12,13 +12,19 @@ import { COLORS, FONT_FAMILIES } from '@retrofit/design';
 import { Button, Notice, Screen, Text } from '@/ui';
 
 /**
- * Six routes. `/` is the camera, opened on launch, and it is also the sweep:
- * there is no screen between the app starting and the viewfinder. `/analyzing`
- * streams each finding as it resolves, `/verdict` is the destination, and the
- * other three are reached only by a tap from there.
+ * Seven routes. `/` is home: it names the room, picks the term, and lists the
+ * rooms this launch has sent. `/scan` is the camera and it is also the sweep.
+ * `/analyzing` streams each finding as it resolves, `/verdict` is the
+ * destination, and the other three are reached only by a tap from there.
  *
- * The camera carries its own controls, so it takes no header. Every other
- * route keeps a visible header for its 44pt back target.
+ * `/` and `/scan` take no header: home draws its own name, and the camera
+ * carries its own controls. Every other route keeps a visible header for its
+ * 44pt back target.
+ *
+ * `anchor` puts home under a cold deep link, so a link straight to a quote can
+ * still go back somewhere. Every "start over" edge uses `dismissTo`, never
+ * `replace`: with home permanently underneath, replacing the top frame with `/`
+ * would leave two home screens stacked on each other.
  *
  * The three type faces are registered here and nowhere else. One name per face:
  * a phone cannot synthesise a weight for a custom font, so Inter Regular and
@@ -29,6 +35,13 @@ import { Button, Notice, Screen, Text } from '@/ui';
 
 // Rejecting here only means the splash was already gone; it is never fatal.
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+/**
+ * Home sits under every deep link. Without it, opening `retrofit://verdict` or
+ * a shared `retrofit://s/<slug>` cold gives a one-frame stack with nothing to
+ * go back to.
+ */
+export const unstable_settings = { anchor: 'index' };
 
 /**
  * Anything that throws while a screen renders lands here. expo-router picks
@@ -45,7 +58,8 @@ export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
       footer={
         <>
           <Button label="Try again" onPress={() => void retry()} />
-          <Button label="Start a new scan" variant="secondary" onPress={() => router.replace('/')} />
+          {/* Home, not the camera: after a render crash the last thing to reopen is an AR session. */}
+          <Button label="Start over" variant="secondary" onPress={() => router.dismissTo('/')} />
         </>
       }
     >
@@ -88,8 +102,16 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="analyzing" options={{ title: 'Reading the room', headerBackVisible: false }} />
-        <Stack.Screen name="verdict" options={{ title: 'Quote', headerBackVisible: false }} />
+        <Stack.Screen name="scan" options={{ headerShown: false }} />
+        {/*
+          Both of these hid their back button when the camera was the root and
+          there was nothing behind them worth returning to. Home is behind them
+          now, so the native back target is a free, correctly sized way out of
+          a long poll or a quote that never priced. Leaving `/analyzing` early
+          is safe: its poll aborts on unmount and its resolve is guarded.
+        */}
+        <Stack.Screen name="analyzing" options={{ title: 'Reading the room' }} />
+        <Stack.Screen name="verdict" options={{ title: 'Quote' }} />
         <Stack.Screen name="verify-fix" options={{ title: 'Recheck' }} />
         <Stack.Screen name="hazard/[id]" options={{ title: 'Finding' }} />
         <Stack.Screen name="s/[slug]" options={{ title: 'Result' }} />

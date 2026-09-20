@@ -179,7 +179,7 @@ export default function VerdictScreen() {
         <Notice tone="error" actionLabel={sweepId !== null ? 'Try again' : undefined} onAction={sweepId !== null ? () => fetchSweep() : undefined}>
           {load.message}
         </Notice>
-        <Button label="Scan a room" variant="secondary" onPress={() => router.replace('/')} />
+        <Button label="Scan a room" variant="secondary" onPress={() => router.replace('/scan')} />
       </Screen>
     );
   }
@@ -195,8 +195,10 @@ export default function VerdictScreen() {
         </Notice>
         <Button
           label={sweep.stage === 'failed' ? 'Scan again' : 'Check again'}
-          onPress={() => (sweep.stage === 'failed' ? router.replace('/') : fetchSweep())}
+          onPress={() => (sweep.stage === 'failed' ? router.replace('/scan') : fetchSweep())}
         />
+        {/* Check again only refetches. Without this, a sweep the API never scores has no way out. */}
+        <Button label="Back to your rooms" variant="secondary" onPress={() => router.dismissTo('/')} />
       </Screen>
     );
   }
@@ -210,7 +212,10 @@ export default function VerdictScreen() {
       onApply={apply}
       onScanAgain={() => {
         sessionStore.reset();
-        router.replace('/');
+        // Home, not `/scan`, and deliberately: `reset()` has just cleared the
+        // room name and the term, and home is the only screen that sets them.
+        // Going straight to the camera would send the next sweep unnamed.
+        router.dismissTo('/');
       }}
       onVerify={(hazardKey) =>
         router.push({
