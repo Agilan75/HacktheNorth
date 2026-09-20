@@ -34,19 +34,20 @@ const stageStyle = {
     position: 'relative',
     height: 'min(72vh, 760px)',
     minHeight: 420,
-    border: `1px solid ${cssVar('muted-tint')}`,
+    border: `1px solid ${cssVar('mute-tint')}`,
     borderRadius: RADIUS.card,
     overflow: 'hidden',
-    background: cssVar('paper'),
+    background: cssVar('bone'),
 };
 const tooltipStyle = {
     position: 'absolute',
     pointerEvents: 'none',
     maxWidth: 280,
     padding: `${SPACE.sm}px ${SPACE.md}px`,
-    background: cssVar('paper'),
-    border: `1px solid ${cssVar('ink')}`,
-    borderRadius: 8,
+    background: cssVar('bone'),
+    // A 2px ink edge on the card radius, the same surface the phone kit raises.
+    border: `2px solid ${cssVar('ink')}`,
+    borderRadius: RADIUS.card,
     fontSize: cssVar('size-micro'),
     lineHeight: 1.45,
     color: cssVar('ink'),
@@ -55,9 +56,11 @@ const toggleStyle = (active) => ({
     minHeight: MIN_TOUCH_TARGET,
     padding: `0 ${SPACE.lg}px`,
     borderRadius: RADIUS.pill,
-    border: `1px solid ${active ? cssVar('ink') : cssVar('muted-tint')}`,
-    background: active ? cssVar('ink') : 'transparent',
-    color: active ? cssVar('paper') : cssVar('ink'),
+    // The phone kit's ChoiceGroup: the chosen one fills with ink, the rest keep
+    // a mute edge on bone. The 2px border is the kit's selected weight.
+    border: `2px solid ${active ? cssVar('ink') : cssVar('mute')}`,
+    background: active ? cssVar('ink') : cssVar('bone'),
+    color: active ? cssVar('bone') : cssVar('ink'),
     font: 'inherit',
     cursor: 'pointer',
 });
@@ -67,7 +70,7 @@ function Swatch({ verdict }) {
                     width: 12,
                     height: 12,
                     borderRadius: '50%',
-                    background: verdict === 'REFER' ? COLORS.redTint : s.fill,
+                    background: s.fill,
                     border: `1.5px solid ${s.border}`,
                 } }), VERDICT_MARKS[verdict], " ", s.label] }));
 }

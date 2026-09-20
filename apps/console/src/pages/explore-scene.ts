@@ -84,9 +84,13 @@ export function scatterPosition(row: QueueRowView): THREE.Vector3 {
 /* Materials and labels                                                       */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Straight from VERDICT_STYLES, so a point in the book is the colour of the
+ * pill beside it and of the pill on the phone. REFER used to need a stand-in
+ * fill because it was an outlined pill; it is amber-filled now, so it does not.
+ */
 function verdictMaterial(verdict: Verdict): THREE.MeshStandardMaterial {
-  const style = VERDICT_STYLES[verdict];
-  const color = verdict === 'REFER' ? COLORS.redTint : style.fill;
+  const color = VERDICT_STYLES[verdict].fill;
   return new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05, transparent: true, opacity: 1 });
 }
 
@@ -187,11 +191,16 @@ interface Hub {
   readonly members: string[];
 }
 
+/**
+ * Four neutrals and the accent. Amber and red stay out of it: they mean REFER
+ * and DOES_NOT_FIT on the points, and a hub is not a verdict. Every hub also
+ * carries a text label, so these only tell the four kinds apart at a glance.
+ */
 const HUB_COLOR: Readonly<Record<HubKind, string>> = {
-  underwriter: COLORS.mutedDeep,
-  state: COLORS.muted,
-  line: COLORS.ink,
-  verdict: COLORS.redDeep,
+  underwriter: COLORS.ink,
+  state: COLORS.mute,
+  line: COLORS.accent,
+  verdict: COLORS.muteTint,
 };
 
 function hubsOf(rows: readonly QueueRowView[]): Hub[] {

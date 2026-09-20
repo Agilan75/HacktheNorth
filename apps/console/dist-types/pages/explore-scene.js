@@ -51,12 +51,16 @@ export function scatterPosition(row) {
 /* -------------------------------------------------------------------------- */
 /* Materials and labels                                                       */
 /* -------------------------------------------------------------------------- */
+/**
+ * Straight from VERDICT_STYLES, so a point in the book is the colour of the
+ * pill beside it and of the pill on the phone. REFER used to need a stand-in
+ * fill because it was an outlined pill; it is amber-filled now, so it does not.
+ */
 function verdictMaterial(verdict) {
-    const style = VERDICT_STYLES[verdict];
-    const color = verdict === 'REFER' ? COLORS.redTint : style.fill;
+    const color = VERDICT_STYLES[verdict].fill;
     return new THREE.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0.05, transparent: true, opacity: 1 });
 }
-function textSprite(text, opts = {}) {
+export function textSprite(text, opts = {}) {
     const size = opts.size ?? 28;
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -80,7 +84,7 @@ function textSprite(text, opts = {}) {
     sprite.scale.set((w / h) * scale, scale, 1);
     return sprite;
 }
-function line(points, color, opacity = 1) {
+export function line(points, color, opacity = 1) {
     const geometry = new THREE.BufferGeometry().setFromPoints([...points]);
     return new THREE.Line(geometry, new THREE.LineBasicMaterial({ color, transparent: opacity < 1, opacity }));
 }
@@ -131,11 +135,16 @@ function scatterAxes(group) {
     group.add(floor);
     tick('No price yet (adequacy n/a)', new THREE.Vector3(-HALF + 14, FLOOR_Y - 1, HALF + 4), 20);
 }
+/**
+ * Four neutrals and the accent. Amber and red stay out of it: they mean REFER
+ * and DOES_NOT_FIT on the points, and a hub is not a verdict. Every hub also
+ * carries a text label, so these only tell the four kinds apart at a glance.
+ */
 const HUB_COLOR = {
-    underwriter: COLORS.mutedDeep,
-    state: COLORS.muted,
-    line: COLORS.ink,
-    verdict: COLORS.redDeep,
+    underwriter: COLORS.ink,
+    state: COLORS.mute,
+    line: COLORS.accent,
+    verdict: COLORS.muteTint,
 };
 function hubsOf(rows) {
     const map = new Map();

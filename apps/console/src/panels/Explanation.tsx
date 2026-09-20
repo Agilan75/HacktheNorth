@@ -49,10 +49,15 @@ const paragraphStyle: CSSProperties = {
   color: cssVar('ink'),
 };
 
+/**
+ * What to do next is the one thing on this page worth raising, so it takes the
+ * phone kit's emphasised surface: bone, with a 2px accent edge. The label
+ * above it says "Recommendation", so the edge is never the only signal.
+ */
 const recommendationStyle: CSSProperties = {
   margin: `${SPACE.lg}px 0 0`,
   padding: `${SPACE.md}px ${SPACE.lg}px`,
-  border: `1px solid ${cssVar('muted-tint')}`,
+  border: `2px solid ${cssVar('accent')}`,
   borderRadius: cssVar('radius-card'),
 };
 

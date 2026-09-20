@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
 import { useMemo, useState } from 'react';
-import { cssVar, MIN_TOUCH_TARGET, SPACE } from '@retrofit/design';
+import { cssVar, MIN_TOUCH_TARGET, RADIUS, SPACE } from '@retrofit/design';
 /** Number of placeholder rows rendered while loading (PRD §13: skeletons for every list). */
 const LOADING_ROWS = 5;
 /** Visually hidden but read by screen readers (private; base.css belongs to C02). */
@@ -25,15 +25,36 @@ const tableStyle = {
 };
 const captionStyle = {
     textAlign: 'left',
-    padding: `${SPACE.sm}px 0`,
+    padding: `${SPACE.md}px ${SPACE.lg}px`,
     fontFamily: cssVar('font-display'),
     fontSize: cssVar('size-heading'),
     lineHeight: cssVar('leading-heading'),
+    fontWeight: 600,
+};
+/**
+ * The table sits in the same frame a card does — radius 16, one mute-tint
+ * hairline, no shadow — so a page of tables reads like a page of the phone
+ * app's cards rather than a page of loose rules.
+ */
+const frameStyle = {
+    position: 'relative',
+    width: '100%',
+    maxWidth: '100%',
+    overflowX: 'auto',
+    border: `1px solid ${cssVar('mute-tint')}`,
+    borderRadius: RADIUS.card,
+    background: cssVar('bone'),
 };
 const cellBase = {
     padding: `${SPACE.sm}px ${SPACE.md}px`,
     borderBottom: `1px solid ${cssVar('muted-tint')}`,
     verticalAlign: 'top',
+    // A dense multi-column table left to auto-layout squeezes every column to
+    // fit the viewport, so free text (an explanation sentence, a long insured
+    // name) wraps one word per line and each row balloons to hundreds of
+    // pixels tall. Cells stay on one line instead; the wrapper's own
+    // `overflow-x: auto` (below) scrolls the rare wide table sideways.
+    whiteSpace: 'nowrap',
 };
 const headerCellBase = {
     ...cellBase,
@@ -136,7 +157,7 @@ export function DataTable(props) {
     else {
         body = sortedRows.map((row) => {
             const clickable = onRowClick !== undefined;
-            return (_jsx("tr", { tabIndex: clickable ? 0 : undefined, onClick: clickable ? () => onRowClick(row) : undefined, onKeyDown: clickable ? (event) => handleRowKeyDown(event, row) : undefined, style: clickable ? { cursor: 'pointer' } : undefined, "data-clickable": clickable ? 'true' : undefined, children: columns.map((column) => (_jsx("td", { style: {
+            return (_jsx("tr", { role: clickable ? 'button' : undefined, tabIndex: clickable ? 0 : undefined, onClick: clickable ? () => onRowClick(row) : undefined, onKeyDown: clickable ? (event) => handleRowKeyDown(event, row) : undefined, style: clickable ? { cursor: 'pointer' } : undefined, "data-clickable": clickable ? 'true' : undefined, children: columns.map((column) => (_jsx("td", { style: {
                         ...cellBase,
                         textAlign: column.align ?? 'left',
                         ...(column.minWidth !== undefined ? { minWidth: column.minWidth } : {}),
@@ -145,10 +166,14 @@ export function DataTable(props) {
                             WebkitBoxOrient: 'vertical',
                             WebkitLineClamp: column.clampLines,
                             overflow: 'hidden',
+                            // The cell itself defaults to nowrap so short columns
+                            // never wrap; a clamped cell needs normal wrapping or
+                            // -webkit-line-clamp has nothing to clamp across lines.
+                            whiteSpace: 'normal',
                         }, children: column.render(row) })) : (column.render(row)) }, column.key))) }, rowKey(row)));
         });
     }
-    return (_jsx("div", { style: { position: 'relative', width: '100%', maxWidth: '100%', overflowX: 'auto' }, children: _jsxs("table", { style: tableStyle, "aria-busy": loading ? 'true' : undefined, children: [_jsxs("caption", { style: captionStyle, children: [caption, loading ? _jsx("span", { style: srOnly, children: " (loading)" }) : null] }), _jsx("thead", { children: _jsx("tr", { children: columns.map((column) => {
+    return (_jsx("div", { style: frameStyle, children: _jsxs("table", { style: tableStyle, "aria-busy": loading ? 'true' : undefined, children: [_jsxs("caption", { style: captionStyle, children: [caption, loading ? _jsx("span", { style: srOnly, children: " (loading)" }) : null] }), _jsx("thead", { children: _jsx("tr", { children: columns.map((column) => {
                             const align = column.align ?? 'left';
                             const active = sort !== null && sort.key === column.key;
                             const ariaSort = !column.sortValue

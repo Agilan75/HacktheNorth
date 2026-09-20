@@ -59,9 +59,15 @@ function Stat(props: {
   readonly value: string;
   readonly hint?: string;
   readonly testId: string;
+  /**
+   * The one number the panel is about, shown the way the phone app shows the
+   * premium it quotes: display face, accent, a step larger than the rest. Its
+   * label sits above it either way, so the emphasis adds nothing to read.
+   */
+  readonly lead?: boolean;
 }): ReactElement {
   return (
-    <div className="rf-stat" data-testid={props.testId}>
+    <div className={props.lead === true ? 'rf-stat rf-stat--lead' : 'rf-stat'} data-testid={props.testId}>
       <dt>{props.label}</dt>
       <dd>
         <span className="rf-stat__value">{props.value}</span>
@@ -184,6 +190,7 @@ export function Pricing(props: PricingPanelProps): ReactElement {
           testId="pricing-predicted"
           label="Predicted premium"
           value={formatMoney(pricing.predictedPremium)}
+          lead
         />
         <Stat
           testId="pricing-adequacy"

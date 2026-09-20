@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactElement, ReactNode } from 'react';
 
-import { cssVar, MIN_TOUCH_TARGET, SPACE } from '@retrofit/design';
+import { cssVar, MIN_TOUCH_TARGET, RADIUS, SPACE } from '@retrofit/design';
 
 export interface DataTableColumn<Row> {
   readonly key: string;
@@ -64,10 +64,26 @@ const tableStyle: CSSProperties = {
 
 const captionStyle: CSSProperties = {
   textAlign: 'left',
-  padding: `${SPACE.sm}px 0`,
+  padding: `${SPACE.md}px ${SPACE.lg}px`,
   fontFamily: cssVar('font-display'),
   fontSize: cssVar('size-heading'),
   lineHeight: cssVar('leading-heading'),
+  fontWeight: 600,
+};
+
+/**
+ * The table sits in the same frame a card does — radius 16, one mute-tint
+ * hairline, no shadow — so a page of tables reads like a page of the phone
+ * app's cards rather than a page of loose rules.
+ */
+const frameStyle: CSSProperties = {
+  position: 'relative',
+  width: '100%',
+  maxWidth: '100%',
+  overflowX: 'auto',
+  border: `1px solid ${cssVar('mute-tint')}`,
+  borderRadius: RADIUS.card,
+  background: cssVar('bone'),
 };
 
 const cellBase: CSSProperties = {
@@ -241,7 +257,7 @@ export function DataTable<Row>(props: DataTableProps<Row>): ReactElement {
   }
 
   return (
-    <div style={{ position: 'relative', width: '100%', maxWidth: '100%', overflowX: 'auto' }}>
+    <div style={frameStyle}>
       <table style={tableStyle} aria-busy={loading ? 'true' : undefined}>
         <caption style={captionStyle}>
           {caption}

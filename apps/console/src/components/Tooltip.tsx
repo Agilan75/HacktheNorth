@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import type { CSSProperties, KeyboardEvent, ReactElement, ReactNode } from 'react';
 
-import { cssVar, SPACE } from '@retrofit/design';
+import { cssVar, RADIUS, SPACE } from '@retrofit/design';
 
 import type { ApiClient, GlossaryResponse } from '../api/client.js';
 import { useApiClient } from '../api/useApi.js';
@@ -74,6 +74,7 @@ const wrapperStyle: CSSProperties = {
 const triggerStyle: CSSProperties = {
   textDecorationLine: 'underline',
   textDecorationStyle: 'dotted',
+  textDecorationColor: cssVar('mute'),
   textUnderlineOffset: '3px',
   cursor: 'help',
 };
@@ -87,10 +88,11 @@ const bubbleStyle: CSSProperties = {
   width: 'max-content',
   maxWidth: 320,
   padding: `${SPACE.sm}px ${SPACE.md}px`,
-  background: cssVar('paper'),
+  background: cssVar('bone'),
   color: cssVar('ink'),
-  border: `${cssVar('border-width')} solid ${cssVar('ink')}`,
-  borderRadius: SPACE.sm,
+  // A 2px ink edge on the card radius: the phone kit's emphasised surface.
+  border: `2px solid ${cssVar('ink')}`,
+  borderRadius: RADIUS.card,
   fontFamily: cssVar('font-body'),
   fontSize: cssVar('size-small'),
   lineHeight: cssVar('leading-small'),

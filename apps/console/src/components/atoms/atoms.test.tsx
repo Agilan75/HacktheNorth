@@ -53,10 +53,24 @@ describe('base.css', () => {
 
   it('enforces the 44px target and styles each pill variant from tokens', () => {
     expect(baseCss).toContain('min-height: var(--rf-min-touch-target)');
-    expect(baseCss).toMatch(/\.rf-pill--fit\s*{[^}]*background: var\(--rf-red\)/);
-    expect(baseCss).toMatch(/\.rf-pill--refer\s*{[^}]*background: transparent[^}]*border-color: var\(--rf-red\)/);
-    expect(baseCss).toMatch(/\.rf-pill--does-not-fit\s*{[^}]*background: var\(--rf-ink\)/);
+    // The same three fills the phone kit uses, from the same VERDICT_STYLES.
+    expect(baseCss).toMatch(/\.rf-pill--fit\s*{[^}]*background: var\(--rf-accent\)/);
+    expect(baseCss).toMatch(/\.rf-pill--refer\s*{[^}]*background: var\(--rf-amber\)/);
+    expect(baseCss).toMatch(/\.rf-pill--does-not-fit\s*{[^}]*background: var\(--rf-red\)/);
     expect(baseCss).toMatch(/\.rf-card\s*{[^}]*border-radius: var\(--rf-radius-card\)/);
+  });
+
+  it('paints each verdict with the fill @retrofit/design gives it', () => {
+    const fill: Readonly<Record<string, string>> = {
+      FIT: 'accent',
+      REFER: 'amber',
+      DOES_NOT_FIT: 'red',
+    };
+    for (const [verdict, token] of Object.entries(fill)) {
+      expect(VERDICT_STYLES[verdict as keyof typeof VERDICT_STYLES].fill).toBe(
+        COLORS[token as keyof typeof COLORS],
+      );
+    }
   });
 });
 
